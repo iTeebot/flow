@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
-import { invoke } from "@tauri-apps/api/core";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { invoke, openPath } from "../../lib/api";
 import type { DeliveryChallan } from "../deliveryChallan/api";
+import { useAuthStore } from "../../store/authStore";
 
 function toBase64(buffer: ArrayBuffer): string {
   let binary = "";
@@ -22,11 +22,31 @@ export async function downloadDeliveryChallanPdf(challan: DeliveryChallan) {
   const pageWidth = doc.internal.pageSize.getWidth();
   let y = margin;
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text("Delivery Challan", margin, y);
+  // Company logo
+  const companyLogo = useAuthStore.getState().companyLogo;
+  if (companyLogo) {
+    try {
+      doc.addImage(companyLogo, "PNG", margin, y, 50, 50);
+      // Title beside logo
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("Delivery Challan", margin + 60, y + 20);
+      y += 56;
+    } catch {
+      // If image fails, fall back to text-only header
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("Delivery Challan", margin, y);
+      y += 24;
+    }
+  } else {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Delivery Challan", margin, y);
+    y += 24;
+  }
 
-  y += 24;
+  y += 4;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.text(`DC Number: ${challan.dc_number}`, margin, y);
@@ -91,6 +111,7 @@ export async function downloadDeliveryChallanPdf(challan: DeliveryChallan) {
 }
 
 export function printDeliveryChallan(challan: DeliveryChallan) {
+  const companyLogo = useAuthStore.getState().companyLogo;
   const itemsRows = challan.items
     .map(
       (item) => `
@@ -103,6 +124,10 @@ export function printDeliveryChallan(challan: DeliveryChallan) {
       `,
     )
     .join("");
+
+  const logoHtml = companyLogo
+    ? `<img src="${companyLogo}" style="height:50px;width:50px;object-fit:contain;margin-right:12px;" />`
+    : "";
 
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";
@@ -127,6 +152,8 @@ export function printDeliveryChallan(challan: DeliveryChallan) {
           <style>
             body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
             .header { margin-bottom: 20px; }
+            .header-top { display: flex; align-items: center; margin-bottom: 8px; }
+            .header-top img { height: 50px; width: 50px; object-fit: contain; margin-right: 12px; }
             h1 { margin: 0 0 8px 0; }
             table { width: 100%; border-collapse: collapse; margin-top: 12px; }
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
@@ -136,7 +163,10 @@ export function printDeliveryChallan(challan: DeliveryChallan) {
         </head>
         <body>
           <div class="header">
-            <h1>Delivery Challan</h1>
+            <div class="header-top">
+              ${logoHtml}
+              <h1>Delivery Challan</h1>
+            </div>
             <div><strong>DC Number:</strong> ${challan.dc_number}</div>
             <div><strong>Customer:</strong> ${challan.customer_name}</div>
             <div><strong>Date:</strong> ${new Date(challan.created_at).toLocaleString()}</div>

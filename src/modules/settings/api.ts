@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../lib/api";
 
 export type BackupInfo = {
   backup_path?: string | null;

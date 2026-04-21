@@ -1,11 +1,14 @@
 {
   "name": "teebot-flow",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:desktop": "tauri dev",
     "build": "tsc && vite build",
+    "build:web": "vite build",
+    "build:desktop": "tauri build",
     "preview": "vite preview",
     "tauri": "tauri"
   },

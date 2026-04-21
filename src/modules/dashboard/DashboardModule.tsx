@@ -24,13 +24,14 @@ import {
 } from "lucide-react";
 import { getDashboardSummary, type DashboardSummary } from "./api";
 import { useAuthStore } from "../../store/authStore";
+import { formatCurrency } from "../../lib/utils";
 
 export function DashboardModule() {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { companyId } = useAuthStore();
+  const { companyId, currency } = useAuthStore();
   const currentCompanyId = companyId || 1;
 
   useEffect(() => {
@@ -70,85 +71,85 @@ export function DashboardModule() {
   const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
         <p className="text-text-muted">Business overview and key metrics</p>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total Products */}
-        <div className="rounded-md border border-border bg-card p-6">
+        <div className="rounded-md border border-border bg-card p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-text-muted">Total Products</p>
-              <p className="text-3xl font-bold text-text-primary mt-1">
+              <p className="text-xs font-medium text-text-muted">Total Products</p>
+              <p className="text-2xl font-bold text-text-primary mt-1">
                 {data.kpi.total_products}
               </p>
             </div>
-            <div className="rounded-full bg-blue-100 p-3">
-              <Package className="h-6 w-6 text-blue-600" />
+            <div className="rounded-full bg-blue-100 p-2">
+              <Package className="h-5 w-5 text-blue-600" />
             </div>
           </div>
         </div>
 
         {/* Total Customers */}
-        <div className="rounded-md border border-border bg-card p-6">
+        <div className="rounded-md border border-border bg-card p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-text-muted">Total Customers</p>
-              <p className="text-3xl font-bold text-text-primary mt-1">
+              <p className="text-xs font-medium text-text-muted">Total Customers</p>
+              <p className="text-2xl font-bold text-text-primary mt-1">
                 {data.kpi.total_customers}
               </p>
             </div>
-            <div className="rounded-full bg-green-100 p-3">
-              <Users className="h-6 w-6 text-green-600" />
+            <div className="rounded-full bg-green-100 p-2">
+              <Users className="h-5 w-5 text-green-600" />
             </div>
           </div>
         </div>
 
         {/* Total Sales */}
-        <div className="rounded-md border border-border bg-card p-6">
+        <div className="rounded-md border border-border bg-card p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-text-muted">Total Sales</p>
-              <p className="text-3xl font-bold text-text-primary mt-1">
-                ${data.kpi.total_sales.toFixed(2)}
+              <p className="text-xs font-medium text-text-muted">Total Sales</p>
+              <p className="text-2xl font-bold text-text-primary mt-1">
+                {formatCurrency(data.kpi.total_sales, currency)}
               </p>
             </div>
-            <div className="rounded-full bg-amber-100 p-3">
-              <DollarSign className="h-6 w-6 text-amber-600" />
+            <div className="rounded-full bg-amber-100 p-2">
+              <DollarSign className="h-5 w-5 text-amber-600" />
             </div>
           </div>
         </div>
 
         {/* Pending Deliveries */}
-        <div className="rounded-md border border-border bg-card p-6">
+        <div className="rounded-md border border-border bg-card p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-text-muted">Pending Deliveries</p>
-              <p className="text-3xl font-bold text-text-primary mt-1">
+              <p className="text-xs font-medium text-text-muted">Pending Deliveries</p>
+              <p className="text-2xl font-bold text-text-primary mt-1">
                 {data.kpi.pending_deliveries}
               </p>
             </div>
-            <div className="rounded-full bg-red-100 p-3">
-              <FileText className="h-6 w-6 text-red-600" />
+            <div className="rounded-full bg-red-100 p-2">
+              <FileText className="h-5 w-5 text-red-600" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Sales Trend Chart */}
-        <div className="rounded-md border border-border bg-card p-6">
-          <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+        <div className="rounded-md border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
             Sales Trend (Last 7 Days)
           </h2>
           {data.sales_trend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={220}>
               <LineChart data={data.sales_trend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                 <XAxis
@@ -163,7 +164,7 @@ export function DashboardModule() {
                     borderRadius: "0.375rem",
                   }}
                   labelStyle={{ color: "#fff" }}
-                  formatter={(value: any) => `$${(value as number).toFixed(2)}`}
+                  formatter={(value: any) => formatCurrency(value as number, currency)}
                 />
                 <Legend wrapperStyle={{ color: "#999" }} />
                 <Line
@@ -178,20 +179,20 @@ export function DashboardModule() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex h-80 items-center justify-center text-text-muted">
+            <div className="flex h-48 items-center justify-center text-text-muted">
               No sales data available
             </div>
           )}
         </div>
 
         {/* Top Products by Inventory Value */}
-        <div className="rounded-md border border-border bg-card p-6">
-          <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+        <div className="rounded-md border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
             <Package className="h-5 w-5" />
             Top Products by Value
           </h2>
           {data.inventory_status.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.inventory_status.slice(0, 5)}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                 <XAxis
@@ -209,7 +210,7 @@ export function DashboardModule() {
                     borderRadius: "0.375rem",
                   }}
                   labelStyle={{ color: "#fff" }}
-                  formatter={(value: any) => `$${(value as number).toFixed(2)}`}
+                  formatter={(value: any) => formatCurrency(value as number, currency)}
                 />
                 <Legend wrapperStyle={{ color: "#999" }} />
                 <Bar
@@ -221,7 +222,7 @@ export function DashboardModule() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex h-80 items-center justify-center text-text-muted">
+            <div className="flex h-48 items-center justify-center text-text-muted">
               No inventory data available
             </div>
           )}
@@ -229,15 +230,15 @@ export function DashboardModule() {
       </div>
 
       {/* Inventory Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Inventory Pie Chart */}
-        <div className="rounded-md border border-border bg-card p-6">
-          <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+        <div className="rounded-md border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
             <Package className="h-5 w-5" />
             Inventory Distribution
           </h2>
           {data.inventory_status.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
                   data={data.inventory_status.slice(0, 5)}
@@ -247,7 +248,7 @@ export function DashboardModule() {
                   cy="50%"
                   outerRadius={80}
                   label={(entry: any) =>
-                    `${entry.payload.product_name}: $${entry.payload.stock_value.toFixed(0)}`
+                    `${entry.payload.product_name}: ${formatCurrency(entry.payload.stock_value, currency)}`
                   }
                 >
                   {data.inventory_status.slice(0, 5).map((_, index) => (
@@ -255,7 +256,7 @@ export function DashboardModule() {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: any) => `$${(value as number).toFixed(2)}`}
+                  formatter={(value: any) => formatCurrency(value as number, currency)}
                   contentStyle={{
                     backgroundColor: "#1f2937",
                     border: "1px solid #374151",
@@ -266,20 +267,20 @@ export function DashboardModule() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex h-80 items-center justify-center text-text-muted">
+            <div className="flex h-48 items-center justify-center text-text-muted">
               No inventory data available
             </div>
           )}
         </div>
 
         {/* Recent Activity */}
-        <div className="rounded-md border border-border bg-card p-6">
-          <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+        <div className="rounded-md border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
             <Activity className="h-5 w-5" />
             Recent Activity
           </h2>
           {data.recent_activity.length > 0 ? (
-            <div className="space-y-3 max-h-80 overflow-y-auto">
+            <div className="space-y-2 max-h-56 overflow-y-auto">
               {data.recent_activity.map((activity) => (
                 <div key={activity.id} className="p-3 rounded-md bg-surface/50 border border-border/50">
                   <div className="flex items-start gap-3">
@@ -300,7 +301,7 @@ export function DashboardModule() {
               ))}
             </div>
           ) : (
-            <div className="flex h-80 items-center justify-center text-text-muted">
+            <div className="flex h-48 items-center justify-center text-text-muted">
               No recent activity
             </div>
           )}
@@ -308,8 +309,8 @@ export function DashboardModule() {
       </div>
 
       {/* Inventory Summary Table */}
-      <div className="rounded-md border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold text-text-primary mb-4 flex items-center gap-2">
+      <div className="rounded-md border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
           <Package className="h-5 w-5" />
           Inventory Summary
         </h2>
@@ -341,7 +342,7 @@ export function DashboardModule() {
                       <td className="px-4 py-3 text-text-primary">{item.product_name}</td>
                       <td className="px-4 py-3 text-text-muted">{item.stock_qty} units</td>
                       <td className="px-4 py-3 text-text-muted">
-                        ${item.stock_value.toFixed(2)}
+                        {formatCurrency(item.stock_value, currency)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">

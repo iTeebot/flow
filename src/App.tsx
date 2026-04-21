@@ -25,6 +25,7 @@ import { SettingsModule } from "./modules/settings/SettingsModule";
 import { ProfileModule } from "./modules/profile/ProfileModule";
 import { InvoicesModule } from "./modules/invoices/InvoicesModule";
 import { InfoModule } from "./modules/info/InfoModule";
+import { ToastContainer } from "./components/ToastContainer";
 
 const navItems: {
   id: ModuleKey;
@@ -118,19 +119,19 @@ function App() {
         } as CSSProperties
       }
     >
-      <div className={`grid h-screen ${sidebarCollapsed ? "grid-cols-[92px_1fr]" : "grid-cols-[270px_1fr]"}`}>
-        <aside className="h-screen overflow-y-auto border-r border-border bg-surface p-6">
-          <div className="mb-8 flex flex-col gap-3">
+      <div className={`grid h-screen ${sidebarCollapsed ? "grid-cols-[72px_1fr]" : "grid-cols-[220px_1fr]"}`}>
+        <aside className="h-screen overflow-y-auto border-r border-border bg-surface px-4 py-4">
+          <div className="mb-5 flex flex-col gap-2">
             <div className="flex items-center gap-3">
               <img
                 src="/logo.png"
                 alt="Teebot Flow logo"
-                className="h-10 w-auto max-w-[140px] object-contain"
+                className="h-8 w-auto max-w-[120px] object-contain"
               />
               {!sidebarCollapsed ? (
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-cyan">Teebot</p>
-                  <h1 className="text-lg font-semibold leading-tight">Teebot Flow</h1>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-cyan">Teebot</p>
+                  <h1 className="text-sm font-semibold leading-tight">Teebot Flow</h1>
                 </div>
               ) : null}
             </div>
@@ -145,7 +146,7 @@ function App() {
               {!sidebarCollapsed ? "Collapse" : null}
             </button>
           </div>
-          <nav className="flex flex-col gap-2">
+          <nav className="flex flex-col gap-1">
             {navItems.map((item) => (
               <NavLink
                 key={item.id}
@@ -155,7 +156,7 @@ function App() {
                   `group relative rounded-lg border transition ${isActive || activeModule === item.id
                     ? "border-primary/80 bg-primary/15 text-text-primary"
                     : "border-transparent text-text-muted hover:border-border hover:bg-card hover:text-text-primary"
-                  } ${sidebarCollapsed ? "flex h-11 items-center justify-center px-0" : "px-3 py-3"}`
+                  } ${sidebarCollapsed ? "flex h-9 items-center justify-center px-0" : "px-3 py-2"}`
                 }
                 title={sidebarCollapsed ? item.label : undefined}
               >
@@ -172,7 +173,7 @@ function App() {
         </aside>
 
         <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden">
-          <header className="sticky top-0 z-20 border-b border-border bg-surface/95 px-8 py-5 backdrop-blur">
+          <header className="sticky top-0 z-20 border-b border-border bg-surface/95 px-6 py-3 backdrop-blur">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <strong className="text-base font-semibold text-text-primary">{currentLabel}</strong>
@@ -184,7 +185,7 @@ function App() {
               />
             </div>
           </header>
-          <main className="overflow-y-auto p-8">
+          <main className="overflow-y-auto p-5">
             <Routes>
               <Route path="/" element={<Navigate to="/delivery-challan" replace />} />
               <Route path="/dashboard" element={<DashboardModule />} />
@@ -200,6 +201,7 @@ function App() {
           </main>
         </div>
       </div>
+      <ToastContainer />
     </div>
   );
 }

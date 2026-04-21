@@ -114,7 +114,7 @@ flowchart TD
 
 ## 🗄️ Data Model (ER Diagram)
 
-Our relational structure ensures data integrity and supports complex business logic.
+Our relational structure ensures data integrity and supports complex business logic. For more technical details on the database design and cloud-sync strategies, see the [Database Architecture Documentation](docs/database-architecture.md).
 
 ```mermaid
 erDiagram

@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, Package, TrendingUp, TrendingDown } from "lucide-re
 import { createProduct, listProducts, updateProduct, deleteProduct, adjustStock, type Product } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { TablePagination } from "../shared/TablePagination";
+import { formatCurrency } from "../../lib/utils";
 
 export function InventoryModule() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -18,7 +19,7 @@ export function InventoryModule() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const { companyId } = useAuthStore();
+  const { companyId, currency } = useAuthStore();
 
   // For demo purposes, using a hardcoded company_id if not available
   // In a real app, this would come from user/company context
@@ -393,7 +394,7 @@ export function InventoryModule() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-text-muted">
-                      ${product.price.toFixed(2)}
+                      {formatCurrency(product.price, currency)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">

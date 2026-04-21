@@ -6,6 +6,8 @@ import { listProducts, type Product } from "../inventory/api";
 import { useAuthStore } from "../../store/authStore";
 import { downloadDeliveryChallanPdf, printDeliveryChallan } from "../reports/pdf";
 import { TablePagination } from "../shared/TablePagination";
+import { formatCurrency } from "../../lib/utils";
+import { useToastStore } from "../../store/toastStore";
 
 type ChallanItem = {
   product_id: number;
@@ -18,8 +20,7 @@ export function DeliveryChallanModule() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const { addToast } = useToastStore();
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "last7" | "last30">("all");
@@ -33,7 +34,7 @@ export function DeliveryChallanModule() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
 
-  const { companyId } = useAuthStore();
+  const { companyId, currency } = useAuthStore();
   const currentCompanyId = companyId || 1;
 
   useEffect(() => {
@@ -54,21 +55,38 @@ export function DeliveryChallanModule() {
       setCustomers(custs);
       setProducts(prods);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
+      addToast(err instanceof Error ? err.message : "Failed to load data", "error");
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddItem = () => {
-    if (!selectedProduct || quantity <= 0) return;
+    if (!selectedProduct) return;
+
+    const qtyToAdd = Number(quantity);
+    if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
+      addToast("Please enter a valid quantity.", "error");
+      return;
+    }
 
     const existingItem = challanItems.find(item => item.product_id === selectedProduct.id);
+    const currentListQty = existingItem ? existingItem.quantity : 0;
+    const totalNewQty = currentListQty + qtyToAdd;
+
+    // VALIDATION: Check against stock
+    if (totalNewQty > selectedProduct.stock_qty) {
+      addToast(
+        `Insufficient stock for "${selectedProduct.name}". Available: ${selectedProduct.stock_qty}, Current list: ${currentListQty}, Requested: ${qtyToAdd}`, "error"
+      );
+      return;
+    }
+
     if (existingItem) {
       setChallanItems(items =>
         items.map(item =>
           item.product_id === selectedProduct.id
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: totalNewQty }
             : item
         )
       );
@@ -76,7 +94,7 @@ export function DeliveryChallanModule() {
       setChallanItems(items => [...items, {
         product_id: selectedProduct.id,
         product: selectedProduct,
-        quantity,
+        quantity: qtyToAdd,
       }]);
     }
 
@@ -106,7 +124,7 @@ export function DeliveryChallanModule() {
       setSelectedCustomer(null);
       setChallanItems([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create delivery challan");
+      addToast(err instanceof Error ? err.message : "Failed to create delivery challan", "error");
     }
   };
 
@@ -128,24 +146,21 @@ export function DeliveryChallanModule() {
   };
 
   const handleDownloadPdf = async (challan: DeliveryChallan) => {
-    setError(null);
-    setNotice(null);
     setDownloadingId(challan.id);
     try {
       const savedPath = await downloadDeliveryChallanPdf(challan);
-      setNotice(`PDF saved to: ${savedPath}`);
+      if (savedPath === "browser-download") {
+        addToast("Document has been downloaded to your browser.", "info");
+      } else {
+        addToast("PDF saved successfully!", "success", savedPath);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to download PDF");
+      addToast(err instanceof Error ? err.message : "Failed to download PDF", "error");
     } finally {
       setDownloadingId(null);
     }
   };
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), 4000);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
 
   const filteredChallans = deliveryChallans
     .filter((challan) => {
@@ -192,7 +207,7 @@ export function DeliveryChallanModule() {
     try {
       printDeliveryChallan(challan);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to open print view");
+      addToast(err instanceof Error ? err.message : "Failed to open print view", "error");
     }
   };
 
@@ -219,18 +234,6 @@ export function DeliveryChallanModule() {
           Create Challan
         </button>
       </div>
-
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-800">
-          {error}
-          <button
-            onClick={() => setError(null)}
-            className="float-right ml-4 text-red-600 hover:text-red-800"
-          >
-            ×
-          </button>
-        </div>
-      )}
 
       {showCreateForm && (
         <div className="rounded-md border border-border bg-card p-6">
@@ -314,7 +317,7 @@ export function DeliveryChallanModule() {
                           <div className="text-right">
                             <div className="text-sm text-text-muted">Qty: {item.quantity}</div>
                             <div className="text-sm font-medium text-text-primary">
-                              ${item.product.price.toFixed(2)} each
+                              {formatCurrency(item.product.price, currency)} each
                             </div>
                           </div>
                           <button
@@ -330,7 +333,7 @@ export function DeliveryChallanModule() {
                   <div className="border-t border-border px-4 py-3">
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-text-primary">Total Amount:</span>
-                      <span className="font-semibold text-text-primary">${calculateTotal().toFixed(2)}</span>
+                      <span className="font-semibold text-text-primary">{formatCurrency(calculateTotal(), currency)}</span>
                     </div>
                   </div>
                 </div>
@@ -447,7 +450,7 @@ export function DeliveryChallanModule() {
                       {challan.items.length} item{challan.items.length !== 1 ? 's' : ''}
                     </td>
                     <td className="px-6 py-4 text-text-muted">
-                      ${challan.total_amount.toFixed(2)}
+                      {formatCurrency(challan.total_amount, currency)}
                     </td>
                     <td className="px-6 py-4 text-text-muted">
                       {new Date(challan.created_at).toLocaleDateString()}
@@ -491,11 +494,6 @@ export function DeliveryChallanModule() {
           />
         ) : null}
       </div>
-      {notice ? (
-        <div className="fixed bottom-6 right-6 z-50 max-w-md rounded-md border border-green-300 bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
-          {notice}
-        </div>
-      ) : null}
     </div>
   );
 }

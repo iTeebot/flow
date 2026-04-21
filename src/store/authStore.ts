@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../lib/api";
 
 export interface User {
   id: number;
@@ -8,14 +8,11 @@ export interface User {
   role: string;
 }
 
-// Helper to check if running in Tauri context
-const isTauri = () => {
-  return (window as any).__TAURI_INTERNALS__ !== undefined;
-};
-
 interface AuthState {
   user: User | null;
   companyId: number | null;
+  currency: string;
+  companyLogo: string | null;
   isAuthenticated: boolean;
   isRegistered: boolean;
   isLoading: boolean;
@@ -23,22 +20,22 @@ interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   register: (data: any) => Promise<void>;
   setUser: (user: User) => void;
+  setCurrency: (currency: string) => void;
+  setCompanyLogo: (logo: string | null) => void;
   logout: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   companyId: null,
+  currency: "USD",
+  companyLogo: localStorage.getItem("companyLogo"),
   isAuthenticated: false,
   isRegistered: false,
   isLoading: true,
 
   checkRegistration: async () => {
     try {
-      if (!isTauri()) {
-        set({ isLoading: false });
-        return;
-      }
       const registered = await invoke<boolean>("is_registered");
       set({ isRegistered: registered, isLoading: false });
     } catch (error) {
@@ -49,11 +46,13 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (username, password) => {
     try {
-      if (!isTauri()) {
-        throw new Error("Application must run in Tauri mode. Use 'pnpm run tauri dev' instead of 'pnpm run dev'");
-      }
       const response = await invoke<any>("login", { username, password });
-      set({ user: response.user, companyId: response.company_id, isAuthenticated: true });
+      set({ 
+        user: response.user, 
+        companyId: response.company_id, 
+        currency: response.user?.currency || "USD",
+        isAuthenticated: true 
+      });
     } catch (error) {
       console.error("Login failed:", error);
       throw error;
@@ -62,11 +61,14 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   register: async (data) => {
     try {
-      if (!isTauri()) {
-        throw new Error("Application must run in Tauri mode. Use 'pnpm run tauri dev' instead of 'pnpm run dev'");
-      }
       const response = await invoke<any>("register", { input: data });
-      set({ user: response.user, companyId: response.company_id, isAuthenticated: true, isRegistered: true });
+      set({ 
+        user: response.user, 
+        companyId: response.company_id, 
+        currency: response.user?.currency || "USD",
+        isAuthenticated: true, 
+        isRegistered: true 
+      });
     } catch (error) {
       console.error("Registration failed:", error);
       throw error;
@@ -77,7 +79,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user });
   },
 
+  setCurrency: (currency) => {
+    set({ currency });
+  },
+
+  setCompanyLogo: (logo) => {
+    if (logo) {
+      localStorage.setItem("companyLogo", logo);
+    } else {
+      localStorage.removeItem("companyLogo");
+    }
+    set({ companyLogo: logo });
+  },
+
   logout: () => {
-    set({ user: null, companyId: null, isAuthenticated: false });
+    set({ user: null, companyId: null, currency: "USD", companyLogo: null, isAuthenticated: false });
   },
 }));
+
+
+

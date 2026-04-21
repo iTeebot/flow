@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Download, FileText, Printer } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
+import { formatCurrency } from "../../lib/utils";
 import { getDashboardSummary, type DashboardSummary } from "../dashboard/api";
 import { listDeliveryChallans, type DeliveryChallan } from "../deliveryChallan/api";
 import { downloadDeliveryChallanPdf, printDeliveryChallan } from "./pdf";
+import { useToastStore } from "../../store/toastStore";
 
 export function ReportsModule() {
-  const { companyId } = useAuthStore();
+  const { companyId, currency } = useAuthStore();
   const currentCompanyId = companyId || 1;
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [challans, setChallans] = useState<DeliveryChallan[]>([]);
   const [selectedChallanId, setSelectedChallanId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const { addToast } = useToastStore();
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export function ReportsModule() {
           setSelectedChallanId(deliveryChallans[0].id);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load reports");
+        addToast(err instanceof Error ? err.message : "Failed to load reports", "error");
       } finally {
         setLoading(false);
       }
@@ -48,24 +49,21 @@ export function ReportsModule() {
 
   const handleDownload = async () => {
     if (!selectedChallan) return;
-    setError(null);
-    setNotice(null);
     setIsDownloading(true);
     try {
       const savedPath = await downloadDeliveryChallanPdf(selectedChallan);
-      setNotice(`PDF saved to: ${savedPath}`);
+      if (savedPath === "browser-download") {
+        addToast("Document has been downloaded to your browser.", "info");
+      } else {
+        addToast("PDF saved successfully!", "success", savedPath);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to download PDF");
+      addToast(err instanceof Error ? err.message : "Failed to download PDF", "error");
     } finally {
       setIsDownloading(false);
     }
   };
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(null), 4000);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
 
   const handlePrint = () => {
     if (!selectedChallan) return;
@@ -76,10 +74,10 @@ export function ReportsModule() {
     return <div className="text-text-muted">Loading reports...</div>;
   }
 
-  if (error || !summary) {
+  if (!summary) {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-800">
-        {error || "Failed to load reports"}
+      <div className="p-4 text-text-muted">
+        No report data available.
       </div>
     );
   }
@@ -92,15 +90,12 @@ export function ReportsModule() {
           Reporting dashboard and document outputs for delivery challans.
         </p>
       </div>
-      {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-800">{error}</div>
-      ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-md border border-border bg-card p-5">
           <p className="text-sm text-text-muted">Total Sales</p>
           <p className="mt-2 text-2xl font-semibold text-text-primary">
-            ${summary.kpi.total_sales.toFixed(2)}
+            {formatCurrency(summary.kpi.total_sales, currency)}
           </p>
         </div>
         <div className="rounded-md border border-border bg-card p-5">
@@ -168,17 +163,12 @@ export function ReportsModule() {
                 className="flex items-center justify-between rounded border border-border/60 bg-surface/40 px-3 py-2 text-sm"
               >
                 <span className="text-text-muted">{point.date}</span>
-                <span className="font-medium text-text-primary">${point.amount.toFixed(2)}</span>
+                <span className="font-medium text-text-primary">{formatCurrency(point.amount, currency)}</span>
               </div>
             ))}
           </div>
         )}
       </div>
-      {notice ? (
-        <div className="fixed bottom-6 right-6 z-50 max-w-md rounded-md border border-green-300 bg-green-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
-          {notice}
-        </div>
-      ) : null}
     </div>
   );
 }
