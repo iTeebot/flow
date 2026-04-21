@@ -1,292 +1,210 @@
-# Flow:
+# 🌊 Teebot Flow
 
-## 1.System Context Diagram
+**Teebot Flow** is a high-performance, professional Desktop ERP solution designed for modern business operations. Built with a focus on speed, reliability, and ease of use, it leverages the power of **Tauri** and **Rust** to provide a secure, offline-first desktop experience.
 
-                ┌───────────────────────┐
-                │     User (Admin)      │
-                └──────────┬────────────┘
-                           │
-                           ▼
-        ┌──────────────────────────────────┐
-        │      Teeebot Flow Desktop       │
-        │   (Tauri + React Application)   │
-        └──────────┬──────────────────────┘
-                   │
-     ┌─────────────┼─────────────┐
-     ▼             ▼             ▼
-┌─────────┐  ┌──────────┐  ┌────────────┐
-│ SQLite  │  │ File Sys │  │ PDF Export │
-│ Database│  │ Storage  │  │ / Reports  │
-└─────────┘  └──────────┘  └────────────┘
+---
 
-## 2.Core Application Flow
+## 🚀 Key Features
 
-React UI (Form / Button)
-        │
-        ▼
-Tauri Invoke (IPC Bridge)
-        │
-        ▼
-Rust Command Layer
-        │
-        ├── Validation
-        ├── Business Logic
-        ▼
-SQLite Database (Read/Write)
-        │
-        ▼
-Response Back to UI
-        │
-        ▼
-UI Updates (State Store)
+-   **📦 Inventory Management**: Track stock levels with real-time updates.
+-   **📄 Delivery Challan System**: Streamlined flow for creating and managing delivery challans.
+-   **👥 Customer Management**: Organize customer data and transaction history.
+-   **📊 Dashboard KPIs**: Visual insights into business performance.
+-   **🖨️ PDF & Export**: Professional report generation and printing capabilities.
 
-## 3.Delivery Challan Flow
+---
 
-User opens "Create Delivery Challan"
-            │
-            ▼
-Select Customer
-            │
-            ▼
-Add Items (Inventory)
-            │
-            ▼
-Frontend validates form
-            │
-            ▼
-Invoke: create_dc()
-            │
-            ▼
-Rust:
- ├─ Generate DC Number
- ├─ Check stock
- ├─ Save DC + Items
-            │
-            ▼
-SQLite Stores Data
-            │
-            ▼
-Return DC ID + Number
-            │
-            ▼
-UI shows success + Print option
-            │
-            ▼
-PDF Generator (optional step)
+## 🛠️ Tech Stack
 
-## 4.Database Relationship Diagram
+| Layer          | Technology                                                                                                                                                             |
+| :------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Frontend**   | [React 19](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/), [Vite 7](https://vitejs.dev/)                                                         |
+| **Styling**    | [Tailwind CSS 4](https://tailwindcss.com/)                                                                                                                            |
+| **State**      | [Zustand](https://github.com/pmndrs/zustand)                                                                                                                           |
+| **Backend**    | [Rust](https://www.rust-lang.org/) (via [Tauri 2.0](https://tauri.app/))                                                                                                 |
+| **Database**   | [SQLite](https://www.sqlite.org/) (Local Storage)                                                                                                                      |
+| **UI Icons**   | [Lucide React](https://lucide.dev/)                                                                                                                                    |
+| **Charts**     | [Recharts](https://recharts.org/)                                                                                                                                      |
 
-Customers
-   │
-   ├──< Delivery Challans >──┐
-   │                         │
-   │                    DC Items
-   │                         │
-Products / Inventory ───────┘
+---
 
-Invoices (future) ← linked from DC
+## 📐 System Architecture
 
-## 5.Module Architecture Diagram
+### 1. System Context Diagram
+Below is the high-level overview of how Teebot Flow interacts with the local system and the user.
 
-Teeebot Flow
-
-Frontend Modules:
- ├── Dashboard
- ├── Delivery Challan
- ├── Inventory
- ├── Customers
- ├── Reports
-
-Backend Commands:
- ├── dc.rs
- ├── inventory.rs
- ├── customers.rs
-
-Shared Layer:
- ├── types
- ├── utils
-
-## 6.Build Order
-
-### STEP 1 (Foundation)
-    Setup Tauri project
-    React layout (sidebar + routing)
-    Zustand store
-### STEP 2 (Database Foundation)
-    SQLite setup
-    Customers table
-    Products table
-### STEP 3 (First Real Feature)
-    Delivery Challan module
-    Create DC flow
-    Save to DB
-### STEP 4 (Business Layer)
-    Inventory stock update
-    DC item linking
-### STEP 5 (Output Layer)
-    PDF export
-    Print view
-### STEP 6 (Scaling)
-    Invoices
-    Reports
-    Dashboard KPIs
-
-## 7. What NOT to do (important)
-
-Avoid these early mistakes:
-
-    Don’t start UI without DB design
-    Don’t build invoices before DC
-    Don’t add cloud sync early
-    Don’t mix frontend logic with Rust logic
-    Don’t skip module isolation
-
-# Architecture Digarams
-
-## 1. System Architecture
-
+```mermaid
 flowchart TD
+    A[User (Admin / Staff)] --> B[React Frontend UI]
+    B --> C[Tauri Invoke Bridge]
+    C --> D[Rust Backend Commands]
 
-A[User (Admin / Staff)] --> B[React Frontend UI]
+    D --> D1[Validation Layer]
+    D --> D2[Business Logic Layer]
 
-B --> C[Tauri Invoke Bridge]
+    D1 --> E[(SQLite Database)]
+    D2 --> E
 
-C --> D[Rust Backend Commands]
+    D --> F[File System Storage]
+    D --> G[PDF / Report Generator]
 
-D --> D1[Validation Layer]
-D --> D2[Business Logic Layer]
+    E --> D
+    F --> D
+    G --> B
 
-D1 --> E[(SQLite Database)]
-D2 --> E
+    B --> H[State Management<br/>Zustand]
+    H --> B
+```
 
-D --> F[File System Storage]
-D --> G[PDF / Report Generator]
+### 2. Core Application Flow
+The bridge between the modern web frontend and the high-performance Rust backend.
 
-E --> D
-F --> D
-G --> B
+```mermaid
+sequenceDiagram
+    participant UI as React UI
+    participant Bridge as Tauri IPC
+    participant Rust as Rust Command Layer
+    participant DB as SQLite Database
 
-B --> H[State Management<br/>Zustand]
+    UI->>Bridge: Invoke Command (e.g., create_dc)
+    Bridge->>Rust: Pass Data
+    Rust->>Rust: Validate & Process
+    Rust->>DB: Read/Write Data
+    DB-->>Rust: Confirmation/Result
+    Rust-->>Bridge: Processed Result
+    Bridge-->>UI: Update State
+```
 
-H --> B
+---
 
-# 2. Delivery Challan Flow (Core ERP Module)
+## 📦 Module Workflow: Delivery Challan
 
+The core workflow for the ERP's Delivery Challan (DC) module.
+
+```mermaid
 flowchart TD
+    A[Open Create Delivery Challan Page] --> B[Select Customer]
+    B --> C[Add Products / Items]
+    C --> D[Frontend Validation]
 
-A[Open Create Delivery Challan Page] --> B[Select Customer]
-B --> C[Add Products / Items]
-C --> D[Frontend Validation]
+    D --> E[Tauri Invoke: create_dc]
 
-D --> E[Tauri Invoke: create_dc]
+    E --> F[Rust Command: dc.rs]
 
-E --> F[Rust Command: dc.rs]
+    F --> G[Generate DC Number]
+    F --> H[Check Stock Levels]
+    F --> I[Save DC Header]
+    F --> J[Save DC Items]
 
-F --> G[Generate DC Number]
-F --> H[Check Stock Levels]
-F --> I[Save DC Header]
-F --> J[Save DC Items]
+    G --> K[(SQLite DB)]
+    H --> K
+    I --> K
+    J --> K
 
-G --> K[(SQLite DB)]
-H --> K
-I --> K
-J --> K
+    K --> L[Return DC ID + Number]
 
-K --> L[Return DC ID + Number]
+    L --> M[UI Success Screen]
+    M --> N[Print / PDF Export Option]
 
-L --> M[UI Success Screen]
-M --> N[Print / PDF Export Option]
+    N --> O[PDF Generator Service]
+    O --> P[Saved File System]
+```
 
-N --> O[PDF Generator Service]
-O --> P[Saved File System]
+---
 
-# 3. Database Relationship Diagram (ER Style)
+## 🗄️ Data Model (ER Diagram)
 
+Our relational structure ensures data integrity and supports complex business logic.
+
+```mermaid
 erDiagram
+    CUSTOMERS ||--o{ DELIVERY_CHALLANS : places
+    DELIVERY_CHALLANS ||--o{ DC_ITEMS : contains
+    PRODUCTS ||--o{ DC_ITEMS : included_in
 
-CUSTOMERS ||--o{ DELIVERY_CHALLANS : places
-DELIVERY_CHALLANS ||--o{ DC_ITEMS : contains
-PRODUCTS ||--o{ DC_ITEMS : included_in
+    CUSTOMERS {
+        int id
+        string name
+        string phone
+        string address
+    }
 
-CUSTOMERS {
-  int id
-  string name
-  string phone
-  string address
-}
+    PRODUCTS {
+        int id
+        string name
+        string sku
+        int stock_qty
+        float price
+    }
 
-PRODUCTS {
-  int id
-  string name
-  string sku
-  int stock_qty
-  float price
-}
+    DELIVERY_CHALLANS {
+        int id
+        string dc_number
+        int customer_id
+        date created_at
+    }
 
-DELIVERY_CHALLANS {
-  int id
-  string dc_number
-  int customer_id
-  date created_at
-}
+    DC_ITEMS {
+        int id
+        int dc_id
+        int product_id
+        int quantity
+        float rate
+    }
+```
 
-DC_ITEMS {
-  int id
-  int dc_id
-  int product_id
-  int quantity
-  float rate
-}
+---
 
-# 4. Full Teeebot Flow Module Architecture
+## 🏗️ Folder Structure
 
-flowchart LR
+```text
+teebot-flow/
+├── src-tauri/             # Rust Backend (Commands, Database Logic)
+├── src/                   # React Frontend
+│   ├── components/        # Reusable UI Components
+│   ├── modules/           # Feature-based Modules (DC, Inventory, etc.)
+│   ├── store/             # Zustand State Stores
+│   └── types/             # TypeScript Interfaces
+├── public/                # Static Assets
+└── package.json           # Frontend Dependencies & Scripts
+```
 
-subgraph FRONTEND [React Frontend]
-A1[Dashboard]
-A2[Delivery Challan]
-A3[Inventory]
-A4[Customers]
-A5[Reports]
-end
+---
 
-subgraph BRIDGE [Tauri Bridge]
-B1[Invoke API Layer]
-B2[Event System]
-end
+## 🛠️ Development Setup
 
-subgraph BACKEND [Rust Backend]
-C1[dc.rs]
-C2[inventory.rs]
-C3[customers.rs]
-C4[reports.rs]
-end
+### Prerequisites
+-   [Node.js](https://nodejs.org/) (LTS recommended)
+-   [Rust](https://www.rust-lang.org/tools/install)
+-   Tauri Dependencies (refer to [Tauri Setup Guide](https://tauri.app/v1/guides/getting-started/prerequisites))
 
-subgraph DATA [Data Layer]
-D1[(SQLite DB)]
-D2[File Storage]
-D3[PDF Engine]
-end
+### Installation
+1.  Clone the repository.
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
 
-A1 --> B1
-A2 --> B1
-A3 --> B1
-A4 --> B1
-A5 --> B1
+### Run Locally
+Launch the application in development mode:
+```bash
+npm run tauri dev
+```
 
-B1 --> C1
-B1 --> C2
-B1 --> C3
-B1 --> C4
+### Build
+Generate the production binary:
+```bash
+npm run tauri build
+```
 
-C1 --> D1
-C2 --> D1
-C3 --> D1
-C4 --> D1
+---
 
-C1 --> D2
-C4 --> D3
+## 🛡️ Best Practices & Guidelines
 
-D1 --> B1
-D2 --> B1
-D3 --> A1
+-   **Database First**: Always design and migrate the DB before implementing UI changes.
+-   **Logic Separation**: Keep heavy business logic in Rust; UI remains thin and reactive.
+-   **Isolation**: Features should be modular to prevent regression.
+-   **Security**: Validate all inputs at the Rust layer, even if validated in the frontend.
+
+---
+© 2026 Teebot Flow. All rights reserved.
