@@ -1,0 +1,12 @@
+---
+description: Enforce strict isolated modules and build order
+alwaysApply: true
+---
+
+# Teebot Flow Module Isolation Rule
+
+- Respect build order: Inventory -> Customers -> Delivery Challan.
+- Keep backend logic isolated in domain modules under `src-tauri/src/modules/`.
+- Do not mix frontend view logic with Rust business rules.
+- SQLite writes and validation for business entities must stay in Rust commands.
+- For cross-module behavior, use shared helpers only (db init, shared types), not direct module coupling.
