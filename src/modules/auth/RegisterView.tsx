@@ -129,8 +129,8 @@ export function RegisterView() {
             {view === "form" && <img src={`${themeMode === "light" ? "auth_logo.png" : "auth_logo_dark.png"}`} alt="Teebot Flow" className="h-auto w-auto opacity-100" />}
 
             {view === "form" ? (
-              <div className="space-y-6 animate-in fade-in duration-300">~
-                <div>~
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div>
                   <h2 className="text-2xl font-black text-text-primary leading-tight tracking-tight">
                     Welcome to<br />
                     <span className="text-primary italic">Teebot Flow</span>
