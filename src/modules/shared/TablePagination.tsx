@@ -1,3 +1,5 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 type TablePaginationProps = {
   page: number;
   totalPages: number;
@@ -16,13 +18,16 @@ export function TablePagination({
   onPageSizeChange,
 }: TablePaginationProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-      <div className="text-sm text-text-muted">Total: {totalItems}</div>
-      <div className="flex items-center gap-3">
-        <label className="text-sm text-text-muted">
-          Rows:
+    <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border px-6 py-4 bg-surface/10">
+      <div className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+        Total {totalItems} items
+      </div>
+      
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-text-muted">Rows per page</span>
           <select
-            className="ml-2 rounded border border-border bg-background px-2 py-1 text-text-primary"
+            className="rounded-lg border border-border bg-background px-2 py-1 text-xs font-bold text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none min-w-[60px] text-center"
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
           >
@@ -30,26 +35,31 @@ export function TablePagination({
             <option value={20}>20</option>
             <option value={50}>50</option>
           </select>
-        </label>
-        <button
-          type="button"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1}
-          className="rounded border border-border px-3 py-1 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Prev
-        </button>
-        <span className="text-sm text-text-muted">
-          {page} / {totalPages}
-        </span>
-        <button
-          type="button"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages}
-          className="rounded border border-border px-3 py-1 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Next
-        </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page <= 1}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background text-text-primary transition-all hover:bg-surface hover:text-primary disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-background"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          
+          <div className="min-w-[60px] text-center text-xs font-bold text-text-primary">
+            Page {page} of {totalPages}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= totalPages}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background text-text-primary transition-all hover:bg-surface hover:text-primary disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-background"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

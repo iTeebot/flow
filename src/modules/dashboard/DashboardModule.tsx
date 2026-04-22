@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -21,6 +19,8 @@ import {
   FileText,
   TrendingUp,
   Activity,
+  ArrowUpRight,
+  History
 } from "lucide-react";
 import { getDashboardSummary, type DashboardSummary } from "./api";
 import { useAuthStore } from "../../store/authStore";
@@ -29,7 +29,6 @@ import { formatCurrency } from "../../lib/utils";
 export function DashboardModule() {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const { companyId, currency } = useAuthStore();
   const currentCompanyId = companyId || 1;
@@ -45,8 +44,8 @@ export function DashboardModule() {
       setLoading(true);
       const summary = await getDashboardSummary(currentCompanyId);
       setData(summary);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load dashboard");
+    } catch {
+      // Data remains null on error
     } finally {
       setLoading(false);
     }
@@ -54,305 +53,203 @@ export function DashboardModule() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-text-muted">Loading dashboard...</div>
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+        <p className="text-sm text-text-muted animate-pulse">Calculating master metrics...</p>
       </div>
     );
   }
 
-  if (error || !data) {
+  if (!data) {
     return (
-      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-800">
-        {error || "Failed to load dashboard data"}
+      <div className="rounded-xl border border-error/20 bg-error/5 p-8 text-center text-error border-dashed">
+        Critical error retriving system telemetry. Please refresh.
       </div>
     );
   }
 
-  const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+  const CHART_COLORS = ["#0284C7", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
-        <p className="text-text-muted">Business overview and key metrics</p>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Total Products */}
-        <div className="rounded-md border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-text-muted">Total Products</p>
-              <p className="text-2xl font-bold text-text-primary mt-1">
-                {data.kpi.total_products}
-              </p>
-            </div>
-            <div className="rounded-full bg-blue-100 p-2">
-              <Package className="h-5 w-5 text-blue-600" />
-            </div>
-          </div>
+    <div className="space-y-8 animate-in fade-in duration-700">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Executive Summary</h1>
+          <p className="text-sm text-text-muted mt-1">Operational intelligence and real-time business health</p>
         </div>
-
-        {/* Total Customers */}
-        <div className="rounded-md border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-text-muted">Total Customers</p>
-              <p className="text-2xl font-bold text-text-primary mt-1">
-                {data.kpi.total_customers}
-              </p>
-            </div>
-            <div className="rounded-full bg-green-100 p-2">
-              <Users className="h-5 w-5 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* Total Sales */}
-        <div className="rounded-md border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-text-muted">Total Sales</p>
-              <p className="text-2xl font-bold text-text-primary mt-1">
-                {formatCurrency(data.kpi.total_sales, currency)}
-              </p>
-            </div>
-            <div className="rounded-full bg-amber-100 p-2">
-              <DollarSign className="h-5 w-5 text-amber-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* Pending Deliveries */}
-        <div className="rounded-md border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-text-muted">Pending Deliveries</p>
-              <p className="text-2xl font-bold text-text-primary mt-1">
-                {data.kpi.pending_deliveries}
-              </p>
-            </div>
-            <div className="rounded-full bg-red-100 p-2">
-              <FileText className="h-5 w-5 text-red-600" />
-            </div>
-          </div>
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-text-muted bg-surface/50 border border-border px-3 py-1.5 rounded-full">
+          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse mr-1"></div>
+          Live Feed Active
         </div>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Sales Trend Chart */}
-        <div className="rounded-md border border-border bg-card p-4">
-          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Sales Trend (Last 7 Days)
-          </h2>
-          {data.sales_trend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={data.sales_trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fill: "#999", fontSize: 12 }}
-                />
-                <YAxis tick={{ fill: "#999", fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#1f2937",
-                    border: "1px solid #374151",
-                    borderRadius: "0.375rem",
-                  }}
-                  labelStyle={{ color: "#fff" }}
-                  formatter={(value: any) => formatCurrency(value as number, currency)}
-                />
-                <Legend wrapperStyle={{ color: "#999" }} />
-                <Line
-                  type="monotone"
-                  dataKey="amount"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  name="Sales Amount"
-                  dot={{ fill: "#3b82f6", r: 4 }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-48 items-center justify-center text-text-muted">
-              No sales data available
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: 'Asset Catalog', value: data.kpi.total_products, icon: Package, color: 'bg-primary/10 text-primary', sub: 'Total SKU count' },
+          { label: 'Active Clients', value: data.kpi.total_customers, icon: Users, color: 'bg-success/10 text-success', sub: 'Registered database' },
+          { label: 'Revenue Pool', value: formatCurrency(data.kpi.total_sales, currency), icon: DollarSign, color: 'bg-warning/10 text-warning', sub: 'Cumulative revenue' },
+          { label: 'Open Logistics', value: data.kpi.pending_deliveries, icon: FileText, color: 'bg-error/10 text-error', sub: 'Pending deliveries' }
+        ].map((kpi, idx) => (
+          <div key={idx} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm transition-all hover:shadow-xl hover:border-primary/20 hover:scale-[1.02]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase text-text-muted tracking-widest">{kpi.label}</p>
+                <p className="text-2xl font-black text-text-primary tracking-tight mt-1">{kpi.value}</p>
+              </div>
+              <div className={`rounded-xl ${kpi.color} p-3 shadow-inner`}>
+                <kpi.icon className="h-6 w-6" />
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Top Products by Inventory Value */}
-        <div className="rounded-md border border-border bg-card p-4">
-          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Top Products by Value
-          </h2>
-          {data.inventory_status.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={data.inventory_status.slice(0, 5)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis
-                  dataKey="product_name"
-                  tick={{ fill: "#999", fontSize: 12 }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis tick={{ fill: "#999", fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#1f2937",
-                    border: "1px solid #374151",
-                    borderRadius: "0.375rem",
-                  }}
-                  labelStyle={{ color: "#fff" }}
-                  formatter={(value: any) => formatCurrency(value as number, currency)}
-                />
-                <Legend wrapperStyle={{ color: "#999" }} />
-                <Bar
-                  dataKey="stock_value"
-                  fill="#10b981"
-                  name="Stock Value"
-                  radius={[8, 8, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-48 items-center justify-center text-text-muted">
-              No inventory data available
+            <div className="mt-4 flex items-center justify-between text-[11px]">
+              <span className="text-text-muted/60">{kpi.sub}</span>
+              <ArrowUpRight className="h-3 w-3 text-text-muted/30 group-hover:text-primary transition-colors" />
             </div>
-          )}
-        </div>
+            {/* Glow effect on hover */}
+            <div className="absolute -right-4 -bottom-4 h-24 w-24 rounded-full bg-primary/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          </div>
+        ))}
       </div>
 
-      {/* Inventory Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Inventory Pie Chart */}
-        <div className="rounded-md border border-border bg-card p-4">
-          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Inventory Distribution
-          </h2>
-          {data.inventory_status.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={data.inventory_status.slice(0, 5)}
-                  dataKey="stock_value"
-                  nameKey="product_name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  label={(entry: any) =>
-                    `${entry.payload.product_name}: ${formatCurrency(entry.payload.stock_value, currency)}`
-                  }
-                >
-                  {data.inventory_status.slice(0, 5).map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value: any) => formatCurrency(value as number, currency)}
-                  contentStyle={{
-                    backgroundColor: "#1f2937",
-                    border: "1px solid #374151",
-                    borderRadius: "0.375rem",
-                  }}
-                  labelStyle={{ color: "#fff" }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-48 items-center justify-center text-text-muted">
-              No inventory data available
-            </div>
-          )}
+      {/* Primary Analytics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Sales Performance Chart */}
+        <div className="lg:col-span-2 rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col">
+          <div className="border-b border-border bg-surface/30 px-6 py-5 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2 uppercase tracking-wide">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Revenue Performance Flow
+            </h3>
+            <span className="text-[10px] font-bold text-text-muted bg-surface border border-border/50 px-2 py-0.5 rounded uppercase">7-Day Window</span>
+          </div>
+          <div className="p-6 flex-1">
+            {data.sales_trend.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={data.sales_trend}>
+                  <defs>
+                    <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0284C7" stopOpacity={0.1} />
+                      <stop offset="95%" stopColor="#0284C7" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#33415520" />
+                  <XAxis
+                    dataKey="date"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }}
+                  />
+                  <Tooltip
+                    cursor={{ stroke: '#0284C7', strokeWidth: 1, strokeDasharray: '4 4' }}
+                    contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "12px", boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                    itemStyle={{ color: "#0284C7", fontWeight: 700 }}
+                    labelStyle={{ color: "#94a3b8", fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px' }}
+                    formatter={(value: any) => formatCurrency(value as number, currency)}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="#0284C7"
+                    strokeWidth={4}
+                    dot={{ fill: "#0284C7", r: 4, strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: 8, strokeWidth: 0 }}
+                    name="Daily Revenue"
+                    animationDuration={1500}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-text-muted space-y-2 opacity-40">
+                <History className="h-10 w-10" />
+                <p className="text-sm italic">Historical flow pending accumulation</p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Recent Activity */}
-        <div className="rounded-md border border-border bg-card p-4">
-          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Recent Activity
-          </h2>
-          {data.recent_activity.length > 0 ? (
-            <div className="space-y-2 max-h-56 overflow-y-auto">
-              {data.recent_activity.map((activity) => (
-                <div key={activity.id} className="p-3 rounded-md bg-surface/50 border border-border/50">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-full bg-primary/20 p-2 flex-shrink-0">
-                      <FileText className="h-4 w-4 text-primary" />
+        {/* Activity Stream */}
+        <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col">
+          <div className="border-b border-border bg-surface/30 px-6 py-5">
+            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2 uppercase tracking-wide">
+              <Activity className="h-4 w-4 text-primary" />
+              Event Stream
+            </h3>
+          </div>
+          <div className="p-4 flex-1 overflow-y-auto max-h-[380px] space-y-4">
+            {data.recent_activity.length > 0 ? (
+              data.recent_activity.map((activity) => (
+                <div key={activity.id} className="relative pl-6 pb-2 border-l border-primary/20 last:border-0 last:pb-0">
+                  <div className="absolute left-[-5px] top-1 h-2 w-2 rounded-full bg-primary ring-4 ring-primary/10"></div>
+                  <div className="p-3 rounded-xl bg-surface/30 border border-border/40 hover:border-primary/30 transition-colors">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-black text-primary uppercase tracking-tighter">{activity.activity_type}</span>
+                      <span className="text-[9px] text-text-muted font-bold">{new Date(activity.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-text-primary text-sm">
-                        {activity.activity_type}
-                      </p>
-                      <p className="text-text-muted text-sm">{activity.description}</p>
-                      <p className="text-text-muted text-xs mt-1">
-                        {new Date(activity.created_at).toLocaleString()}
-                      </p>
-                    </div>
+                    <p className="text-xs text-text-primary/90 font-medium leading-relaxed">{activity.description}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex h-48 items-center justify-center text-text-muted">
-              No recent activity
-            </div>
-          )}
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-text-muted/40 text-center p-8">
+                <Activity className="h-12 w-12 mb-2" />
+                <p className="text-xs font-bold uppercase">No events logged</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Inventory Summary Table */}
-      <div className="rounded-md border border-border bg-card p-4">
-        <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          Inventory Summary
-        </h2>
-        {data.inventory_status.length > 0 ? (
-          <div className="overflow-x-auto">
+      {/* Secondary Analytics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Inventory Table */}
+        <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="border-b border-border bg-surface/30 px-6 py-5 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2 uppercase tracking-wide">
+              <Package className="h-4 w-4 text-primary" />
+              Strategic Inventory Valuation
+            </h3>
+          </div>
+          <div className="p-2 overflow-x-auto">
             <table className="w-full">
-              <thead className="border-b border-border bg-surface/50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted">
-                    Product Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted">
-                    Quantity
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted">
-                    Stock Value
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted">
-                    % of Total
-                  </th>
+              <thead>
+                <tr className="text-[10px] font-black uppercase text-text-muted tracking-widest bg-surface/30">
+                  <th className="px-4 py-3 text-left">Article</th>
+                  <th className="px-4 py-3 text-left">Level</th>
+                  <th className="px-4 py-3 text-right">Valuation</th>
+                  <th className="px-4 py-3 text-right">Weight</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
-                {data.inventory_status.map((item, index) => {
+              <tbody className="divide-y divide-border/40">
+                {data.inventory_status.slice(0, 6).map((item, index) => {
                   const totalValue = data.inventory_status.reduce((sum, i) => sum + i.stock_value, 0);
                   const percentage = totalValue > 0 ? (item.stock_value / totalValue) * 100 : 0;
                   return (
-                    <tr key={index} className="hover:bg-surface/30">
-                      <td className="px-4 py-3 text-text-primary">{item.product_name}</td>
-                      <td className="px-4 py-3 text-text-muted">{item.stock_qty} units</td>
-                      <td className="px-4 py-3 text-text-muted">
-                        {formatCurrency(item.stock_value, currency)}
+                    <tr key={index} className="group hover:bg-surface/50 transition-colors">
+                      <td className="px-4 py-4">
+                        <div className="text-xs font-bold text-text-primary">{item.product_name}</div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-4">
                         <div className="flex items-center gap-2">
-                          <div className="h-2 w-24 rounded-full bg-surface/50">
-                            <div
-                              className="h-2 rounded-full bg-primary"
-                              style={{ width: `${percentage}%` }}
-                            />
+                          <div className={`h-1.5 w-1.5 rounded-full ${item.stock_qty < 10 ? 'bg-error' : 'bg-success'}`}></div>
+                          <span className="text-xs font-medium text-text-muted">{item.stock_qty} <span className="text-[9px] opacity-40">UNITS</span></span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="text-xs font-black text-text-primary">{formatCurrency(item.stock_value, currency)}</div>
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[9px] font-black text-primary">{percentage.toFixed(1)}%</span>
+                          <div className="h-1 w-16 rounded-full bg-surface">
+                            <div className="h-1 rounded-full bg-primary" style={{ width: `${percentage}%` }}></div>
                           </div>
-                          <span className="text-sm text-text-muted">{percentage.toFixed(1)}%</span>
                         </div>
                       </td>
                     </tr>
@@ -361,9 +258,55 @@ export function DashboardModule() {
               </tbody>
             </table>
           </div>
-        ) : (
-          <div className="p-8 text-center text-text-muted">No inventory data available</div>
-        )}
+        </div>
+
+        {/* Global Stock Split */}
+        <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden h-fit">
+          <div className="border-b border-border bg-surface/30 px-6 py-5 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-text-primary flex items-center gap-2 uppercase tracking-wide">
+              <History className="h-4 w-4 text-primary" />
+              Equity Distribution
+            </h3>
+          </div>
+          <div className="p-6">
+            {data.inventory_status.length > 0 ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <PieChart>
+                  <Pie
+                    data={data.inventory_status.slice(0, 5)}
+                    dataKey="stock_value"
+                    nameKey="product_name"
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={8}
+                    stroke="none"
+                  >
+                    {data.inventory_status.slice(0, 5).map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "12px" }}
+                    itemStyle={{ color: "#fff", fontWeight: 700, fontSize: '12px' }}
+                    formatter={(value: any) => formatCurrency(value as number, currency)}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    iconType="circle"
+                    formatter={(value: string) => <span className="text-[10px] font-black text-text-muted uppercase tracking-wider">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[320px] flex items-center justify-center text-text-muted/30">
+                No equity data to visualize
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

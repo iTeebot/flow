@@ -1,7 +1,6 @@
-import { type CSSProperties, type ComponentType, useEffect } from "react";
+import { type CSSProperties, type ComponentType, useEffect, lazy, Suspense } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import {
-  BarChart3,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -16,16 +15,26 @@ import {
 import "./App.css";
 import { theme } from "./theme";
 import { type ModuleKey, useUiStore } from "./store/uiStore";
-import { CustomersModule } from "./modules/customers/CustomersModule";
-import { DashboardModule } from "./modules/dashboard/DashboardModule";
-import { DeliveryChallanModule } from "./modules/deliveryChallan/DeliveryChallanModule";
-import { InventoryModule } from "./modules/inventory/InventoryModule";
-import { ReportsModule } from "./modules/reports/ReportsModule";
-import { SettingsModule } from "./modules/settings/SettingsModule";
-import { ProfileModule } from "./modules/profile/ProfileModule";
-import { InvoicesModule } from "./modules/invoices/InvoicesModule";
-import { InfoModule } from "./modules/info/InfoModule";
 import { ToastContainer } from "./components/ToastContainer";
+
+// Lazy-loaded Business Modules
+const DashboardModule = lazy(() => import("./modules/dashboard/DashboardModule").then(m => ({ default: m.DashboardModule })));
+const DeliveryChallanModule = lazy(() => import("./modules/deliveryChallan/DeliveryChallanModule").then(m => ({ default: m.DeliveryChallanModule })));
+const InventoryModule = lazy(() => import("./modules/inventory/InventoryModule").then(m => ({ default: m.InventoryModule })));
+const CustomersModule = lazy(() => import("./modules/customers/CustomersModule").then(m => ({ default: m.CustomersModule })));
+const InvoicesModule = lazy(() => import("./modules/invoices/InvoicesModule").then(m => ({ default: m.InvoicesModule })));
+const ProfileModule = lazy(() => import("./modules/profile/ProfileModule").then(m => ({ default: m.ProfileModule })));
+const SettingsModule = lazy(() => import("./modules/settings/SettingsModule").then(m => ({ default: m.SettingsModule })));
+const InfoModule = lazy(() => import("./modules/info/InfoModule").then(m => ({ default: m.InfoModule })));
+
+const LoadingFallback = () => (
+  <div className="flex h-full w-full items-center justify-center animate-in fade-in duration-500">
+    <div className="flex flex-col items-center gap-4">
+      <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Loading Module...</span>
+    </div>
+  </div>
+);
 
 const navItems: {
   id: ModuleKey;
@@ -43,7 +52,7 @@ const navItems: {
     },
     { id: "inventory", label: "Inventory", path: "/inventory", icon: Package },
     { id: "customers", label: "Customers", path: "/customers", icon: Users },
-    { id: "reports", label: "Reports", path: "/reports", icon: BarChart3 },
+    // { id: "reports", label: "Reports", path: "/reports", icon: BarChart3 },
     { id: "invoices", label: "Invoices", path: "/invoices", icon: FileBadge2 },
     { id: "profile", label: "Profile", path: "/profile", icon: UserCircle2 },
     { id: "settings", label: "Settings", path: "/settings", icon: Settings },
@@ -68,18 +77,16 @@ function App() {
     setActiveModule,
     sidebarCollapsed,
     toggleSidebar,
-    initializeTheme,
+    initializeStore,
     syncSystemTheme,
+    themeMode
   } = useUiStore();
   const currentLabel = navItems.find((item) => item.id === activeModule)?.label ?? "Teebot Flow";
 
   useEffect(() => {
     checkRegistration();
-  }, [checkRegistration]);
-
-  useEffect(() => {
-    initializeTheme();
-  }, [initializeTheme]);
+    initializeStore();
+  }, [checkRegistration, initializeStore]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -120,33 +127,39 @@ function App() {
       }
     >
       <div className={`grid h-screen ${sidebarCollapsed ? "grid-cols-[72px_1fr]" : "grid-cols-[220px_1fr]"}`}>
-        <aside className="h-screen overflow-y-auto border-r border-border bg-surface px-4 py-4">
-          <div className="mb-5 flex flex-col gap-2">
-            <div className="flex items-center gap-3">
-              <img
-                src="/logo.png"
-                alt="Teebot Flow logo"
-                className="h-8 w-auto max-w-[120px] object-contain"
-              />
-              {!sidebarCollapsed ? (
-                <div>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-cyan">Teebot</p>
-                  <h1 className="text-sm font-semibold leading-tight">Teebot Flow</h1>
-                </div>
-              ) : null}
+        <aside className="h-screen flex flex-col border-r border-border bg-surface">
+          {/* Header Area: Branding + Toggle (Persistent) */}
+          <div className="px-4 py-4 space-y-4 shrink-0 border-b border-transparent">
+            <div className="flex items-center justify-center w-full">
+              {sidebarCollapsed ? (
+                <img
+                  src={themeMode === "dark" ? "/logo_dark.png" : "/logo.png"}
+                  alt="Teebot Flow logo"
+                  className="h-10 w-auto object-contain"
+                />
+              ) : (
+                <img
+                  src={themeMode === "dark" ? "/auth_logo_dark.png" : "/auth_logo.png"}
+                  alt="Teebot Flow logo"
+                  className="h-9 w-auto object-contain"
+                />
+              )}
             </div>
+
             <button
               type="button"
               onClick={toggleSidebar}
               title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              className={`inline-flex items-center justify-center rounded-md border border-border bg-card text-xs font-medium text-text-primary transition hover:border-primary hover:bg-primary/10 ${sidebarCollapsed ? "h-9 w-9" : "w-fit gap-1 px-3 py-1.5"
+              className={`inline-flex items-center justify-center rounded-lg border border-border bg-card text-xs font-medium text-text-primary transition hover:border-primary hover:bg-primary/10 ${sidebarCollapsed ? "h-9 w-full" : "w-fit gap-1 px-3 py-1.5"
                 }`}
             >
               {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
               {!sidebarCollapsed ? "Collapse" : null}
             </button>
           </div>
-          <nav className="flex flex-col gap-1">
+
+          {/* Navigation Area: (Scrollable) */}
+          <nav className="flex-1 overflow-y-auto px-4 py-2 flex flex-col gap-1 custom-scrollbar">
             {navItems.map((item) => (
               <NavLink
                 key={item.id}
@@ -156,7 +169,7 @@ function App() {
                   `group relative rounded-lg border transition ${isActive || activeModule === item.id
                     ? "border-primary/80 bg-primary/15 text-text-primary"
                     : "border-transparent text-text-muted hover:border-border hover:bg-card hover:text-text-primary"
-                  } ${sidebarCollapsed ? "flex h-9 items-center justify-center px-0" : "px-3 py-2"}`
+                  } ${sidebarCollapsed ? "flex h-9 items-center justify-center px-0 shrink-0" : "px-3 py-2 shrink-0"}`
                 }
                 title={sidebarCollapsed ? item.label : undefined}
               >
@@ -179,25 +192,27 @@ function App() {
                 <strong className="text-base font-semibold text-text-primary">{currentLabel}</strong>
               </div>
               <img
-                src="/logo.png"
+                src={themeMode === "dark" ? "/auth_logo_dark.png" : "/auth_logo.png"}
                 alt="Teebot icon"
                 className="h-8 w-auto max-w-[120px] object-contain"
               />
             </div>
           </header>
-          <main className="overflow-y-auto p-5">
-            <Routes>
-              <Route path="/" element={<Navigate to="/delivery-challan" replace />} />
-              <Route path="/dashboard" element={<DashboardModule />} />
-              <Route path="/delivery-challan" element={<DeliveryChallanModule />} />
-              <Route path="/inventory" element={<InventoryModule />} />
-              <Route path="/customers" element={<CustomersModule />} />
-              <Route path="/reports" element={<ReportsModule />} />
-              <Route path="/invoices" element={<InvoicesModule />} />
-              <Route path="/profile" element={<ProfileModule />} />
-              <Route path="/settings" element={<SettingsModule />} />
-              <Route path="/info" element={<InfoModule />} />
-            </Routes>
+          <main className="overflow-y-auto p-5 relative">
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
+                <Route path="/" element={<Navigate to="/delivery-challan" replace />} />
+                <Route path="/dashboard" element={<DashboardModule />} />
+                <Route path="/delivery-challan" element={<DeliveryChallanModule />} />
+                <Route path="/inventory" element={<InventoryModule />} />
+                <Route path="/customers" element={<CustomersModule />} />
+                {/* <Route path="/reports" element={<ReportsModule />} /> */}
+                <Route path="/invoices" element={<InvoicesModule />} />
+                <Route path="/profile" element={<ProfileModule />} />
+                <Route path="/settings" element={<SettingsModule />} />
+                <Route path="/info" element={<InfoModule />} />
+              </Routes>
+            </Suspense>
           </main>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { invoke } from "../../lib/api";
 import { useAuthStore } from "../../store/authStore";
 import currencies from "../../assets/currencies.json";
 import { APP_VERSION } from "../../lib/version";
-import { Upload, Trash2, Image as ImageIcon } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Building2, Briefcase, MapPin, Globe, ShieldCheck, Mail, Phone, User as UserIcon } from "lucide-react";
 import { useToastStore } from "../../store/toastStore";
 import {
   getCompanyProfile,
@@ -142,135 +142,215 @@ export function ProfileModule() {
   };
 
   if (loading) {
-    return <div className="text-text-muted">Loading profile...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+        <p className="text-sm text-text-muted animate-pulse">Retreiving identity records...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-text-primary">Profile</h1>
-        <p className="text-sm text-text-muted">Update registration, company information, and branding.</p>
-      </div>
-
-      {/* Company Logo Section */}
-      <div className="rounded-md border border-border bg-card p-5">
-        <h2 className="mb-4 text-sm font-semibold text-text-primary flex items-center gap-2">
-          <ImageIcon className="h-4 w-4 text-primary" />
-          Company Logo
-          <span className="text-[10px] font-normal text-text-muted ml-1">(Shown on PDFs)</span>
-        </h2>
-        <div className="flex items-center gap-5">
-          {/* Preview */}
-          <div className="relative h-20 w-20 shrink-0 rounded-lg border-2 border-dashed border-border bg-surface/50 flex items-center justify-center overflow-hidden">
-            {companyLogo ? (
-              <img src={companyLogo} alt="Company logo" className="h-full w-full object-contain p-1" />
-            ) : (
-              <ImageIcon className="h-8 w-8 text-text-muted/30" />
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-col gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/svg+xml,image/webp"
-              onChange={handleLogoUpload}
-              className="hidden"
-              id="logo-upload"
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-primary transition hover:border-primary hover:bg-primary/10"
-            >
-              <Upload className="h-3.5 w-3.5" />
-              {companyLogo ? "Change Logo" : "Upload Logo"}
-            </button>
-            {companyLogo && (
-              <button
-                type="button"
-                onClick={handleRemoveLogo}
-                className="inline-flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/5 px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/10"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Remove
-              </button>
-            )}
-            <p className="text-[10px] text-text-muted">PNG, JPG, SVG or WebP. Max 2 MB.</p>
-          </div>
+    <div className="space-y-8 animate-in fade-in duration-600">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Identity & Branding</h1>
+          <p className="text-sm text-text-muted mt-1">Manage registration details and company profile</p>
+        </div>
+        <div className="text-[10px] text-text-muted font-black border border-border px-2 py-1 rounded bg-surface">
+          V. <span className="text-primary">{APP_VERSION}</span>
         </div>
       </div>
 
-      {/* Profile Form */}
-      <form onSubmit={handleSave} className="rounded-md border border-border bg-card p-5">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Full name</label>
-            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Full name" value={form.full_name} onChange={(e) => setField("full_name", e.target.value)} />
+      <form onSubmit={handleSave} className="space-y-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Logo & Branding */}
+          <div className="lg:col-span-1 space-y-8">
+            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden h-fit">
+              <div className="border-b border-border bg-surface/30 px-6 py-5">
+                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5 text-primary" />
+                  Visual Asset
+                </h2>
+                <p className="text-[10px] text-text-muted mt-1 font-bold uppercase tracking-tighter">Company Seal / Branding</p>
+              </div>
+
+              <div className="p-8 flex flex-col items-center gap-6">
+                <div className="relative group">
+                  <div className="h-40 w-40 rounded-2xl border-2 border-dashed border-border bg-surface/30 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary/50 group-hover:bg-primary/5">
+                    {companyLogo ? (
+                      <img src={companyLogo} alt="Logo" className="h-full w-full object-contain p-4 transition-transform duration-500 group-hover:scale-110" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-text-muted/30">
+                        <Building2 className="h-12 w-12" />
+                        <span className="text-[10px] font-black uppercase">No Logo</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute -bottom-3 -right-3 p-3 rounded-xl bg-primary text-primary-foreground shadow-xl shadow-primary/40 hover:scale-110 active:scale-95 transition-all"
+                    title="Update Logo"
+                  >
+                    <Upload className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="text-center space-y-2">
+                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-widest italic">Dynamic PDF Injection</p>
+                  <p className="text-xs text-text-muted/60 leading-relaxed max-w-[200px]">This asset will be automatically injected into your challans and invoices.</p>
+                </div>
+
+                {companyLogo && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveLogo}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold text-error/60 border border-error/20 bg-error/5 hover:bg-error/10 hover:text-error transition-all"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Purge Attachment
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Company name</label>
-            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Company name" value={form.company_name} onChange={(e) => setField("company_name", e.target.value)} required />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Owner name</label>
-            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Owner name" value={form.owner_name} onChange={(e) => setField("owner_name", e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Tax ID / TIN</label>
-            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Tax registration number" value={form.tax_registration_number} onChange={(e) => setField("tax_registration_number", e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Sales Tax Number</label>
-            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Sales tax number" value={form.sales_tax_number} onChange={(e) => setField("sales_tax_number", e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Business type</label>
-            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Business type" value={form.business_type} onChange={(e) => setField("business_type", e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Business Currency</label>
-            <select
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary"
-              value={form.currency}
-              onChange={(e) => setField("currency", e.target.value)}
-            >
-              {currenciesList.map((curr: any) => (
-                <option key={curr.code} value={curr.code}>
-                  {curr.symbol} {curr.name} ({curr.code})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Website</label>
-            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Website" value={form.website} onChange={(e) => setField("website", e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Phone</label>
-            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Phone" value={form.phone} onChange={(e) => setField("phone", e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Email Address</label>
-            <input className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Email" value={form.email} onChange={(e) => setField("email", e.target.value)} />
-          </div>
-          <div className="md:col-span-2 space-y-1">
-            <label className="text-xs font-semibold text-text-muted uppercase">Full Address</label>
-            <textarea className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary" placeholder="Address" value={form.address} onChange={(e) => setField("address", e.target.value)} rows={3} />
+
+          {/* Detailed Information Sections */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Core Profile */}
+            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+              <div className="border-b border-border bg-surface/30 px-6 py-5 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2 text-primary">
+                  <UserIcon className="h-5 w-5" />
+                  Professional Profile
+                </h2>
+              </div>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2 group">
+                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Account Executive Name</label>
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-primary" />
+                    <input className="w-full pl-10" placeholder="e.g. John Doe" value={form.full_name} onChange={(e) => setField("full_name", e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2 group">
+                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider group-focus-within:text-primary transition-colors">Legal Trading Name <span className="text-error">*</span></label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-primary" />
+                    <input className="w-full pl-10" placeholder="e.g. Teebotics Ltd" value={form.company_name} onChange={(e) => setField("company_name", e.target.value)} required />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Business Registration */}
+            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+              <div className="border-b border-border bg-surface/30 px-6 py-5">
+                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                  Tax & Registration
+                </h2>
+              </div>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-gradient-to-br from-card to-surface/40">
+                <div className="space-y-2 group">
+                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">NTN / Tax ID</label>
+                  <input className="w-full" placeholder="PKR-00-0000" value={form.tax_registration_number} onChange={(e) => setField("tax_registration_number", e.target.value)} />
+                </div>
+                <div className="space-y-2 group">
+                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Sales Tax #</label>
+                  <input className="w-full" placeholder="STRN-12345" value={form.sales_tax_number} onChange={(e) => setField("sales_tax_number", e.target.value)} />
+                </div>
+                <div className="space-y-2 group">
+                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Business Vertical</label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                    <input className="w-full pl-10" placeholder="e.g. Manufacturing" value={form.business_type} onChange={(e) => setField("business_type", e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2 group md:col-span-2 lg:col-span-3">
+                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Transactional Currency</label>
+                  <select
+                    className="w-full"
+                    value={form.currency}
+                    onChange={(e) => setField("currency", e.target.value)}
+                  >
+                    {currenciesList.map((curr: any) => (
+                      <option key={curr.code} value={curr.code}>
+                        {curr.symbol} {curr.name} ({curr.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact & Geography */}
+            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+              <div className="border-b border-border bg-surface/30 px-6 py-5">
+                <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-primary" />
+                  Connectivity & Location
+                </h2>
+              </div>
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2 group">
+                    <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Web Domain</label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                      <input className="w-full pl-10 overflow-hidden text-ellipsis" placeholder="www.yourlink.com" value={form.website} onChange={(e) => setField("website", e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-2 group">
+                    <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Support Phone</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                      <input className="w-full pl-10" placeholder="+12 345 6789" value={form.phone} onChange={(e) => setField("phone", e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-2 group md:col-span-2">
+                    <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Business Email</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                      <input className="w-full pl-10" placeholder="admin@domain.com" value={form.email} onChange={(e) => setField("email", e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 group">
+                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Headquarters / Physical Address</label>
+                  <textarea className="w-full min-h-[100px] bg-background" placeholder="Building, Street, City, Country..." value={form.address} onChange={(e) => setField("address", e.target.value)} rows={3} />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="mt-5 flex items-center justify-between">
+
+        {/* Global Action Bar */}
+        <div className="sticky bottom-4 z-50 rounded-2xl border border-border bg-card/80 backdrop-blur-xl p-4 shadow-2xl shadow-primary/10 flex items-center justify-between">
+          <div className="hidden md:flex items-center gap-2 ml-4">
+            <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
+            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">Master Identity Locked</span>
+          </div>
+
           <button
             type="submit"
             disabled={saving}
-            className="rounded-md bg-primary px-6 py-2 text-sm font-medium text-text-primary hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full md:w-auto inline-flex items-center justify-center gap-3 rounded-xl bg-primary px-12 py-4 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Save Profile"}
+            {saving ? (
+              <div className="w-5 h-5 border-3 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
+            ) : <ShieldCheck className="h-5 w-5" />}
+            {saving ? "Updating Records..." : "Synchronize Identity"}
           </button>
-          <div className="text-xs text-text-muted">
-            Internal Version: <span className="font-mono text-cyan">{APP_VERSION}</span>
-          </div>
         </div>
       </form>
     </div>

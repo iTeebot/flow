@@ -24,15 +24,19 @@ const applyTheme = (theme: ResolvedTheme) => {
   document.documentElement.setAttribute("data-theme", theme);
 };
 
+type LanguageKey = "en" | "hi" | "gu" | "ur";
+
 type UiState = {
   activeModule: ModuleKey;
   sidebarCollapsed: boolean;
   themeMode: ThemeMode;
   resolvedTheme: ResolvedTheme;
+  language: LanguageKey;
   setActiveModule: (module: ModuleKey) => void;
   toggleSidebar: () => void;
   setThemeMode: (mode: ThemeMode) => void;
-  initializeTheme: () => void;
+  setLanguage: (lang: LanguageKey) => void;
+  initializeStore: () => void;
   syncSystemTheme: () => void;
 };
 
@@ -41,6 +45,7 @@ export const useUiStore = create<UiState>((set) => ({
   sidebarCollapsed: false,
   themeMode: "system",
   resolvedTheme: getSystemTheme(),
+  language: "en",
   setActiveModule: (module) => set({ activeModule: module }),
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -50,13 +55,23 @@ export const useUiStore = create<UiState>((set) => ({
     applyTheme(resolved);
     set({ themeMode: mode, resolvedTheme: resolved });
   },
-  initializeTheme: () => {
-    const stored = localStorage.getItem("ui-theme-mode");
+  setLanguage: (lang) => {
+    localStorage.setItem("ui-language", lang);
+    set({ language: lang });
+  },
+  initializeStore: () => {
+    // Theme initialization
+    const storedTheme = localStorage.getItem("ui-theme-mode");
     const mode: ThemeMode =
-      stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+      storedTheme === "light" || storedTheme === "dark" || storedTheme === "system" ? storedTheme : "system";
     const resolved = mode === "system" ? getSystemTheme() : mode;
     applyTheme(resolved);
-    set({ themeMode: mode, resolvedTheme: resolved });
+    
+    // Language initialization
+    const storedLang = localStorage.getItem("ui-language") as LanguageKey;
+    const lang: LanguageKey = ["en", "hi", "gu", "ur"].includes(storedLang) ? storedLang : "en";
+    
+    set({ themeMode: mode, resolvedTheme: resolved, language: lang });
   },
   syncSystemTheme: () =>
     set((state) => {

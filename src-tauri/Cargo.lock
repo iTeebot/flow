@@ -46,7 +46,7 @@ dependencies = [
 
 [[package]]
 name = "android_system_properties"
-version = "0.0.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
 dependencies = [
@@ -1054,7 +1054,7 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "foldhash"
-version = "0.0.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
@@ -1102,7 +1102,7 @@ dependencies = [
 
 [[package]]
 name = "futf"
-version = "0.0.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df420e2e84819663797d1ec6544b13c5be84629e7bb00dc960d6917db2987843"
 dependencies = [
@@ -1528,7 +1528,7 @@ version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
- "foldhash 0.0.4",
+ "foldhash 0.1.5",
 ]
 
 [[package]]
@@ -2787,7 +2787,7 @@ dependencies = [
 
 [[package]]
 name = "potential_utf"
-version = "0.0.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0103b1cef7ec0cf76490e969665504990193874ea05c85ff9bab8b911d0a0564"
 dependencies = [
@@ -4010,7 +4010,7 @@ dependencies = [
 
 [[package]]
 name = "teebot-flow"
-version = "0.1.0"
+version = "0.0.5"
 dependencies = [
  "base64 0.22.1",
  "bcrypt",

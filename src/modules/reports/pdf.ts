@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+console.log("PDF Module Loaded");
 import { invoke, openPath } from "../../lib/api";
 import type { DeliveryChallan } from "../deliveryChallan/api";
 import { useAuthStore } from "../../store/authStore";
@@ -112,7 +113,7 @@ export async function downloadDeliveryChallanPdf(challan: DeliveryChallan) {
 
 export function printDeliveryChallan(challan: DeliveryChallan) {
   const companyLogo = useAuthStore.getState().companyLogo;
-  const itemsRows = challan.items
+  challan.items
     .map(
       (item) => `
         <tr>
@@ -129,72 +130,66 @@ export function printDeliveryChallan(challan: DeliveryChallan) {
     ? `<img src="${companyLogo}" style="height:50px;width:50px;object-fit:contain;margin-right:12px;" />`
     : "";
 
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
-  document.body.appendChild(iframe);
+  console.log("[Print] Starting print process via main window overlay...");
 
-  const iframeDoc = iframe.contentWindow?.document;
-  if (!iframeDoc || !iframe.contentWindow) {
-    document.body.removeChild(iframe);
-    throw new Error("Unable to open print view.");
+  let printRoot = document.getElementById("print-root");
+  if (!printRoot) {
+    console.log("[Print] Creating #print-root element");
+    printRoot = document.createElement("div");
+    printRoot.id = "print-root";
+    document.body.appendChild(printRoot);
   }
 
-  iframeDoc.open();
-  iframeDoc.write(`
-      <html>
-        <head>
-          <title>${challan.dc_number}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
-            .header { margin-bottom: 20px; }
-            .header-top { display: flex; align-items: center; margin-bottom: 8px; }
-            .header-top img { height: 50px; width: 50px; object-fit: contain; margin-right: 12px; }
-            h1 { margin: 0 0 8px 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background: #f5f5f5; }
-            .total { margin-top: 16px; font-weight: bold; text-align: right; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="header-top">
-              ${logoHtml}
-              <h1>Delivery Challan</h1>
-            </div>
-            <div><strong>DC Number:</strong> ${challan.dc_number}</div>
-            <div><strong>Customer:</strong> ${challan.customer_name}</div>
-            <div><strong>Date:</strong> ${new Date(challan.created_at).toLocaleString()}</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Qty</th>
-                <th>Rate</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>${itemsRows}</tbody>
-          </table>
-          <div class="total">Total: ${challan.total_amount.toFixed(2)}</div>
-        </body>
-      </html>
-    `);
-  iframeDoc.close();
+  const itemsHtml = challan.items
+    .map(
+      (item) => `
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 8px;">${item.product_name}</td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${item.quantity}</td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${item.rate.toFixed(2)}</td>
+          <td style="border: 1px solid #ddd; padding: 8px;">${item.amount.toFixed(2)}</td>
+        </tr>
+      `,
+    )
+    .join("");
 
+  printRoot.innerHTML = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #111; background: white;">
+      <div style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+          ${logoHtml}
+          <h1 style="margin: 0 0 8px 0; font-size: 24px;">Delivery Challan</h1>
+        </div>
+        <div><strong>DC Number:</strong> ${challan.dc_number}</div>
+        <div><strong>Customer:</strong> ${challan.customer_name}</div>
+        <div><strong>Date:</strong> ${new Date(challan.created_at).toLocaleString()}</div>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
+        <thead>
+          <tr>
+            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background: #f5f5f5;">Product</th>
+            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background: #f5f5f5;">Qty</th>
+            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background: #f5f5f5;">Rate</th>
+            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background: #f5f5f5;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>${itemsHtml}</tbody>
+      </table>
+      <div style="margin-top: 16px; font-weight: bold; text-align: right; font-size: 18px;">
+        Total: ${challan.total_amount.toFixed(2)}
+      </div>
+    </div>
+  `;
+
+  console.log("[Print] Content injected. Triggering window.print()...");
+
+  // Use a small timeout to ensure the DOM has rendered the content
   setTimeout(() => {
-    iframe.contentWindow?.focus();
-    iframe.contentWindow?.print();
-    setTimeout(() => {
-      if (document.body.contains(iframe)) {
-        document.body.removeChild(iframe);
-      }
-    }, 1000);
-  }, 150);
+    try {
+      window.print();
+      console.log("[Print] window.print() called successfully");
+    } catch (e) {
+      console.error("[Print] Error calling window.print():", e);
+    }
+  }, 100);
 }

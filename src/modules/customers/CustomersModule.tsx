@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { Plus, Edit, Trash2, Users } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Search } from "lucide-react";
 import { createCustomer, listCustomers, updateCustomer, deleteCustomer, type Customer } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { TablePagination } from "../shared/TablePagination";
+import { SortableHeader } from "../../components/SortableHeader";
+import { TableActions } from "../../components/TableActions";
+import { useToastStore } from "../../store/toastStore";
 
 export function CustomersModule() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -16,6 +18,8 @@ export function CustomersModule() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const { addToast } = useToastStore();
 
   const { companyId } = useAuthStore();
 
@@ -44,7 +48,7 @@ export function CustomersModule() {
       const data = await listCustomers(currentCompanyId);
       setCustomers(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load customers");
+      addToast(err instanceof Error ? err.message : "Failed to load customers", "error");
     } finally {
       setLoading(false);
     }
@@ -68,8 +72,9 @@ export function CustomersModule() {
       setShowAddForm(false);
       setEditingCustomer(null);
       setFormData({ name: "", tax_registration_number: "", phone: "", address: "" });
+      addToast(editingCustomer ? "Customer profile updated." : "New customer registered.", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save customer");
+      addToast(err instanceof Error ? err.message : "Failed to save customer", "error");
     }
   };
 
@@ -89,8 +94,18 @@ export function CustomersModule() {
     try {
       await deleteCustomer(customerId);
       await loadCustomers();
+      addToast("Customer record deleted successfully.", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete customer");
+      addToast(err instanceof Error ? err.message : "Failed to delete customer", "error");
+    }
+  };
+
+  const handleSort = (key: "name" | "phone" | "tax") => {
+    if (sortBy === key) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(key);
+      setSortOrder("asc");
     }
   };
 
@@ -145,97 +160,97 @@ export function CustomersModule() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Header Section */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Customer Management</h1>
-          <p className="text-text-muted">Manage your customer database and contact information</p>
+          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Customer Directory</h1>
+          <p className="text-sm text-text-muted mt-1">Manage your customer database and contact profiles</p>
         </div>
         <button
           onClick={() => setShowAddForm(true)}
-          className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98]"
         >
           <Plus className="h-4 w-4" />
-          Add Customer
+          Create
         </button>
       </div>
 
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-red-800">
-          {error}
-          <button
-            onClick={() => setError(null)}
-            className="float-right ml-4 text-red-600 hover:text-red-800"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
       {showAddForm && (
-        <div className="rounded-md border border-border bg-card p-6">
-          <h2 className="mb-4 text-lg font-semibold">
-            {editingCustomer ? "Edit Customer" : "Add New Customer"}
-          </h2>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-text-primary">
-                  Customer Name *
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-in slide-in-from-top-4 duration-300">
+          <div className="border-b border-border bg-surface/50 px-6 py-4">
+            <h2 className="text-lg font-bold text-text-primary">
+              {editingCustomer ? "Edit Contact Profile" : "New Customer Onboarding"}
+            </h2>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
+                  Customer Name <span className="text-error">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  required
+                  placeholder="e.g. Acme Corp / John Doe"
+                  className="w-full"
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-text-primary">
+                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
                   Tax Registration Number
                 </label>
                 <input
                   type="text"
                   value={formData.tax_registration_number}
                   onChange={(e) => setFormData({ ...formData, tax_registration_number: e.target.value })}
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="TIN / VAT / GST"
+                  className="w-full"
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-text-primary">
+                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
                   Phone Number
                 </label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="+1 (555) 000-0000"
+                  className="w-full"
                 />
               </div>
-              <div className="col-span-2">
-                <label className="block text-sm font-medium text-text-primary">
-                  Address
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
+                  Physical Address
                 </label>
                 <textarea
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   rows={3}
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-text-primary text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-text-muted/40"
+                  placeholder="Street address, City, Country"
                 />
               </div>
             </div>
-            <div className="flex gap-2">
+
+            <div className="flex items-center gap-3 pt-4 border-t border-border">
               <button
                 type="submit"
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                className="rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
               >
-                {editingCustomer ? "Update Customer" : "Add Customer"}
+                {editingCustomer ? "Save Changes" : "Create Customer Account"}
               </button>
               <button
                 type="button"
                 onClick={resetForm}
-                className="rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-text-primary hover:bg-card"
+                className="rounded-lg border border-border bg-background px-6 py-2.5 text-sm font-semibold text-text-primary hover:bg-surface"
               >
                 Cancel
               </button>
@@ -244,108 +259,133 @@ export function CustomersModule() {
         </div>
       )}
 
-      <div className="rounded-md border border-border bg-card">
-        <div className="border-b border-border px-6 py-4">
-          <h2 className="text-lg font-semibold text-text-primary">Customers ({filteredCustomers.length})</h2>
-          <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-4">
-            <input
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Search name, phone, tax, address..."
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary"
-            />
-            <select
-              value={phoneFilter}
-              onChange={(e) => {
-                setPhoneFilter(e.target.value as "all" | "with-phone" | "without-phone");
-                setPage(1);
-              }}
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary"
-            >
-              <option value="all">All Phone States</option>
-              <option value="with-phone">With Phone</option>
-              <option value="without-phone">Without Phone</option>
-            </select>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "name" | "phone" | "tax")}
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary"
-            >
-              <option value="name">Sort By Name</option>
-              <option value="phone">Sort By Phone</option>
-              <option value="tax">Sort By Tax Registration</option>
-            </select>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
-              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-text-primary"
-            >
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
-            </select>
+      {/* List Container */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="border-b border-border bg-surface/30 px-6 py-5">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Manage Contacts
+              <span className="ml-1 text-xs font-medium px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border">
+                {filteredCustomers.length}
+              </span>
+            </h2>
+
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 lg:w-3/4">
+              <div className="relative group lg:col-span-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted group-focus-within:text-primary transition-colors" />
+                <input
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search customer database..."
+                  className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-text-muted/50"
+                />
+              </div>
+
+              <select
+                value={phoneFilter}
+                onChange={(e) => {
+                  setPhoneFilter(e.target.value as "all" | "with-phone" | "without-phone");
+                  setPage(1);
+                }}
+                className="text-xs"
+              >
+                <option value="all">All Phones</option>
+                <option value="with-phone">Has Phone</option>
+                <option value="without-phone">No Phone</option>
+              </select>
+
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "name" | "phone" | "tax")}
+                className="text-xs"
+              >
+                <option value="name">Sort by Name</option>
+                <option value="phone">Sort by Phone</option>
+                <option value="tax">Sort by Tax ID</option>
+              </select>
+            </div>
           </div>
         </div>
+
         {filteredCustomers.length === 0 ? (
-          <div className="p-8 text-center text-text-muted">
-            <Users className="mx-auto h-12 w-12 text-text-muted/50" />
-            <p className="mt-2">No customers found. Add your first customer to get started.</p>
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="rounded-full bg-surface p-4 mb-4 border border-border">
+              <Users className="h-10 w-10 text-text-muted/30" />
+            </div>
+            <p className="text-text-muted font-medium">No customers matched your criteria</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b border-border bg-surface/50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted">
-                    Customer Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted">
-                    Phone
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted">
-                    Tax Registration
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted">
-                    Address
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-text-muted">
-                    Actions
-                  </th>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-surface/50 border-b border-border">
+                  <SortableHeader
+                    label="Customer Name"
+                    sortKey="name"
+                    currentSortBy={sortBy}
+                    sortOrder={sortOrder}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Phone Number"
+                    sortKey="phone"
+                    currentSortBy={sortBy}
+                    sortOrder={sortOrder}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Tax ID / TIN"
+                    sortKey="tax"
+                    currentSortBy={sortBy}
+                    sortOrder={sortOrder}
+                    onSort={handleSort}
+                  />
+                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-text-muted">Physical Address</th>
+                  <th className="sticky right-0 z-10 bg-surface/90 w-14 px-2 py-4 text-right text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-[-4px_0_10px_rgba(0,0,0,0.1)] backdrop-blur-sm"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {paginatedCustomers.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-surface/30">
+                  <tr key={customer.id} className="group hover:bg-surface/30 transition-all duration-200">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-text-primary">{customer.name}</div>
-                    </td>
-                    <td className="px-6 py-4 text-text-muted">
-                      {customer.phone || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-text-muted">
-                      {customer.tax_registration_number || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-text-muted max-w-xs truncate">
-                      {customer.address || "-"}
+                      <div className="font-bold text-text-primary text-sm">{customer.name}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(customer)}
-                          className="text-text-muted hover:text-primary"
-                          title="Edit customer"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(customer.id)}
-                          className="text-red-600 hover:text-red-800"
-                          title="Delete customer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="text-sm text-text-primary font-mono tracking-tighter">
+                        {customer.phone || <span className="text-text-muted/30">---</span>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-medium px-2 py-1 rounded bg-surface border border-border text-text-muted">
+                        {customer.tax_registration_number || "NOT_ASSIGNED"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-xs text-text-muted max-w-xs truncate" title={customer.address || ""}>
+                        {customer.address || "No address provided"}
+                      </div>
+                    </td>
+                    <td className="sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-4 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm">
+                      <div className="flex items-center justify-end">
+                        <TableActions
+                          actions={[
+                            {
+                              label: "Modify Profile",
+                              icon: Edit,
+                              onClick: () => handleEdit(customer)
+                            },
+                            {
+                              label: "Remove Contact",
+                              icon: Trash2,
+                              onClick: () => handleDelete(customer.id),
+                              variant: "danger"
+                            }
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -354,19 +394,22 @@ export function CustomersModule() {
             </table>
           </div>
         )}
-        {filteredCustomers.length > 0 ? (
-          <TablePagination
-            page={safePage}
-            totalPages={totalPages}
-            totalItems={filteredCustomers.length}
-            pageSize={pageSize}
-            onPageChange={setPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-            }}
-          />
-        ) : null}
+
+        {filteredCustomers.length > 0 && (
+          <div className="border-t border-border bg-surface/20">
+            <TablePagination
+              page={safePage}
+              totalPages={totalPages}
+              totalItems={filteredCustomers.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

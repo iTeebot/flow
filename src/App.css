@@ -1,9 +1,27 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-card: var(--color-card);
+  --color-border: var(--color-border);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-muted: var(--color-text-muted);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+  --color-info: var(--color-info);
+  --color-navy: var(--color-navy);
+  --color-cyan: var(--color-cyan);
+}
+
 :root {
-  --color-primary: #2563EB;
+  --color-primary: #0284C7; /* Sky-600 */
+  --color-primary-foreground: #FFFFFF;
   --color-navy: #0B1220;
-  --color-cyan: #22D3EE;
+  --color-cyan: #0EA5E9;
   --color-background: #0F172A;
   --color-surface: #111827;
   --color-card: #1F2937;
@@ -23,16 +41,21 @@
   color-scheme: dark;
 }
 
+html {
+  font-size: 14px;
+}
+
 :root[data-theme="light"] {
-  --color-primary: #2563eb;
+  --color-primary: #0284C7;
+  --color-primary-foreground: #FFFFFF;
   --color-navy: #ffffff;
-  --color-cyan: #0e7490;
-  --color-background: #f1f5f9;
+  --color-cyan: #0369A1;
+  --color-background: #f8fafc;
   --color-surface: #ffffff;
   --color-card: #ffffff;
-  --color-border: #cbd5e1;
+  --color-border: #e2e8f0;
   --color-text-primary: #0f172a;
-  --color-text-muted: #475569;
+  --color-text-muted: #64748b;
   color-scheme: light;
 }
 
@@ -46,28 +69,79 @@ body {
   overflow: hidden;
   background: var(--color-background);
   color: var(--color-text-primary);
+  line-height: 1.5;
 }
 
 button {
   cursor: pointer;
-  transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-button:hover:not(:disabled) {
-  filter: brightness(1.03);
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-primary-foreground);
+  box-shadow: 0 4px 6px -1px color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background-color: color-mix(in srgb, var(--color-primary) 5%, transparent);
 }
 
 button:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: scale(0.96);
+  filter: brightness(0.9);
 }
 
 button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary) 70%, transparent);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
 button:disabled {
   cursor: not-allowed;
+  opacity: 0.5;
+}
+
+input,
+select,
+textarea {
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  border-radius: 0.5rem;
+  padding-block: 0.5rem;
+  padding-inline: 0.75rem;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+input:hover, select:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 50%, var(--color-border));
+}
+
+input:focus, select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
 select {
@@ -113,4 +187,74 @@ select option {
 
 *::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    overflow: visible !important;
+  }
+  
+  #root, .h-screen {
+    height: auto !important;
+    overflow: visible !important;
+    display: none !important;
+  }
+
+  #print-root {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+#print-root {
+  display: none;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInFromTop {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-in {
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fadeIn;
+}
+
+.slide-in-from-top-4 {
+  animation-name: slideInFromTop;
+}
+
+.duration-300 {
+  animation-duration: 300ms;
+}
+
+.duration-500 {
+  animation-duration: 500ms;
+}
+
+.duration-600 {
+  animation-duration: 600ms;
+}
+
+.duration-700 {
+  animation-duration: 700ms;
+}
+
+.duration-1000 {
+  animation-duration: 1000ms;
 }
