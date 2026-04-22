@@ -1,45 +1,72 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from '@tailwindcss/vite'
-
-// @ts-expect-error process is a nodejs global
-const host = process.env.TAURI_DEV_HOST;
+import { resolve } from "path";
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
-  plugins: [react(), tailwindcss()],
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  // Detect if building for Tauri desktop
+  const isTauri = process.env.TAURI_ENV_PLATFORM || env.IS_TAURI === 'true' || mode === 'tauri';
+  const host = process.env.TAURI_DEV_HOST || env.TAURI_DEV_HOST;
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
-  clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
-  server: {
-    port: 1420,
-    strictPort: true,
-    host: host || false,
-    hmr: host
-      ? {
-        protocol: "ws",
-        host,
-        port: 1421,
-      }
-      : undefined,
-    watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
-    },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor': ['react', 'react-dom', 'react-router-dom', 'zustand'],
-          'pdf': ['jspdf'],
-          'ui': ['recharts', 'lucide-react']
+  return {
+    plugins: [
+      react(),
+      tailwindcss(),
+      // When building for Tauri, strip the large release binaries from the output
+      ...(isTauri ? [{
+        name: 'exclude-releases',
+        generateBundle(_opts: any, bundle: any) {
+          for (const key of Object.keys(bundle)) {
+            if (key.startsWith('releases/')) {
+              delete bundle[key];
+            }
+          }
         }
-      }
+      }] : [])
+    ],
+
+    // Inject compile-time constant so app code can reliably detect Tauri vs Web
+    define: {
+      '__IS_TAURI__': JSON.stringify(!!isTauri)
     },
-    chunkSizeWarningLimit: 1000
-  }
-}));
+
+    publicDir: 'public',
+
+    clearScreen: false,
+    server: {
+      port: 1420,
+      strictPort: true,
+      host: host || false,
+      hmr: host
+        ? {
+          protocol: "ws",
+          host,
+          port: 1421,
+        }
+        : undefined,
+      watch: {
+        ignored: ["**/src-tauri/**"],
+      },
+    },
+    build: {
+      // Explicitly set the input to avoid any "tauri/index.html" resolution issues
+      rollupOptions: {
+        input: {
+          main: resolve(__dirname, 'index.html'),
+        },
+        output: {
+          manualChunks: {
+            'vendor': ['react', 'react-dom', 'react-router-dom', 'zustand'],
+            'pdf': ['jspdf'],
+            'ui': ['recharts', 'lucide-react']
+          }
+        }
+      },
+      chunkSizeWarningLimit: 1000
+    }
+  };
+});
+

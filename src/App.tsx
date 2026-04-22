@@ -16,6 +16,8 @@ import "./App.css";
 import { theme } from "./theme";
 import { type ModuleKey, useUiStore } from "./store/uiStore";
 import { ToastContainer } from "./components/ToastContainer";
+import { LandingPage } from "./pages/LandingPage";
+import { isTauri } from "./lib/platform";
 
 // Lazy-loaded Business Modules
 const DashboardModule = lazy(() => import("./modules/dashboard/DashboardModule").then(m => ({ default: m.DashboardModule })));
@@ -43,27 +45,27 @@ const navItems: {
   note?: string;
   icon: ComponentType<{ className?: string }>;
 }[] = [
-    { id: "dashboard", label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    { id: "dashboard", label: "Dashboard", path: "/app/dashboard", icon: LayoutDashboard },
     {
       id: "delivery-challan",
       label: "Delivery Challan",
-      path: "/delivery-challan",
+      path: "/app/delivery-challan",
       icon: ClipboardList,
     },
-    { id: "inventory", label: "Inventory", path: "/inventory", icon: Package },
-    { id: "customers", label: "Customers", path: "/customers", icon: Users },
-    // { id: "reports", label: "Reports", path: "/reports", icon: BarChart3 },
-    { id: "invoices", label: "Invoices", path: "/invoices", icon: FileBadge2 },
-    { id: "profile", label: "Profile", path: "/profile", icon: UserCircle2 },
-    { id: "settings", label: "Settings", path: "/settings", icon: Settings },
-    { id: "info", label: "Info", path: "/info", icon: Info },
+    { id: "inventory", label: "Inventory", path: "/app/inventory", icon: Package },
+    { id: "customers", label: "Customers", path: "/app/customers", icon: Users },
+    // { id: "reports", label: "Reports", path: "/app/reports", icon: BarChart3 },
+    { id: "invoices", label: "Invoices", path: "/app/invoices", icon: FileBadge2 },
+    { id: "profile", label: "Profile", path: "/app/profile", icon: UserCircle2 },
+    { id: "settings", label: "Settings", path: "/app/settings", icon: Settings },
+    { id: "info", label: "Info", path: "/app/info", icon: Info },
   ];
 
 import { useAuthStore } from "./store/authStore";
 import { LoginView } from "./modules/auth/LoginView";
 import { RegisterView } from "./modules/auth/RegisterView";
 
-function App() {
+function AppContent() {
   const location = useLocation();
   const {
     isAuthenticated,
@@ -101,6 +103,15 @@ function App() {
       setActiveModule(active.id);
     }
   }, [activeModule, location.pathname, setActiveModule]);
+
+  // Show landing page for / route (web only, never in Tauri desktop)
+  if (location.pathname === "/" && !isTauri()) {
+    return <LandingPage />;
+  }
+  // In Tauri, redirect / to the main app
+  if (location.pathname === "/" && isTauri()) {
+    return <Navigate to="/app/delivery-challan" replace />;
+  }
 
   if (isLoading) {
     return <div className="flex h-screen items-center justify-center bg-background text-text-primary">Loading...</div>;
@@ -141,7 +152,7 @@ function App() {
                 <img
                   src={themeMode === "light" ? "/auth_logo.png" : "/auth_logo_dark.png"}
                   alt="Teebot Flow logo"
-                  className="h-9 w-auto object-contain"
+                  className="h-40 w-auto object-contain"
                 />
               )}
             </div>
@@ -201,16 +212,17 @@ function App() {
           <main className="overflow-y-auto p-5 relative">
             <Suspense fallback={<LoadingFallback />}>
               <Routes>
-                <Route path="/" element={<Navigate to="/delivery-challan" replace />} />
-                <Route path="/dashboard" element={<DashboardModule />} />
-                <Route path="/delivery-challan" element={<DeliveryChallanModule />} />
-                <Route path="/inventory" element={<InventoryModule />} />
-                <Route path="/customers" element={<CustomersModule />} />
-                {/* <Route path="/reports" element={<ReportsModule />} /> */}
-                <Route path="/invoices" element={<InvoicesModule />} />
-                <Route path="/profile" element={<ProfileModule />} />
-                <Route path="/settings" element={<SettingsModule />} />
-                <Route path="/info" element={<InfoModule />} />
+                <Route path="/app" element={<Navigate to="/app/delivery-challan" replace />} />
+                <Route path="/app/dashboard" element={<DashboardModule />} />
+                <Route path="/app/delivery-challan" element={<DeliveryChallanModule />} />
+                <Route path="/app/inventory" element={<InventoryModule />} />
+                <Route path="/app/customers" element={<CustomersModule />} />
+                {/* <Route path="/app/reports" element={<ReportsModule />} /> */}
+                <Route path="/app/invoices" element={<InvoicesModule />} />
+                <Route path="/app/profile" element={<ProfileModule />} />
+                <Route path="/app/settings" element={<SettingsModule />} />
+                <Route path="/app/info" element={<InfoModule />} />
+                <Route path="*" element={<div className="p-10 text-text-muted">No route matched: {location.pathname}</div>} />
               </Routes>
             </Suspense>
           </main>
@@ -219,6 +231,13 @@ function App() {
       <ToastContainer />
     </div>
   );
+}
+
+function App() {
+  // AppContent handles platform detection internally:
+  // - Tauri desktop: / redirects to /app/delivery-challan
+  // - Web: / shows LandingPage
+  return <AppContent />;
 }
 
 export default App;
