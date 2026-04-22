@@ -57,7 +57,7 @@ export function LoginView() {
         <div className="hidden md:flex w-[260px] shrink-0 bg-navy/60 border-r border-border/60 flex-col backdrop-blur-xl overflow-y-auto">
           <div className="flex flex-col p-6 gap-6 min-h-full">
 
-            {view === "form" && <img src={`${themeMode === "dark" ? "auth_logo_dark.png" : "/auth_logo.png"}`} alt="Teebot Flow" className="h-auto w-auto opacity-100" />}
+            {view === "form" && <img src={`${themeMode === "light" ? "auth_logo.png" : "auth_logo_dark.png"}`} alt="Teebot Flow" className="h-auto w-auto opacity-100" />}
 
             {view === "form" ? (
               <div className="space-y-5 animate-in fade-in duration-300">

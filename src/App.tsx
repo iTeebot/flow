@@ -133,13 +133,13 @@ function App() {
             <div className="flex items-center justify-center w-full">
               {sidebarCollapsed ? (
                 <img
-                  src={themeMode === "dark" ? "/logo_dark.png" : "/logo.png"}
+                  src={themeMode === "light" ? "/logo.png" : "/logo_dark.png"}
                   alt="Teebot Flow logo"
                   className="h-10 w-auto object-contain"
                 />
               ) : (
                 <img
-                  src={themeMode === "dark" ? "/auth_logo_dark.png" : "/auth_logo.png"}
+                  src={themeMode === "light" ? "/auth_logo.png" : "/auth_logo_dark.png"}
                   alt="Teebot Flow logo"
                   className="h-9 w-auto object-contain"
                 />
@@ -192,7 +192,7 @@ function App() {
                 <strong className="text-base font-semibold text-text-primary">{currentLabel}</strong>
               </div>
               <img
-                src={themeMode === "dark" ? "/auth_logo_dark.png" : "/auth_logo.png"}
+                src={themeMode === "light" ? "/auth_logo.png" : "/auth_logo_dark.png"}
                 alt="Teebot icon"
                 className="h-8 w-auto max-w-[120px] object-contain"
               />

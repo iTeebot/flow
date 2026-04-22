@@ -126,11 +126,11 @@ export function RegisterView() {
         {/* ── Sidebar ── */}
         <div className="hidden md:flex md:w-[300px] bg-navy/60 border-r border-border/60 flex-col backdrop-blur-xl shrink-0 overflow-y-auto">
           <div className="flex flex-col p-8 gap-6 min-h-full">
-            {view === "form" && <img src={`${themeMode === "dark" ? "auth_logo_dark.png" : "/auth_logo.png"}`} alt="Teebot Flow" className="h-auto w-auto opacity-100" />}
+            {view === "form" && <img src={`${themeMode === "light" ? "auth_logo.png" : "auth_logo_dark.png"}`} alt="Teebot Flow" className="h-auto w-auto opacity-100" />}
 
             {view === "form" ? (
-              <div className="space-y-6 animate-in fade-in duration-300">
-                <div>
+              <div className="space-y-6 animate-in fade-in duration-300">~
+                <div>~
                   <h2 className="text-2xl font-black text-text-primary leading-tight tracking-tight">
                     Welcome to<br />
                     <span className="text-primary italic">Teebot Flow</span>
