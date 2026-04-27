@@ -16,10 +16,13 @@
     "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "i18next": "^26.0.8",
+    "i18next-browser-languagedetector": "^8.2.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.8.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-i18next": "^17.0.6",
     "react-router-dom": "^7.14.1",
     "recharts": "^3.8.1",
     "tailwindcss": "^4.2.4",
@@ -33,5 +36,5 @@
     "typescript": "~5.8.3",
     "vite": "^7.0.4"
   },
-  "packageManager": "pnpm@10.33.0"
+  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8"
 }

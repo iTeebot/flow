@@ -210,7 +210,16 @@ export function InventoryModule() {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    let baseSku = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+                    if (!baseSku && name) baseSku = "ITEM";
+                    
+                    const exists = products.some(p => p.sku === baseSku);
+                    const finalSku = exists ? `${baseSku}-${Date.now().toString().slice(-4)}` : baseSku;
+                    
+                    setFormData({ ...formData, name, sku: finalSku });
+                  }}
                   placeholder="e.g. Premium Cotton Tee"
                   className="w-full"
                 />
@@ -223,10 +232,10 @@ export function InventoryModule() {
                 <input
                   type="text"
                   required
+                  readOnly
                   value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  placeholder="e.g. T-SHIRT-001"
-                  className="w-full"
+                  placeholder="Auto-generated"
+                  className="w-full bg-surface/50 cursor-not-allowed opacity-80"
                 />
               </div>
 
@@ -235,14 +244,14 @@ export function InventoryModule() {
                   Initial Stock Qty
                 </label>
                 <div className="relative">
-                  <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                  <Package className="input-icon-left h-4 w-4 text-text-muted" />
                   <input
                     type="number"
                     required
                     min="0"
                     value={formData.stock_qty}
                     onChange={(e) => setFormData({ ...formData, stock_qty: parseInt(e.target.value) || 0 })}
-                    className="w-full pl-10"
+                    className="w-full input-with-icon"
                   />
                 </div>
               </div>
@@ -343,7 +352,7 @@ export function InventoryModule() {
             {/* Filters */}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 lg:w-3/4">
               <div className="relative group lg:col-span-2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted group-focus-within:text-primary transition-colors" />
+                <Search className="input-icon-left h-3.5 w-3.5 text-text-muted group-focus-within:text-primary transition-colors" />
                 <input
                   value={searchTerm}
                   onChange={(e) => {
@@ -351,7 +360,7 @@ export function InventoryModule() {
                     setPage(1);
                   }}
                   placeholder="Search articles and assets..."
-                  className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-text-muted/50"
+                  className="w-full input-with-icon pr-4 py-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-text-muted/50"
                 />
               </div>
 

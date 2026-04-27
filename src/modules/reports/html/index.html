@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Delivery Challan — {{DC_NUMBER}}</title>
+  <style>
+    @page { 
+      size: A4; 
+      margin: 0; 
+    }
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      -webkit-print-color-adjust: exact;
+      color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body { 
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+      background: white; 
+      color: #111827; 
+      -webkit-font-smoothing: antialiased;
+    }
+    #challan { 
+      width: 210mm; 
+      min-height: 297mm; 
+      margin: 0 auto; 
+      display: flex; 
+      flex-direction: column;
+      background: white;
+    }
+    @media print {
+      html, body { 
+        width: 210mm; 
+        height: 297mm; 
+        margin: 0; 
+        padding: 0; 
+        background: white;
+      }
+      body * {
+        visibility: hidden;
+      }
+      #print-root, #print-root * {
+        visibility: visible;
+      }
+      #print-root {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      #challan { 
+        page-break-after: always; 
+        box-shadow: none;
+      }
+    }
+    
+    /* Typography & Utilities */
+    .text-gray-900 { color: #111827; }
+    .text-gray-500 { color: #6b7280; }
+    .text-gray-400 { color: #9ca3af; }
+    .text-white { color: #ffffff; }
+    .font-bold { font-weight: 700; }
+    .font-black { font-weight: 900; }
+    .text-xs { font-size: 0.75rem; line-height: 1rem; }
+    .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+    .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+    .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+    .uppercase { text-transform: uppercase; }
+    .tracking-widest { letter-spacing: 0.1em; }
+    
+    /* Layout */
+    .header {
+      background: linear-gradient(135deg, #1e293b, #334155);
+      padding: 32px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .meta-grid {
+      padding: 32px 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f9fafb;
+    }
+    .table-container {
+      padding: 32px 40px 0;
+    }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .table th {
+      background: #1e293b;
+      color: white;
+      padding: 12px 16px;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border: 1px solid #334155;
+      text-align: left;
+    }
+    .table td {
+      padding: 12px 16px;
+      border: 1px solid #e5e7eb;
+      font-size: 12px;
+    }
+    .summary-bar {
+      margin: 24px 40px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr auto;
+    }
+    .signatures {
+      margin: 0 40px 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+    }
+    .footer {
+      margin-top: auto;
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
+      padding: 16px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+<div id="challan">
+  <!-- HEADER -->
+  <div class="header">
+    <div style="display: flex; align-items: center; gap: 16px;">
+      {{LOGO_HTML}}
+      <div>
+        <h1 style="font-size: 28px; font-weight: 900; color: white; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Delivery Challan</h1>
+        <p style="font-size: 11px; color: #94a3b8; letter-spacing: 0.15em; font-weight: 700; text-transform: uppercase;">Goods Dispatch Document</p>
+      </div>
+    </div>
+    <div style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 12px 24px; text-align: right;">
+      <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; margin-bottom: 4px;">DC Number</div>
+      <div style="font-size: 20px; font-weight: 900; color: white; letter-spacing: -0.02em;">{{DC_NUMBER}}</div>
+    </div>
+  </div>
+
+  <!-- META GRID -->
+  <div class="meta-grid">
+    <div>
+      <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; margin-bottom: 8px;">Bill To / Deliver To</div>
+      <div style="font-size: 15px; font-weight: 700; color: #111827; margin-bottom: 4px;">{{CUSTOMER_NAME}}</div>
+      <div style="margin-top: 20px;">
+        <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; margin-bottom: 4px;">Date</div>
+        <div style="font-size: 13px; font-weight: 600; color: #374151;">{{DATE}}</div>
+      </div>
+    </div>
+    <div>{{CUSTOM_FIELDS}}</div>
+  </div>
+
+  <!-- LINE ITEMS TABLE -->
+  <div class="table-container">
+    <table class="table">
+      <colgroup>
+        <col style="width: 8%;" />
+        <col style="width: 52%;" />
+        <col style="width: 25%;" />
+        <col style="width: 15%;" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Product / Description</th>
+          <th>SKU / Code</th>
+          <th style="text-align: center;">Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ITEM_ROWS}}
+        {{EMPTY_ROWS}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SUMMARY BAR -->
+  <div class="summary-bar">
+    <div style="background: #1e293b; padding: 16px 24px; display: flex; align-items: center; justify-content: flex-end;">
+      <span style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8;">Total Quantity Dispatched</span>
+    </div>
+    <div style="background: #334155; padding: 16px 32px; display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 24px; font-weight: 900; color: white;">{{TOTAL_QTY}}</span>
+      <span style="font-size: 12px; color: #94a3b8; margin-top: 4px;">units</span>
+    </div>
+  </div>
+
+  <!-- SIGNATURE SECTION -->
+  <div class="signatures">
+    <div>
+      <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; margin-bottom: 12px;">Dispatched By</div>
+      <div style="height: 64px; border-bottom: 2px dashed #d1d5db; display: flex; align-items: flex-end; padding-bottom: 6px;">
+        <span style="font-size: 11px; color: #d1d5db; font-style: italic;">Authorized Signature</span>
+      </div>
+      <div style="font-size: 10px; color: #9ca3af; margin-top: 8px;">Name &amp; Stamp</div>
+    </div>
+    <div>
+      <div style="font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af; margin-bottom: 12px;">Received By</div>
+      <div style="height: 64px; border-bottom: 2px dashed #d1d5db; display: flex; align-items: flex-end; padding-bottom: 6px;">
+        <span style="font-size: 11px; color: #d1d5db; font-style: italic;">Receiver Signature</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 8px;">
+        <div>
+          <div style="height: 24px; border-bottom: 1px dashed #e5e7eb;"></div>
+          <div style="font-size: 10px; color: #9ca3af; margin-top: 4px;">Name</div>
+        </div>
+        <div>
+          <div style="height: 24px; border-bottom: 1px dashed #e5e7eb;"></div>
+          <div style="font-size: 10px; color: #9ca3af; margin-top: 4px;">Date</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9ca3af;">This is a computer-generated document</span>
+    <span style="font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: #6b7280;">Teebot Flow · v{{APP_VERSION}}</span>
+  </div>
+</div>
+</body>
+</html>

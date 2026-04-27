@@ -1,0 +1,16 @@
+{
+  "save": "Save",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "edit": "Edit",
+  "add": "Add",
+  "loading": "Loading...",
+  "search": "Search",
+  "select": "Select...",
+  "actions": "Actions",
+  "date": "Date",
+  "quantity": "Quantity",
+  "status": "Status",
+  "total": "Total",
+  "currency": "Currency"
+}

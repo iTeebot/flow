@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import i18n from "../lib/i18n";
 
 type ModuleKey =
   | "dashboard"
@@ -57,6 +58,7 @@ export const useUiStore = create<UiState>((set) => ({
   },
   setLanguage: (lang) => {
     localStorage.setItem("ui-language", lang);
+    i18n.changeLanguage(lang);
     set({ language: lang });
   },
   initializeStore: () => {
@@ -70,6 +72,7 @@ export const useUiStore = create<UiState>((set) => ({
     // Language initialization
     const storedLang = localStorage.getItem("ui-language") as LanguageKey;
     const lang: LanguageKey = ["en", "hi", "gu", "ur"].includes(storedLang) ? storedLang : "en";
+    i18n.changeLanguage(lang);
     
     set({ themeMode: mode, resolvedTheme: resolved, language: lang });
   },

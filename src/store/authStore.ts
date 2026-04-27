@@ -28,7 +28,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   companyId: null,
-  currency: "USD",
+  currency: localStorage.getItem("currency") || "USD",
   companyLogo: localStorage.getItem("companyLogo"),
   isAuthenticated: false,
   isRegistered: false,
@@ -47,10 +47,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (username, password) => {
     try {
       const response = await invoke<any>("login", { username, password });
+      const userCurrency = response.user?.currency || "USD";
+      localStorage.setItem("currency", userCurrency);
       set({ 
         user: response.user, 
         companyId: response.company_id, 
-        currency: response.user?.currency || "USD",
+        currency: userCurrency,
         isAuthenticated: true 
       });
     } catch (error) {
@@ -62,10 +64,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   register: async (data) => {
     try {
       const response = await invoke<any>("register", { input: data });
+      const userCurrency = response.user?.currency || "USD";
+      localStorage.setItem("currency", userCurrency);
       set({ 
         user: response.user, 
         companyId: response.company_id, 
-        currency: response.user?.currency || "USD",
+        currency: userCurrency,
         isAuthenticated: true, 
         isRegistered: true 
       });
@@ -80,6 +84,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   setCurrency: (currency) => {
+    localStorage.setItem("currency", currency);
     set({ currency });
   },
 

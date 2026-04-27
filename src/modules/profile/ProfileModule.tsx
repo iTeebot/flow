@@ -10,6 +10,9 @@ import {
   updateCompanyProfile,
   type CompanyProfile,
 } from "../companyProfile/api";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { SearchableSelect } from "../../components/ui/SearchableSelect";
 
 type ProfileForm = {
   full_name: string;
@@ -210,14 +213,14 @@ export function ProfileModule() {
                 </div>
 
                 {companyLogo && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="danger"
+                    size="sm"
                     onClick={handleRemoveLogo}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold text-error/60 border border-error/20 bg-error/5 hover:bg-error/10 hover:text-error transition-all"
+                    leftIcon={<Trash2 className="h-3.5 w-3.5" />}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
                     Purge Attachment
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -234,20 +237,21 @@ export function ProfileModule() {
                 </h2>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2 group">
-                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Account Executive Name</label>
-                  <div className="relative">
-                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-primary" />
-                    <input className="w-full pl-10" placeholder="e.g. John Doe" value={form.full_name} onChange={(e) => setField("full_name", e.target.value)} />
-                  </div>
-                </div>
-                <div className="space-y-2 group">
-                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider group-focus-within:text-primary transition-colors">Legal Trading Name <span className="text-error">*</span></label>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-primary" />
-                    <input className="w-full pl-10" placeholder="e.g. Teebotics Ltd" value={form.company_name} onChange={(e) => setField("company_name", e.target.value)} required />
-                  </div>
-                </div>
+                <Input
+                  label="Account Executive Name"
+                  placeholder="e.g. John Doe"
+                  value={form.full_name}
+                  onChange={(e) => setField("full_name", e.target.value)}
+                  leftIcon={<UserIcon className="h-4 w-4" />}
+                />
+                <Input
+                  label="Legal Trading Name"
+                  placeholder="e.g. Teebotics Ltd"
+                  value={form.company_name}
+                  onChange={(e) => setField("company_name", e.target.value)}
+                  required
+                  leftIcon={<Building2 className="h-4 w-4" />}
+                />
               </div>
             </div>
 
@@ -260,34 +264,37 @@ export function ProfileModule() {
                 </h2>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-gradient-to-br from-card to-surface/40">
-                <div className="space-y-2 group">
-                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">NTN / Tax ID</label>
-                  <input className="w-full" placeholder="PKR-00-0000" value={form.tax_registration_number} onChange={(e) => setField("tax_registration_number", e.target.value)} />
-                </div>
-                <div className="space-y-2 group">
-                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Sales Tax #</label>
-                  <input className="w-full" placeholder="STRN-12345" value={form.sales_tax_number} onChange={(e) => setField("sales_tax_number", e.target.value)} />
-                </div>
-                <div className="space-y-2 group">
-                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Business Vertical</label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                    <input className="w-full pl-10" placeholder="e.g. Manufacturing" value={form.business_type} onChange={(e) => setField("business_type", e.target.value)} />
-                  </div>
-                </div>
-                <div className="space-y-2 group md:col-span-2 lg:col-span-3">
-                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Transactional Currency</label>
-                  <select
-                    className="w-full"
+                <Input
+                  label="NTN / Tax ID"
+                  placeholder="PKR-00-0000"
+                  value={form.tax_registration_number}
+                  onChange={(e) => setField("tax_registration_number", e.target.value)}
+                />
+                <Input
+                  label="Sales Tax #"
+                  placeholder="STRN-12345"
+                  value={form.sales_tax_number}
+                  onChange={(e) => setField("sales_tax_number", e.target.value)}
+                />
+                <Input
+                  label="Business Vertical"
+                  placeholder="e.g. Manufacturing"
+                  value={form.business_type}
+                  onChange={(e) => setField("business_type", e.target.value)}
+                  leftIcon={<Briefcase className="h-4 w-4" />}
+                />
+                <div className="md:col-span-2 lg:col-span-3">
+                  <SearchableSelect
+                    label="Transactional Currency"
+                    options={currenciesList.map((curr: any) => ({
+                      label: `${curr.name} (${curr.code})`,
+                      value: curr.code,
+                      description: `Symbol: ${curr.symbol}`,
+                      icon: <span className="text-primary font-bold">{curr.symbol}</span>
+                    }))}
                     value={form.currency}
-                    onChange={(e) => setField("currency", e.target.value)}
-                  >
-                    {currenciesList.map((curr: any) => (
-                      <option key={curr.code} value={curr.code}>
-                        {curr.symbol} {curr.name} ({curr.code})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setField("currency", val)}
+                  />
                 </div>
               </div>
             </div>
@@ -302,26 +309,28 @@ export function ProfileModule() {
               </div>
               <div className="p-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2 group">
-                    <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Web Domain</label>
-                    <div className="relative">
-                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                      <input className="w-full pl-10 overflow-hidden text-ellipsis" placeholder="www.yourlink.com" value={form.website} onChange={(e) => setField("website", e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2 group">
-                    <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Support Phone</label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                      <input className="w-full pl-10" placeholder="+12 345 6789" value={form.phone} onChange={(e) => setField("phone", e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2 group md:col-span-2">
-                    <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Business Email</label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                      <input className="w-full pl-10" placeholder="admin@domain.com" value={form.email} onChange={(e) => setField("email", e.target.value)} />
-                    </div>
+                  <Input
+                    label="Web Domain"
+                    placeholder="www.yourlink.com"
+                    value={form.website}
+                    onChange={(e) => setField("website", e.target.value)}
+                    leftIcon={<Globe className="h-4 w-4" />}
+                  />
+                  <Input
+                    label="Support Phone"
+                    placeholder="+12 345 6789"
+                    value={form.phone}
+                    onChange={(e) => setField("phone", e.target.value)}
+                    leftIcon={<Phone className="h-4 w-4" />}
+                  />
+                  <div className="md:col-span-2">
+                    <Input
+                      label="Business Email"
+                      placeholder="admin@domain.com"
+                      value={form.email}
+                      onChange={(e) => setField("email", e.target.value)}
+                      leftIcon={<Mail className="h-4 w-4" />}
+                    />
                   </div>
                 </div>
 
@@ -341,16 +350,14 @@ export function ProfileModule() {
             <span className="text-xs font-bold text-text-muted uppercase tracking-widest">Master Identity Locked</span>
           </div>
 
-          <button
+          <Button
             type="submit"
-            disabled={saving}
-            className="w-full md:w-auto inline-flex items-center justify-center gap-3 rounded-xl bg-primary px-12 py-4 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            isLoading={saving}
+            className="w-full md:w-auto px-12 py-6 text-sm uppercase tracking-widest"
+            leftIcon={!saving && <ShieldCheck className="h-5 w-5" />}
           >
-            {saving ? (
-              <div className="w-5 h-5 border-3 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
-            ) : <ShieldCheck className="h-5 w-5" />}
             {saving ? "Updating Records..." : "Synchronize Identity"}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

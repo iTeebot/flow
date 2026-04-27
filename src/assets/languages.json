@@ -1,0 +1,12 @@
+[
+    {
+        "name": "English",
+        "nativeName": "English",
+        "code": "en"
+    },
+    {
+        "name": "Urdu",
+        "nativeName": "اردو",
+        "code": "ur"
+    }
+]

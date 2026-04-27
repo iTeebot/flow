@@ -1,4 +1,32 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
+
+/* Language specific font overrides */
+[lang="ur"] {
+  font-family: 'Noto Nastaliq Urdu', serif !important;
+  font-size: 13px; /* Slightly smaller base font for Urdu */
+}
+
+[lang="ur"] body,
+[lang="ur"] input,
+[lang="ur"] select,
+[lang="ur"] button,
+[lang="ur"] textarea {
+  font-family: 'Noto Nastaliq Urdu', serif !important;
+}
+
+/* Adjust heading sizes for Urdu to prevent layout overflow */
+[lang="ur"] h1 { font-size: 1.5rem !important; line-height: 2.2 !important; }
+[lang="ur"] h2 { font-size: 1.25rem !important; line-height: 2 !important; }
+[lang="ur"] h3 { font-size: 1.1rem !important; line-height: 1.8 !important; }
+
+/* Global line-height boost for Urdu to prevent clipping of Nastaliq characters */
+[lang="ur"] p, 
+[lang="ur"] span, 
+[lang="ur"] label,
+[lang="ur"] button {
+  line-height: 2 !important;
+}
 
 @theme {
   --color-primary: var(--color-primary);
@@ -128,7 +156,8 @@ textarea {
   color: var(--color-text-primary);
   border-radius: 0.5rem;
   padding-block: 0.5rem;
-  padding-inline: 0.75rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
   font-size: 0.875rem;
   transition: all 0.2s ease;
   outline: none;
@@ -141,6 +170,19 @@ input:hover, select:hover {
 input:focus, select:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+
+.input-with-icon {
+  padding-left: 2.5rem !important;
+}
+
+.input-icon-left {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 10;
 }
 
 select {

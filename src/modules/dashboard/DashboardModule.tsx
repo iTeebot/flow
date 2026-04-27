@@ -15,7 +15,7 @@ import {
 import {
   Package,
   Users,
-  DollarSign,
+  Coins,
   FileText,
   TrendingUp,
   Activity,
@@ -89,7 +89,7 @@ export function DashboardModule() {
         {[
           { label: 'Asset Catalog', value: data.kpi.total_products, icon: Package, color: 'bg-primary/10 text-primary', sub: 'Total SKU count' },
           { label: 'Active Clients', value: data.kpi.total_customers, icon: Users, color: 'bg-success/10 text-success', sub: 'Registered database' },
-          { label: 'Revenue Pool', value: formatCurrency(data.kpi.total_sales, currency), icon: DollarSign, color: 'bg-warning/10 text-warning', sub: 'Cumulative revenue' },
+          { label: 'Revenue Pool', value: formatCurrency(data.kpi.total_sales, currency), icon: Coins, color: 'bg-warning/10 text-warning', sub: 'Cumulative revenue' },
           { label: 'Open Logistics', value: data.kpi.pending_deliveries, icon: FileText, color: 'bg-error/10 text-error', sub: 'Pending deliveries' }
         ].map((kpi, idx) => (
           <div key={idx} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm transition-all hover:shadow-xl hover:border-primary/20 hover:scale-[1.02]">

@@ -1,15 +1,23 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, FileText, Download, Printer, Search, Users, Package } from "lucide-react";
+import { Plus, FileText, Download, Printer, Search, Users, Package, X, Settings2, GripHorizontal, Edit2 } from "lucide-react";
 import { createDeliveryChallan, listDeliveryChallans, type DeliveryChallan } from "./api";
 import { listCustomers, type Customer } from "../customers/api";
 import { listProducts, type Product } from "../inventory/api";
 import { useAuthStore } from "../../store/authStore";
-import { downloadDeliveryChallanPdf, printDeliveryChallan } from "../reports/pdf";
+import { downloadDeliveryChallanPdf, printDeliveryChallan, type ChallanCustomField } from "../reports/pdf";
 import { TablePagination } from "../shared/TablePagination";
-import { formatCurrency } from "../../lib/utils";
 import { useToastStore } from "../../store/toastStore";
 import { SortableHeader } from "../../components/SortableHeader";
 import { TableActions } from "../../components/TableActions";
+import { ChallanPreviewPane } from "./ChallanPreviewPane";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { SearchableSelect } from "../../components/ui/SearchableSelect";
+import { LanguageSwitcher } from "../../components/ui/LanguageSwitcher";
+import { useTranslation } from "react-i18next";
+import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
+import { CreateProductModal } from "../../components/modals/CreateProductModal";
 
 type ChallanItem = {
   product_id: number;
@@ -18,6 +26,7 @@ type ChallanItem = {
 };
 
 export function DeliveryChallanModule() {
+  const { t } = useTranslation();
   const [deliveryChallans, setDeliveryChallans] = useState<DeliveryChallan[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -35,9 +44,20 @@ export function DeliveryChallanModule() {
   const [challanItems, setChallanItems] = useState<ChallanItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [customFields, setCustomFields] = useState<ChallanCustomField[]>([]);
+  const [newFieldLabel, setNewFieldLabel] = useState("");
 
-  const { companyId, currency } = useAuthStore();
+  const { companyId, companyLogo } = useAuthStore();
   const currentCompanyId = companyId || 1;
+  const APP_VERSION = "0.0.5";
+
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+
+  // Dynamic Editor State
+  const [editingChallan, setEditingChallan] = useState<DeliveryChallan | null>(null);
+  const [editorCustomFields, setEditorCustomFields] = useState<ChallanCustomField[]>([]);
+  const [editorNewFieldLabel, setEditorNewFieldLabel] = useState("");
 
   useEffect(() => {
     if (currentCompanyId) {
@@ -61,6 +81,16 @@ export function DeliveryChallanModule() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleQuickAddCustomerSuccess = (newCustomer: Customer) => {
+    setCustomers(prev => [...prev, newCustomer]);
+    setSelectedCustomer(newCustomer);
+  };
+
+  const handleQuickAddProductSuccess = (newProduct: Product) => {
+    setProducts(prev => [...prev, newProduct]);
+    setSelectedProduct(newProduct);
   };
 
   const handleAddItem = () => {
@@ -145,6 +175,23 @@ export function DeliveryChallanModule() {
     setChallanItems([]);
     setSelectedProduct(null);
     setQuantity(1);
+    setCustomFields([]);
+    setNewFieldLabel("");
+  };
+
+  const handleAddCustomField = () => {
+    const label = newFieldLabel.trim();
+    if (!label) return;
+    setCustomFields(prev => [...prev, { id: `cf-${Date.now()}`, label, value: "" }]);
+    setNewFieldLabel("");
+  };
+
+  const handleUpdateCustomField = (id: string, value: string) => {
+    setCustomFields(prev => prev.map(f => f.id === id ? { ...f, value } : f));
+  };
+
+  const handleRemoveCustomField = (id: string) => {
+    setCustomFields(prev => prev.filter(f => f.id !== id));
   };
 
   const getAvailableProducts = () => {
@@ -152,14 +199,12 @@ export function DeliveryChallanModule() {
     return products.filter(product => !usedProductIds.includes(product.id) && product.stock_qty > 0);
   };
 
-  const calculateTotal = () => {
-    return challanItems.reduce((total, item) => total + (item.quantity * item.product.price), 0);
-  };
 
-  const handleDownloadPdf = async (challan: DeliveryChallan) => {
+
+  const handleDownloadPdf = async (challan: DeliveryChallan, fields: ChallanCustomField[] = []) => {
     setDownloadingId(challan.id);
     try {
-      const savedPath = await downloadDeliveryChallanPdf(challan);
+      const savedPath = await downloadDeliveryChallanPdf(challan, fields);
       if (savedPath === "browser-download") {
         addToast("Document has been downloaded to your browser.", "info");
       } else {
@@ -214,9 +259,9 @@ export function DeliveryChallanModule() {
   const safePage = Math.min(page, totalPages);
   const paginatedChallans = filteredChallans.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  const handlePrint = (challan: DeliveryChallan) => {
+  const handlePrint = (challan: DeliveryChallan, fields: ChallanCustomField[] = []) => {
     try {
-      printDeliveryChallan(challan);
+      printDeliveryChallan(challan, fields);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to open print view", "error");
     }
@@ -234,161 +279,173 @@ export function DeliveryChallanModule() {
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Delivery Challans</h1>
-          <p className="text-sm text-text-muted mt-1">Manage and track your customer delivery documents</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-text-primary">{t('challan.title')}</h1>
+            <p className="text-sm text-text-muted mt-1">Manage and track your customer delivery documents</p>
+          </div>
+          <LanguageSwitcher />
         </div>
-        <button
+        <Button
           onClick={() => setShowCreateForm(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98]"
+          leftIcon={<Plus className="h-4 w-4" />}
         >
-          <Plus className="h-4 w-4" />
-          Create
-        </button>
+          {t('common.add')}
+        </Button>
       </div>
 
       {showCreateForm && (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-in slide-in-from-top-4 duration-300">
-          <div className="border-b border-border bg-surface/50 px-6 py-4">
-            <h2 className="text-lg font-bold text-text-primary">New Delivery Challan</h2>
+          <div className="border-b border-border bg-surface/50 px-6 py-4 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              New Delivery Challan
+            </h2>
+            <button onClick={resetForm} className="text-text-muted hover:text-text-primary transition-colors">
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
-          <div className="p-6 space-y-8">
-            {/* Customer Selection */}
-            <div className="max-w-md">
-              <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                Select Customer <span className="text-error">*</span>
-              </label>
-              <div className="relative group">
-                <Users className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-primary transition-colors" />
-                <select
-                  value={selectedCustomer?.id || ""}
-                  onChange={(e) => {
-                    const customer = customers.find(c => c.id === parseInt(e.target.value));
-                    setSelectedCustomer(customer || null);
-                  }}
-                  className="block w-full rounded-lg border border-border bg-background pl-10 pr-3 py-2.5 text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none"
-                  required
-                >
-                  <option value="">Choose a customer...</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 xl:grid-cols-[380px_1fr] min-h-0">
+            {/* ── LEFT PANEL: Controls ── */}
+            <div className="border-b xl:border-b-0 xl:border-r border-border bg-surface/20 p-6 space-y-6 overflow-y-auto">
 
-            {/* Product Selection */}
-            {selectedCustomer && (
-              <div className="space-y-4 animate-in fade-in duration-300">
-                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted">
-                  Line Items
-                </label>
+              {/* Customer */}
+              <SearchableSelect
+                label={t('challan.customer')}
+                placeholder="Choose a customer..."
+                options={[
+                  { label: "＋ Register New Customer", value: "ADD_NEW" },
+                  ...customers.map(c => ({ label: c.name, value: c.id, description: c.phone, icon: <Users className="h-4 w-4" /> }))
+                ]}
+                value={selectedCustomer?.id || null}
+                onChange={(val) => {
+                  if (val === "ADD_NEW") { setShowCustomerModal(true); return; }
+                  setSelectedCustomer(customers.find(c => c.id === parseInt(val)) || null);
+                }}
+              />
 
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <div className="relative flex-1 group">
-                    <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted group-focus-within:text-primary transition-colors" />
-                    <select
-                      value={selectedProduct?.id || ""}
-                      onChange={(e) => {
-                        const product = products.find(p => p.id === parseInt(e.target.value));
-                        setSelectedProduct(product || null);
-                      }}
-                      className="w-full rounded-lg border border-border bg-background pl-10 pr-3 py-2.5 text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none"
-                    >
-                      <option value="">Choose a product...</option>
-                      {getAvailableProducts().map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.name} ({product.sku}) - Stock: {product.stock_qty}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="sm:w-24">
-                    <input
-                      type="number"
-                      value={quantity}
-                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                      min="1"
-                      placeholder="Qty"
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-                    />
-                  </div>
+              {/* Custom Fields */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-text-muted flex items-center gap-1.5">
+                    <Settings2 className="h-3 w-3" /> Custom Fields
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newFieldLabel}
+                    onChange={(e) => setNewFieldLabel(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddCustomField())}
+                    placeholder="e.g. PO Number, UT Number..."
+                    className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
                   <button
-                    onClick={handleAddItem}
-                    disabled={!selectedProduct}
-                    className="inline-flex items-center justify-center rounded-lg bg-surface border border-border px-6 py-2.5 text-sm font-semibold text-text-primary transition-all hover:bg-card hover:border-primary/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    type="button"
+                    onClick={handleAddCustomField}
+                    disabled={!newFieldLabel.trim()}
+                    className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold disabled:opacity-40 hover:scale-[1.02] transition-all"
                   >
-                    Add Item
+                    <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>
-
-                {/* Items List */}
-                {challanItems.length > 0 && (
-                  <div className="rounded-lg border border-border overflow-hidden bg-background/50">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-surface/30 border-b border-border">
-                          <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-text-muted">Product</th>
-                          <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-text-muted text-center">Qty</th>
-                          <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-text-muted text-right">Rate</th>
-                          <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-text-muted text-right">Amount</th>
-                          <th className="px-4 py-3 w-10"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {challanItems.map((item) => (
-                          <tr key={item.product_id} className="group hover:bg-surface/20 transition-colors">
-                            <td className="px-4 py-3">
-                              <div className="font-medium text-text-primary">{item.product.name}</div>
-                              <div className="text-xs text-text-muted">{item.product.sku}</div>
-                            </td>
-                            <td className="px-4 py-3 text-center text-sm">{item.quantity}</td>
-                            <td className="px-4 py-3 text-right text-sm font-medium">{formatCurrency(item.product.price, currency)}</td>
-                            <td className="px-4 py-3 text-right text-sm font-bold">{formatCurrency(item.quantity * item.product.price, currency)}</td>
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => handleRemoveItem(item.product_id)}
-                                className="p-1.5 text-text-muted hover:text-error transition-colors rounded-md hover:bg-error/10"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-surface/10">
-                        <tr>
-                          <td colSpan={3} className="px-4 py-3 text-sm font-bold text-text-primary text-right uppercase tracking-wider">Total Amount</td>
-                          <td className="px-4 py-3 text-right text-lg font-black text-primary">
-                            {formatCurrency(calculateTotal(), currency)}
-                          </td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                {customFields.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {customFields.map(f => (
+                      <div key={f.id} className="flex items-center gap-2 bg-background rounded-lg border border-border px-3 py-1.5">
+                        <GripHorizontal className="h-3.5 w-3.5 text-text-muted/40 shrink-0" />
+                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider shrink-0 w-20 truncate">{f.label}</span>
+                        <input
+                          type="text"
+                          value={f.value}
+                          onChange={(e) => handleUpdateCustomField(f.id, e.target.value)}
+                          placeholder="Enter value..."
+                          className="flex-1 bg-transparent text-xs outline-none text-text-primary placeholder:text-text-muted/40"
+                        />
+                        <button onClick={() => handleRemoveCustomField(f.id)} className="text-text-muted hover:text-error transition-colors shrink-0">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            )}
 
-            <div className="flex items-center gap-3 pt-4">
-              <button
-                onClick={handleCreateChallan}
-                disabled={!selectedCustomer || challanItems.length === 0}
-                className="rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              >
-                Confirm & Create Challan
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="rounded-lg border border-border bg-background px-6 py-2.5 text-sm font-semibold text-text-primary transition-all hover:bg-surface hover:border-text-muted/30"
-              >
-                Cancel
-              </button>
+              {/* Add Products */}
+              <div className="space-y-3">
+                <SearchableSelect
+                  label="Add Line Item"
+                  placeholder="Choose a product..."
+                  options={[
+                    { label: "＋ Register New Product", value: "ADD_NEW" },
+                    ...getAvailableProducts().map(p => ({
+                      label: p.name,
+                      value: p.id,
+                      description: `SKU: ${p.sku} | Stock: ${p.stock_qty}`,
+                      icon: <Package className="h-4 w-4" />
+                    }))
+                  ]}
+                  value={selectedProduct?.id || null}
+                  onChange={(val) => {
+                    if (val === "ADD_NEW") { setShowProductModal(true); return; }
+                    setSelectedProduct(products.find(p => p.id === parseInt(val)) || null);
+                  }}
+                />
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                    min="1"
+                    className="w-24"
+                  />
+                  <Button
+                    onClick={handleAddItem}
+                    disabled={!selectedProduct}
+                    variant="outline"
+                    className="flex-1"
+                    leftIcon={<Plus className="h-4 w-4" />}
+                  >
+                    Add to Challan
+                  </Button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                <Button
+                  onClick={handleCreateChallan}
+                  disabled={!selectedCustomer || challanItems.length === 0}
+                  className="w-full"
+                >
+                  ✓ Confirm & Create Challan
+                </Button>
+                <Button
+                  onClick={resetForm}
+                  variant="ghost"
+                  className="w-full"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+
+            {/* ── RIGHT PANEL: Live Preview ── */}
+            <div className="p-6 bg-gray-100/50 dark:bg-surface/30 overflow-y-auto">
+              <p className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-3 flex items-center gap-1.5">
+                <FileText className="h-3 w-3" /> Live Preview
+              </p>
+              <ChallanPreviewPane
+                customer={selectedCustomer}
+                items={challanItems}
+                customFields={customFields}
+                companyLogo={companyLogo}
+                onRemoveItem={handleRemoveItem}
+                onUpdateCustomField={handleUpdateCustomField}
+                onRemoveCustomField={handleRemoveCustomField}
+                version={APP_VERSION}
+              />
             </div>
           </div>
         </div>
@@ -408,52 +465,53 @@ export function DeliveryChallanModule() {
 
             {/* Responsive Filter Bar */}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 lg:w-3/4">
-              <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted group-focus-within:text-primary transition-colors" />
-                <input
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder="Search..."
-                  className="w-full rounded-lg border border-border bg-background pl-9 pr-3 py-2 text-xs text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
+              <Input
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
+                placeholder={t('common.search')}
+                leftIcon={<Search className="h-4 w-4" />}
+                className="py-2"
+              />
 
-              <select
+              <Select
                 value={dateFilter}
                 onChange={(e) => {
                   setDateFilter(e.target.value as "all" | "today" | "last7" | "last30");
                   setPage(1);
                 }}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none"
-              >
-                <option value="all">All Time</option>
-                <option value="today">Today</option>
-                <option value="last7">Last 7 Days</option>
-                <option value="last30">Last 30 Days</option>
-              </select>
+                options={[
+                  { label: "All Time", value: "all" },
+                  { label: "Today", value: "today" },
+                  { label: "Last 7 Days", value: "last7" },
+                  { label: "Last 30 Days", value: "last30" }
+                ]}
+                className="py-2"
+              />
 
-              <select
+              <Select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as "date" | "amount" | "customer" | "dc_number")}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none"
-              >
-                <option value="date">Sort by Date</option>
-                <option value="amount">Sort by Amount</option>
-                <option value="customer">Sort by Customer</option>
-                <option value="dc_number">Sort by DC #</option>
-              </select>
+                options={[
+                  { label: "Sort by Date", value: "date" },
+                  { label: "Sort by Amount", value: "amount" },
+                  { label: "Sort by Customer", value: "customer" },
+                  { label: "Sort by DC #", value: "dc_number" }
+                ]}
+                className="py-2"
+              />
 
-              <select
+              <Select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-xs text-text-primary outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 appearance-none"
-              >
-                <option value="desc">Descending</option>
-                <option value="asc">Ascending</option>
-              </select>
+                options={[
+                  { label: "Descending", value: "desc" },
+                  { label: "Ascending", value: "asc" }
+                ]}
+                className="py-2"
+              />
             </div>
           </div>
         </div>
@@ -485,10 +543,9 @@ export function DeliveryChallanModule() {
                     sortOrder={sortOrder}
                     onSort={handleSort}
                   />
-                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-text-muted">Items</th>
                   <SortableHeader
-                    label="Total Amount"
-                    sortKey="amount"
+                    label="Items"
+                    sortKey="items_count"
                     currentSortBy={sortBy}
                     sortOrder={sortOrder}
                     onSort={handleSort}
@@ -519,9 +576,7 @@ export function DeliveryChallanModule() {
                         {challan.items.length} unit{challan.items.length !== 1 ? 's' : ''}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-text-primary">{formatCurrency(challan.total_amount, currency)}</div>
-                    </td>
+
                     <td className="px-6 py-4">
                       <div className="text-sm text-text-muted flex items-center gap-1.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-success/60"></span>
@@ -532,6 +587,22 @@ export function DeliveryChallanModule() {
                       <div className="flex items-center justify-end">
                         <TableActions
                           actions={[
+                            {
+                              label: "Add Custom Fields",
+                              icon: Plus,
+                              onClick: () => {
+                                setEditingChallan({ ...challan, items: [...challan.items] });
+                                setEditorCustomFields([]);
+                              }
+                            },
+                            {
+                              label: "Edit Layout / Content",
+                              icon: Edit2,
+                              onClick: () => {
+                                setEditingChallan({ ...challan, items: [...challan.items] });
+                                setEditorCustomFields([]);
+                              }
+                            },
                             {
                               label: "Print Document",
                               icon: Printer,
@@ -569,6 +640,197 @@ export function DeliveryChallanModule() {
           </div>
         )}
       </div>
+      <CreateCustomerModal
+        isOpen={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        onSuccess={handleQuickAddCustomerSuccess}
+        companyId={currentCompanyId}
+      />
+
+      <CreateProductModal
+        isOpen={showProductModal}
+        onClose={() => setShowProductModal(false)}
+        onSuccess={handleQuickAddProductSuccess}
+        companyId={currentCompanyId}
+        existingProducts={products}
+      />
+      {/* Dynamic Document Editor Modal */}
+      {editingChallan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-full max-w-5xl max-h-[90vh] flex flex-col bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="px-6 py-4 border-b border-border bg-surface/50 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                  <Edit2 className="h-5 w-5 text-primary" />
+                  Dynamic Document Editor
+                </h3>
+                <p className="text-xs text-text-muted mt-1">Changes made here only apply to the printed or downloaded document.</p>
+              </div>
+              <button
+                onClick={() => { setEditingChallan(null); setEditorCustomFields([]); }}
+                className="text-text-muted hover:text-text-primary transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-[380px_1fr]">
+              {/* Controls */}
+              <div className="border-r border-border bg-surface/20 p-6 space-y-6 overflow-y-auto">
+                <Input
+                  label="Document Number"
+                  value={editingChallan.dc_number}
+                  onChange={(e) => setEditingChallan({ ...editingChallan, dc_number: e.target.value })}
+                />
+                <Input
+                  label="Customer Name"
+                  value={editingChallan.customer_name}
+                  onChange={(e) => setEditingChallan({ ...editingChallan, customer_name: e.target.value })}
+                />
+
+                {/* Custom Fields section */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted flex items-center gap-1.5">
+                      <Settings2 className="h-3 w-3" /> Custom Fields
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={editorNewFieldLabel}
+                      onChange={(e) => setEditorNewFieldLabel(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && editorNewFieldLabel.trim()) {
+                          e.preventDefault();
+                          setEditorCustomFields(prev => [...prev, { id: `cf-${Date.now()}`, label: editorNewFieldLabel.trim(), value: "" }]);
+                          setEditorNewFieldLabel("");
+                        }
+                      }}
+                      placeholder="e.g. PO Number..."
+                      className="py-2"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (editorNewFieldLabel.trim()) {
+                          setEditorCustomFields(prev => [...prev, { id: `cf-${Date.now()}`, label: editorNewFieldLabel.trim(), value: "" }]);
+                          setEditorNewFieldLabel("");
+                        }
+                      }}
+                      disabled={!editorNewFieldLabel.trim()}
+                      className="px-3"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  {editorCustomFields.length > 0 && (
+                    <div className="mt-2 space-y-1.5">
+                      {editorCustomFields.map(f => (
+                        <div key={f.id} className="flex items-center gap-2 bg-background rounded-lg border border-border px-3 py-1.5">
+                          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider shrink-0 w-20 truncate">{f.label}</span>
+                          <input
+                            type="text"
+                            value={f.value}
+                            onChange={(e) => setEditorCustomFields(prev => prev.map(cf => cf.id === f.id ? { ...cf, value: e.target.value } : cf))}
+                            placeholder="Value..."
+                            className="flex-1 bg-transparent text-xs outline-none text-text-primary placeholder:text-text-muted/40"
+                          />
+                          <button onClick={() => setEditorCustomFields(prev => prev.filter(cf => cf.id !== f.id))} className="text-text-muted hover:text-error transition-colors shrink-0">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Line Items section */}
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-text-muted mb-2 block">
+                    Line Items
+                  </label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {editingChallan.items.map((item, idx) => (
+                      <div key={item.id} className="bg-background border border-border rounded-lg p-3 space-y-2">
+                        <input
+                          type="text"
+                          value={item.product_name}
+                          onChange={(e) => {
+                            const newItems = [...editingChallan.items];
+                            newItems[idx].product_name = e.target.value;
+                            setEditingChallan({ ...editingChallan, items: newItems });
+                          }}
+                          className="w-full bg-transparent text-sm font-semibold text-text-primary outline-none border-b border-border focus:border-primary"
+                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={item.product_sku}
+                            onChange={(e) => {
+                              const newItems = [...editingChallan.items];
+                              newItems[idx].product_sku = e.target.value;
+                              setEditingChallan({ ...editingChallan, items: newItems });
+                            }}
+                            className="flex-1 bg-transparent text-xs text-text-muted outline-none"
+                          />
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => {
+                              const newItems = [...editingChallan.items];
+                              newItems[idx].quantity = parseInt(e.target.value) || 0;
+                              setEditingChallan({ ...editingChallan, items: newItems });
+                            }}
+                            className="w-16 bg-transparent text-sm font-bold text-center border border-border rounded outline-none focus:border-primary"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Live Preview Pane */}
+              <div className="p-6 bg-gray-100/50 dark:bg-surface/30 overflow-y-auto">
+                <ChallanPreviewPane
+                  customer={{ name: editingChallan.customer_name } as Customer}
+                  items={editingChallan.items.map(i => ({ product_id: i.product_id, quantity: i.quantity, product: { name: i.product_name, sku: i.product_sku } as Product }))}
+                  customFields={editorCustomFields}
+                  companyLogo={companyLogo}
+                  onRemoveItem={() => { }}
+                  onUpdateCustomField={() => { }}
+                  onRemoveCustomField={() => { }}
+                  version={APP_VERSION}
+                  dcNumber={editingChallan.dc_number}
+                  date={editingChallan.created_at}
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border bg-surface/50 flex justify-end gap-3 shrink-0">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  handlePrint(editingChallan, editorCustomFields);
+                }}
+                leftIcon={<Printer className="h-4 w-4" />}
+              >
+                Print Document
+              </Button>
+              <Button
+                onClick={() => {
+                  handleDownloadPdf(editingChallan, editorCustomFields);
+                }}
+                leftIcon={<Download className="h-4 w-4" />}
+              >
+                Save as PDF
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -273,7 +273,7 @@ export function CustomersModule() {
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 lg:w-3/4">
               <div className="relative group lg:col-span-2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted group-focus-within:text-primary transition-colors" />
+                <Search className="input-icon-left h-3.5 w-3.5 text-text-muted group-focus-within:text-primary transition-colors" />
                 <input
                   value={searchTerm}
                   onChange={(e) => {
@@ -281,7 +281,7 @@ export function CustomersModule() {
                     setPage(1);
                   }}
                   placeholder="Search customer database..."
-                  className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-text-muted/50"
+                  className="w-full input-with-icon pr-4 py-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-text-muted/50"
                 />
               </div>
 

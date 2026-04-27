@@ -1,97 +1,354 @@
 import { jsPDF } from "jspdf";
-console.log("PDF Module Loaded");
 import { invoke, openPath } from "../../lib/api";
 import type { DeliveryChallan } from "../deliveryChallan/api";
 import { useAuthStore } from "../../store/authStore";
+import challanTemplate from "./html/index.html?raw";
+
+export type ChallanCustomField = {
+  id: string;
+  label: string;
+  value: string;
+};
+
+const APP_VERSION = "0.0.5";
+const MIN_ROWS = 8;
 
 function toBase64(buffer: ArrayBuffer): string {
   let binary = "";
   const bytes = new Uint8Array(buffer);
   const chunkSize = 0x8000;
-
   for (let i = 0; i < bytes.length; i += chunkSize) {
     const chunk = bytes.subarray(i, i + chunkSize);
     binary += String.fromCharCode(...chunk);
   }
-
   return btoa(binary);
 }
 
-export async function downloadDeliveryChallanPdf(challan: DeliveryChallan) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const margin = 40;
-  const pageWidth = doc.internal.pageSize.getWidth();
-  let y = margin;
+/** Builds the shared print-ready HTML document string */
+function buildChallanHtml(
+  challan: DeliveryChallan,
+  companyLogo: string | null,
+  customFields: ChallanCustomField[] = []
+): string {
+  const displayDate = new Date(challan.created_at).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 
-  // Company logo
+  const totalQty = challan.items.reduce((s, i) => s + i.quantity, 0);
+  const emptyRowCount = Math.max(0, MIN_ROWS - challan.items.length);
+
+  const logoHtml = companyLogo
+    ? `<img src="${companyLogo}" style="height:52px;width:52px;object-fit:contain;border-radius:6px;background:#fff;padding:3px;margin-right:12px;" />`
+    : "";
+
+  const itemRows = challan.items
+    .map(
+      (item, idx) => `
+      <tr style="background:${idx % 2 === 0 ? "#fff" : "#f9fafb"};">
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;color:#6b7280;">${idx + 1}</td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;font-weight:600;color:#111827;">${item.product_name}</td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;font-family:monospace;color:#6b7280;">${item.product_sku}</td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:12px;font-weight:700;color:#111827;text-align:center;">${item.quantity}</td>
+      </tr>`
+    )
+    .join("");
+
+  const emptyRows = Array.from({ length: emptyRowCount })
+    .map(
+      (_, i) => `
+      <tr style="background:${(challan.items.length + i) % 2 === 0 ? "#fff" : "#f9fafb"};">
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;color:#d1d5db;">${challan.items.length + i + 1}</td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;color:#e5e7eb;">—</td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;color:#e5e7eb;">—</td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;"></td>
+      </tr>`
+    )
+    .join("");
+
+  const customFieldsHtml =
+    customFields.length > 0
+      ? customFields
+        .map(
+          (f) => `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#9ca3af;margin-bottom:4px;">${f.label}</div>
+          <div style="font-size:14px;font-weight:600;color:#111827;">${f.value || "—"}</div>
+        </div>`
+        )
+        .join("")
+      : `<div style="font-size:12px;color:#d1d5db;font-style:italic;">No custom fields</div>`;
+
+  return challanTemplate
+    .replace("{{LOGO_HTML}}", logoHtml)
+    .replace(/{{DC_NUMBER}}/g, challan.dc_number)
+    .replace("{{CUSTOMER_NAME}}", challan.customer_name)
+    .replace("{{DATE}}", displayDate)
+    .replace("{{CUSTOM_FIELDS}}", customFieldsHtml)
+    .replace("{{ITEM_ROWS}}", itemRows)
+    .replace("{{EMPTY_ROWS}}", emptyRows)
+    .replace("{{TOTAL_QTY}}", String(totalQty))
+    .replace("{{APP_VERSION}}", APP_VERSION);
+}
+
+export async function downloadDeliveryChallanPdf(
+  challan: DeliveryChallan,
+  customFields: ChallanCustomField[] = []
+) {
   const companyLogo = useAuthStore.getState().companyLogo;
+
+  // Use jsPDF html rendering via a hidden iframe approach
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+
+  // ── Header band ──────────────────────────────────────────────
+  doc.setFillColor(30, 41, 59);
+  doc.rect(0, 0, pageWidth, 90, "F");
+
+  // Logo
   if (companyLogo) {
     try {
-      doc.addImage(companyLogo, "PNG", margin, y, 50, 50);
-      // Title beside logo
+      doc.addImage(companyLogo, "PNG", margin, 15, 60, 60);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("Delivery Challan", margin + 60, y + 20);
-      y += 56;
+      doc.setFontSize(28);
+      doc.setTextColor(255, 255, 255);
+      doc.text("DELIVERY CHALLAN", margin + 75, 45);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.setTextColor(148, 163, 184);
+      doc.text("GOODS DISPATCH DOCUMENT", margin + 75, 65);
     } catch {
-      // If image fails, fall back to text-only header
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("Delivery Challan", margin, y);
-      y += 24;
+      doc.setFontSize(28);
+      doc.setTextColor(255, 255, 255);
+      doc.text("DELIVERY CHALLAN", margin, 45);
     }
   } else {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("Delivery Challan", margin, y);
-    y += 24;
+    doc.setFontSize(28);
+    doc.setTextColor(255, 255, 255);
+    doc.text("DELIVERY CHALLAN", margin, 45);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.setTextColor(148, 163, 184);
+    doc.text("GOODS DISPATCH DOCUMENT", margin, 65);
   }
 
-  y += 4;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  doc.text(`DC Number: ${challan.dc_number}`, margin, y);
-  y += 16;
-  doc.text(`Customer: ${challan.customer_name}`, margin, y);
-  y += 16;
-  doc.text(`Date: ${new Date(challan.created_at).toLocaleString()}`, margin, y);
+  // DC Number box (top-right)
+  doc.setFillColor(255, 255, 255, 0.1);
+  doc.roundedRect(pageWidth - margin - 150, 15, 150, 60, 6, 6, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(148, 163, 184);
+  doc.text("DC NUMBER", pageWidth - margin - 75, 35, { align: "center" });
+  doc.setFontSize(20);
+  doc.setTextColor(255, 255, 255);
+  doc.text(challan.dc_number, pageWidth - margin - 75, 60, { align: "center" });
+
+  // ── Meta section ─────────────────────────────────────────────
+  let y = 110;
+  doc.setFillColor(249, 250, 251);
+  doc.rect(0, 90, pageWidth, 100, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(156, 163, 175);
+  doc.text("BILL TO / DELIVER TO", margin, y);
+  y += 18;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(17, 24, 39);
+  doc.text(challan.customer_name, margin, y);
   y += 24;
-
   doc.setFont("helvetica", "bold");
-  doc.text("Items", margin, y);
+  doc.setFontSize(10);
+  doc.setTextColor(156, 163, 175);
+  doc.text("DATE", margin, y);
   y += 16;
-  doc.setLineWidth(0.5);
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 14;
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Product", margin, y);
-  doc.text("Qty", margin + 260, y);
-  doc.text("Rate", margin + 330, y);
-  doc.text("Amount", margin + 420, y);
-  y += 12;
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 14;
-
   doc.setFont("helvetica", "normal");
-  for (const item of challan.items) {
-    if (y > 760) {
+  doc.setFontSize(14);
+  doc.setTextColor(55, 65, 81);
+
+  const displayDate = new Date(challan.created_at).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+  doc.text(displayDate, margin, y);
+
+  // Custom fields on the right column
+  const rightCol = pageWidth / 2 + 10;
+  let cfY = 110;
+  for (const f of customFields) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(156, 163, 175);
+    doc.text(f.label.toUpperCase(), rightCol, cfY);
+    cfY += 16;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(17, 24, 39);
+    doc.text(f.value || "—", rightCol, cfY);
+    cfY += 24;
+  }
+
+  // ── Table ────────────────────────────────────────────────────
+  y = 210;
+  const colWidths = [40, 245, 130, 100]; // Total 515
+  const tableRight = pageWidth - margin;
+  const colX = [margin, margin + colWidths[0], margin + colWidths[0] + colWidths[1], margin + colWidths[0] + colWidths[1] + colWidths[2]];
+  const rowH = 26;
+
+  // Header row
+  doc.setFillColor(30, 41, 59);
+  doc.rect(margin, y, tableRight - margin, rowH, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(255, 255, 255);
+  const headers = ["#", "PRODUCT / DESCRIPTION", "SKU / CODE", "QTY"];
+  headers.forEach((h, i) => {
+    if (i === 3) {
+      doc.text(h, colX[i] + colWidths[i] / 2, y + 17, { align: "center" });
+    } else {
+      doc.text(h, colX[i] + 10, y + 17);
+    }
+  });
+  y += rowH;
+
+  // Item rows + empty rows
+  const allItems: Array<{ num: number; name: string; sku: string; qty: string | number; isEmpty: boolean }> = [
+    ...challan.items.map((item, idx) => ({
+      num: idx + 1,
+      name: item.product_name,
+      sku: item.product_sku,
+      qty: item.quantity,
+      isEmpty: false,
+    })),
+    ...Array.from({ length: Math.max(0, MIN_ROWS - challan.items.length) }).map((_, i) => ({
+      num: challan.items.length + i + 1,
+      name: "—",
+      sku: "—",
+      qty: "",
+      isEmpty: true,
+    })),
+  ];
+
+  for (let idx = 0; idx < allItems.length; idx++) {
+    const row = allItems[idx];
+    if (y > pageHeight - 140) {
       doc.addPage();
       y = margin;
     }
-    doc.text(item.product_name, margin, y);
-    doc.text(String(item.quantity), margin + 260, y);
-    doc.text(item.rate.toFixed(2), margin + 330, y);
-    doc.text(item.amount.toFixed(2), margin + 420, y);
-    y += 16;
+
+    doc.setFillColor(idx % 2 === 0 ? 255 : 249, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 251);
+    doc.rect(margin, y, tableRight - margin, rowH, "F");
+
+    // Cell borders
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, tableRight - margin, rowH, "S");
+    let cx = margin;
+    for (const w of colWidths) {
+      doc.rect(cx, y, w, rowH, "S");
+      cx += w;
+    }
+
+    if (row.isEmpty) {
+      doc.setTextColor(209, 213, 219);
+    } else {
+      doc.setTextColor(17, 24, 39);
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.text(String(row.num), colX[0] + 10, y + 18);
+    doc.text(row.name, colX[1] + 10, y + 18);
+    doc.text(row.sku, colX[2] + 10, y + 18);
+    if (row.qty !== "") {
+      doc.setFont("helvetica", "bold");
+      doc.text(String(row.qty), colX[3] + colWidths[3] / 2, y + 18, { align: "center" });
+    }
+    y += rowH;
   }
 
-  y += 8;
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 20;
-  doc.setFont("helvetica", "bold");
-  doc.text(`Total: ${challan.total_amount.toFixed(2)}`, margin + 330, y);
+  // ── Summary bar ──────────────────────────────────────────────
+  y += 16;
+  const totalQty = challan.items.reduce((s, i) => s + i.quantity, 0);
+  const summaryW = tableRight - margin;
+  const labelW = summaryW - 120;
 
+  doc.setFillColor(30, 41, 59);
+  doc.roundedRect(margin, y, labelW, 40, 4, 4, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(148, 163, 184);
+  doc.text("TOTAL QUANTITY DISPATCHED", margin + labelW - 16, y + 24, { align: "right" });
+
+  doc.setFillColor(51, 65, 85);
+  doc.roundedRect(margin + labelW + 6, y, 114, 40, 4, 4, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(24);
+  doc.setTextColor(255, 255, 255);
+  doc.text(String(totalQty), margin + labelW + 63, y + 28, { align: "center" });
+
+  // ── Signature section ────────────────────────────────────────
+  y += 64;
+  const halfW = (tableRight - margin) / 2 - 20;
+
+  // Dispatched By
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(156, 163, 175);
+  doc.text("DISPATCHED BY", margin, y);
+  doc.setDrawColor(209, 213, 219);
+  doc.setLineWidth(1);
+  doc.setLineDashPattern([4, 4], 0);
+  doc.line(margin, y + 60, margin + halfW, y + 60);
+  doc.setLineDashPattern([], 0);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(209, 213, 219);
+  doc.text("Name & Stamp", margin, y + 74);
+
+  // Received By
+  const rx = margin + halfW + 40;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(156, 163, 175);
+  doc.text("RECEIVED BY", rx, y);
+  doc.setDrawColor(209, 213, 219);
+  doc.setLineWidth(1);
+  doc.setLineDashPattern([4, 4], 0);
+  doc.line(rx, y + 60, rx + halfW, y + 60);
+  doc.setLineDashPattern([], 0);
+
+  const nameLineW = halfW / 2 - 10;
+  doc.line(rx, y + 90, rx + nameLineW, y + 90);
+  doc.line(rx + nameLineW + 20, y + 90, rx + halfW, y + 90);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(156, 163, 175);
+  doc.text("Name", rx, y + 104);
+  doc.text("Date", rx + nameLineW + 20, y + 104);
+
+  // ── Footer ───────────────────────────────────────────────────
+  doc.setFillColor(249, 250, 251);
+  doc.rect(0, pageHeight - 40, pageWidth, 40, "F");
+  doc.setDrawColor(229, 231, 235);
+  doc.setLineWidth(1);
+  doc.line(0, pageHeight - 40, pageWidth, pageHeight - 40);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(209, 213, 219);
+  doc.text("This is a computer-generated document", margin, pageHeight - 16);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(156, 163, 175);
+  doc.text(`Teebot Flow · v${APP_VERSION}`, pageWidth - margin, pageHeight - 16, { align: "right" });
+
+  // ── Save ─────────────────────────────────────────────────────
   const fileName = `${challan.dc_number}.pdf`;
   const arrayBuffer = doc.output("arraybuffer");
   const base64Data = toBase64(arrayBuffer);
@@ -101,95 +358,26 @@ export async function downloadDeliveryChallanPdf(challan: DeliveryChallan) {
     base64Data,
   });
 
-  // Best-effort preview: do not fail download if OS open action fails.
-  try {
-    await openPath(savedPath);
-  } catch {
-    // Ignore opener failures; file is still saved to disk.
-  }
-
+  try { await openPath(savedPath); } catch { /* ignore */ }
   return savedPath;
 }
 
-export function printDeliveryChallan(challan: DeliveryChallan) {
+export function printDeliveryChallan(
+  challan: DeliveryChallan,
+  customFields: ChallanCustomField[] = []
+) {
   const companyLogo = useAuthStore.getState().companyLogo;
-  challan.items
-    .map(
-      (item) => `
-        <tr>
-          <td>${item.product_name}</td>
-          <td>${item.quantity}</td>
-          <td>${item.rate.toFixed(2)}</td>
-          <td>${item.amount.toFixed(2)}</td>
-        </tr>
-      `,
-    )
-    .join("");
-
-  const logoHtml = companyLogo
-    ? `<img src="${companyLogo}" style="height:50px;width:50px;object-fit:contain;margin-right:12px;" />`
-    : "";
-
-  console.log("[Print] Starting print process via main window overlay...");
+  const html = buildChallanHtml(challan, companyLogo, customFields);
 
   let printRoot = document.getElementById("print-root");
   if (!printRoot) {
-    console.log("[Print] Creating #print-root element");
     printRoot = document.createElement("div");
     printRoot.id = "print-root";
     document.body.appendChild(printRoot);
   }
+  printRoot.innerHTML = html;
 
-  const itemsHtml = challan.items
-    .map(
-      (item) => `
-        <tr>
-          <td style="border: 1px solid #ddd; padding: 8px;">${item.product_name}</td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${item.quantity}</td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${item.rate.toFixed(2)}</td>
-          <td style="border: 1px solid #ddd; padding: 8px;">${item.amount.toFixed(2)}</td>
-        </tr>
-      `,
-    )
-    .join("");
-
-  printRoot.innerHTML = `
-    <div style="font-family: Arial, sans-serif; padding: 20px; color: #111; background: white;">
-      <div style="margin-bottom: 20px;">
-        <div style="display: flex; align-items: center; margin-bottom: 8px;">
-          ${logoHtml}
-          <h1 style="margin: 0 0 8px 0; font-size: 24px;">Delivery Challan</h1>
-        </div>
-        <div><strong>DC Number:</strong> ${challan.dc_number}</div>
-        <div><strong>Customer:</strong> ${challan.customer_name}</div>
-        <div><strong>Date:</strong> ${new Date(challan.created_at).toLocaleString()}</div>
-      </div>
-      <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
-        <thead>
-          <tr>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background: #f5f5f5;">Product</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background: #f5f5f5;">Qty</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background: #f5f5f5;">Rate</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; background: #f5f5f5;">Amount</th>
-          </tr>
-        </thead>
-        <tbody>${itemsHtml}</tbody>
-      </table>
-      <div style="margin-top: 16px; font-weight: bold; text-align: right; font-size: 18px;">
-        Total: ${challan.total_amount.toFixed(2)}
-      </div>
-    </div>
-  `;
-
-  console.log("[Print] Content injected. Triggering window.print()...");
-
-  // Use a small timeout to ensure the DOM has rendered the content
   setTimeout(() => {
-    try {
-      window.print();
-      console.log("[Print] window.print() called successfully");
-    } catch (e) {
-      console.error("[Print] Error calling window.print():", e);
-    }
-  }, 100);
+    try { window.print(); } catch (e) { console.error("[Print] Error:", e); }
+  }, 150);
 }

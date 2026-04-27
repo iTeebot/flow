@@ -15,6 +15,7 @@ import {
 import "./App.css";
 import { theme } from "./theme";
 import { type ModuleKey, useUiStore } from "./store/uiStore";
+import { getLanguageDirection } from "./utils/layout";
 import { ToastContainer } from "./components/ToastContainer";
 import { LandingPage } from "./pages/LandingPage";
 import { isTauri } from "./lib/platform";
@@ -64,6 +65,7 @@ const navItems: {
 import { useAuthStore } from "./store/authStore";
 import { LoginView } from "./modules/auth/LoginView";
 import { RegisterView } from "./modules/auth/RegisterView";
+import { getCompanyProfile } from "./modules/companyProfile/api";
 
 function AppContent() {
   const location = useLocation();
@@ -71,7 +73,9 @@ function AppContent() {
     isAuthenticated,
     isRegistered,
     isLoading,
-    checkRegistration
+    checkRegistration,
+    companyId,
+    setCurrency
   } = useAuthStore();
 
   const {
@@ -81,14 +85,36 @@ function AppContent() {
     toggleSidebar,
     initializeStore,
     syncSystemTheme,
-    themeMode
+    themeMode,
+    language
   } = useUiStore();
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = getLanguageDirection(language);
+  }, [language]);
   const currentLabel = navItems.find((item) => item.id === activeModule)?.label ?? "Teebot Flow";
 
   useEffect(() => {
     checkRegistration();
     initializeStore();
   }, [checkRegistration, initializeStore]);
+
+  useEffect(() => {
+    const syncProfile = async () => {
+      if (isAuthenticated && companyId) {
+        try {
+          const profile = await getCompanyProfile(companyId);
+          if (profile.currency) {
+            setCurrency(profile.currency);
+          }
+        } catch (err) {
+          console.error("Failed to sync company profile currency:", err);
+        }
+      }
+    };
+    syncProfile();
+  }, [isAuthenticated, companyId, setCurrency]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -138,7 +164,10 @@ function AppContent() {
       }
     >
       <div className={`grid h-screen ${sidebarCollapsed ? "grid-cols-[72px_1fr]" : "grid-cols-[220px_1fr]"}`}>
-        <aside className="h-screen flex flex-col border-r border-border bg-surface">
+        <aside 
+          onContextMenu={(e) => e.preventDefault()}
+          className="h-screen flex flex-col border-r border-border bg-surface"
+        >
           {/* Header Area: Branding + Toggle (Persistent) */}
           <div className="px-4 py-4 space-y-4 shrink-0 border-b border-transparent">
             <div className="flex items-center justify-center w-full">
