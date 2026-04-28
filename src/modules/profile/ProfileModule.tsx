@@ -1,10 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "../../lib/api";
-import { useAuthStore } from "../../store/authStore";
+import { useTranslation } from "react-i18next";
+import { useAuthStore, User } from "../../store/authStore";
 import currencies from "../../assets/currencies.json";
+import languagesData from "../../assets/languages.json";
+import pakistanCitiesEn from "../../assets/countries/Pakistan.en.json";
 import { APP_VERSION } from "../../lib/version";
-import { Upload, Trash2, Image as ImageIcon, Building2, Briefcase, MapPin, Globe, ShieldCheck, Mail, Phone, User as UserIcon } from "lucide-react";
+import { Upload, Trash2, Image as ImageIcon, Building2, MapPin, Globe, ShieldCheck, Mail, Phone, User as UserIcon, Hash, Map as MapIcon } from "lucide-react";
 import { useToastStore } from "../../store/toastStore";
+import { useUiStore } from "../../store/uiStore";
+import { getLanguageDirection } from "../../utils/layout";
+
+// Dynamic Urdu cities fallback logic
+let pakistanCitiesUr: any[] = pakistanCitiesEn;
+try {
+  // @ts-ignore
+  const urData = await import("../../assets/countries/Pakistan.ur.json");
+  if (urData && urData.default) pakistanCitiesUr = urData.default;
+} catch (e) {
+  // Fallback already set to en
+}
+
 import {
   getCompanyProfile,
   updateCompanyProfile,
@@ -26,10 +42,17 @@ type ProfileForm = {
   phone: string;
   email: string;
   address: string;
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+  logo_base64: string | null;
 };
 
 export function ProfileModule() {
   const { user, companyId, companyLogo, setUser, setCurrency, setCompanyLogo } = useAuthStore();
+  const { language } = useUiStore();
+  const { t } = useTranslation(["profile", "auth"]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
   const [form, setForm] = useState<ProfileForm>({
     full_name: user?.full_name ?? "",
@@ -43,13 +66,43 @@ export function ProfileModule() {
     phone: "",
     email: "",
     address: "",
+    city: "",
+    state: "",
+    country: "",
+    postal_code: "",
+    logo_base64: null,
   });
+  const [customCountry, setCustomCountry] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToastStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const direction = getLanguageDirection(language);
   const currenciesList = Object.values(currencies);
+
+  const countryOptions = languagesData.countries.map(c => ({
+    label: language === "ur" ? c.ur : c.en,
+    value: c.code,
+  }));
+
+
+  const handleCountryChange = (val: string) => {
+    setField("country", val);
+    setField("city", "");
+    setField("state", "");
+    if (val === "US") setField("currency", "USD");
+    else if (val === "Pakistan") setField("currency", "PKR");
+  };
+
+  const handleCityChange = (val: string) => {
+    setField("city", val);
+    const citiesData = language === "ur" ? pakistanCitiesUr : pakistanCitiesEn;
+    const selected = citiesData.find(c => c.name === val);
+    if (selected) {
+      setField("state", selected.state);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -72,9 +125,17 @@ export function ProfileModule() {
           phone: profile.phone ?? "",
           email: profile.email ?? "",
           address: profile.address ?? "",
+          city: profile.city ?? "",
+          state: profile.state ?? "",
+          country: profile.country ?? "",
+          postal_code: profile.postal_code ?? "",
+          logo_base64: profile.logo_base64 ?? companyLogo,
         });
+        if (profile.logo_base64) {
+          setCompanyLogo(profile.logo_base64);
+        }
       } catch (err) {
-        addToast(err instanceof Error ? err.message : "Failed to load profile", "error");
+        addToast(err instanceof Error ? err.message : t("load_error"), "error");
       } finally {
         setLoading(false);
       }
@@ -82,7 +143,7 @@ export function ProfileModule() {
     load();
   }, [companyId, user?.full_name]);
 
-  const setField = (key: keyof ProfileForm, value: string) => {
+  const setField = (key: keyof ProfileForm, value: string | null) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -91,22 +152,25 @@ export function ProfileModule() {
     if (!file) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      addToast("Logo must be under 2 MB.", "error");
+      addToast(t("logo_size_error"), "error");
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
-      setCompanyLogo(reader.result as string);
-      addToast("Company logo updated.", "success");
+      const base64 = reader.result as string;
+      setCompanyLogo(base64);
+      setField("logo_base64", base64);
+      addToast(t("logo_updated"), "success");
     };
     reader.readAsDataURL(file);
   };
 
   const handleRemoveLogo = () => {
     setCompanyLogo(null);
+    setField("logo_base64", null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    addToast("Company logo removed.", "info");
+    addToast(t("logo_removed"), "info");
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -115,7 +179,7 @@ export function ProfileModule() {
     try {
       setSaving(true);
 
-      const updatedUser = await invoke<{ id: number; username: string; full_name: string | null; role: string }>(
+      const updatedUser = await invoke<User>(
         "update_user_profile",
         { input: { id: user.id, full_name: form.full_name || null } },
       );
@@ -133,12 +197,17 @@ export function ProfileModule() {
         phone: form.phone || null,
         email: form.email || null,
         address: form.address || null,
+        city: form.city || null,
+        state: form.state || null,
+        country: form.country === "Others" ? customCountry : form.country,
+        postal_code: form.postal_code || null,
+        logo_base64: form.logo_base64,
       });
       setCompanyProfile(updatedCompany);
       setCurrency(form.currency);
-      addToast("Profile updated successfully.", "success");
+      addToast(t("update_success"), "success");
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to update profile", "error");
+      addToast(err instanceof Error ? err.message : t("update_error"), "error");
     } finally {
       setSaving(false);
     }
@@ -148,7 +217,7 @@ export function ProfileModule() {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-        <p className="text-sm text-text-muted animate-pulse">Retreiving identity records...</p>
+        <p className="text-sm text-text-muted animate-pulse">{t("loading")}</p>
       </div>
     );
   }
@@ -157,8 +226,8 @@ export function ProfileModule() {
     <div className="space-y-8 animate-in fade-in duration-600">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Identity & Branding</h1>
-          <p className="text-sm text-text-muted mt-1">Manage registration details and company profile</p>
+          <h1 className="text-3xl font-bold tracking-tight text-text-primary">{t("title")}</h1>
+          <p className="text-sm text-text-muted mt-1">{t("subtitle")}</p>
         </div>
         <div className="text-[10px] text-text-muted font-black border border-border px-2 py-1 rounded bg-surface">
           V. <span className="text-primary">{APP_VERSION}</span>
@@ -173,9 +242,9 @@ export function ProfileModule() {
               <div className="border-b border-border bg-surface/30 px-6 py-5">
                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
                   <ImageIcon className="h-5 w-5 text-primary" />
-                  Visual Asset
+                  {t("visual_asset")}
                 </h2>
-                <p className="text-[10px] text-text-muted mt-1 font-bold uppercase tracking-tighter">Company Seal / Branding</p>
+                <p className="text-[10px] text-text-muted mt-1 font-bold uppercase tracking-tighter">{t("company_seal")}</p>
               </div>
 
               <div className="p-8 flex flex-col items-center gap-6">
@@ -186,7 +255,7 @@ export function ProfileModule() {
                     ) : (
                       <div className="flex flex-col items-center gap-2 text-text-muted/30">
                         <Building2 className="h-12 w-12" />
-                        <span className="text-[10px] font-black uppercase">No Logo</span>
+                        <span className="text-[10px] font-black uppercase">{t("no_logo")}</span>
                       </div>
                     )}
                   </div>
@@ -201,15 +270,15 @@ export function ProfileModule() {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     className="absolute -bottom-3 -right-3 p-3 rounded-xl bg-primary text-primary-foreground shadow-xl shadow-primary/40 hover:scale-110 active:scale-95 transition-all"
-                    title="Update Logo"
+                    title={t("update_logo")}
                   >
                     <Upload className="h-5 w-5" />
                   </button>
                 </div>
 
                 <div className="text-center space-y-2">
-                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-widest italic">Dynamic PDF Injection</p>
-                  <p className="text-xs text-text-muted/60 leading-relaxed max-w-[200px]">This asset will be automatically injected into your challans and invoices.</p>
+                  <p className="text-[11px] text-text-muted font-bold uppercase tracking-widest italic">{t("pdf_injection")}</p>
+                  <p className="text-xs text-text-muted/60 leading-relaxed max-w-[200px]">{t("pdf_injection_desc")}</p>
                 </div>
 
                 {companyLogo && (
@@ -219,7 +288,7 @@ export function ProfileModule() {
                     onClick={handleRemoveLogo}
                     leftIcon={<Trash2 className="h-3.5 w-3.5" />}
                   >
-                    Purge Attachment
+                    {t("purge_attachment")}
                   </Button>
                 )}
               </div>
@@ -233,20 +302,20 @@ export function ProfileModule() {
               <div className="border-b border-border bg-surface/30 px-6 py-5 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2 text-primary">
                   <UserIcon className="h-5 w-5" />
-                  Professional Profile
+                  {t("professional_profile")}
                 </h2>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
-                  label="Account Executive Name"
-                  placeholder="e.g. John Doe"
+                  label={t("account_exec_name")}
+                  placeholder={t("account_exec_name_placeholder")}
                   value={form.full_name}
                   onChange={(e) => setField("full_name", e.target.value)}
                   leftIcon={<UserIcon className="h-4 w-4" />}
                 />
                 <Input
-                  label="Legal Trading Name"
-                  placeholder="e.g. Teebotics Ltd"
+                  label={t("legal_trading_name")}
+                  placeholder={t("legal_trading_name_placeholder")}
                   value={form.company_name}
                   onChange={(e) => setField("company_name", e.target.value)}
                   required
@@ -260,36 +329,29 @@ export function ProfileModule() {
               <div className="border-b border-border bg-surface/30 px-6 py-5">
                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-primary" />
-                  Tax & Registration
+                  {t("tax_registration")}
                 </h2>
               </div>
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-gradient-to-br from-card to-surface/40">
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-gradient-to-br from-card to-surface/40">
                 <Input
-                  label="NTN / Tax ID"
-                  placeholder="PKR-00-0000"
+                  label={t("ntn_tax_id")}
+                  placeholder={t("ntn_tax_id_placeholder")}
                   value={form.tax_registration_number}
                   onChange={(e) => setField("tax_registration_number", e.target.value)}
                 />
                 <Input
-                  label="Sales Tax #"
-                  placeholder="STRN-12345"
+                  label={t("sales_tax_no")}
+                  placeholder={t("sales_tax_no_placeholder")}
                   value={form.sales_tax_number}
                   onChange={(e) => setField("sales_tax_number", e.target.value)}
                 />
-                <Input
-                  label="Business Vertical"
-                  placeholder="e.g. Manufacturing"
-                  value={form.business_type}
-                  onChange={(e) => setField("business_type", e.target.value)}
-                  leftIcon={<Briefcase className="h-4 w-4" />}
-                />
-                <div className="md:col-span-2 lg:col-span-3">
+                <div className="md:col-span-2">
                   <SearchableSelect
-                    label="Transactional Currency"
+                    label={t("transactional_currency")}
                     options={currenciesList.map((curr: any) => ({
                       label: `${curr.name} (${curr.code})`,
                       value: curr.code,
-                      description: `Symbol: ${curr.symbol}`,
+                      description: `${t("symbol")}: ${curr.symbol}`,
                       icon: <span className="text-primary font-bold">{curr.symbol}</span>
                     }))}
                     value={form.currency}
@@ -304,39 +366,98 @@ export function ProfileModule() {
               <div className="border-b border-border bg-surface/30 px-6 py-5">
                 <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-primary" />
-                  Connectivity & Location
+                  {t("connectivity_location")}
                 </h2>
               </div>
               <div className="p-6 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Input
-                    label="Web Domain"
-                    placeholder="www.yourlink.com"
-                    value={form.website}
-                    onChange={(e) => setField("website", e.target.value)}
-                    leftIcon={<Globe className="h-4 w-4" />}
-                  />
-                  <Input
-                    label="Support Phone"
-                    placeholder="+12 345 6789"
+                    label={t("support_phone")}
+                    placeholder={t("support_phone_placeholder")}
                     value={form.phone}
                     onChange={(e) => setField("phone", e.target.value)}
                     leftIcon={<Phone className="h-4 w-4" />}
                   />
-                  <div className="md:col-span-2">
+                  <Input
+                    label={t("business_email")}
+                    placeholder={t("business_email_placeholder")}
+                    value={form.email}
+                    onChange={(e) => setField("email", e.target.value)}
+                    leftIcon={<Mail className="h-4 w-4" />}
+                  />
+
+                  {/* Unified Location Row */}
+                  <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                    <SearchableSelect
+                      label={t("auth:register.country_label")}
+                      options={countryOptions}
+                      value={form.country}
+                      onChange={handleCountryChange}
+                      leftIcon={<Globe className="h-4 w-4" />}
+                    />
+
+                    {form.country === "Pakistan" ? (
+                      <SearchableSelect
+                        label={t("auth:register.city_label")}
+                        value={form.city}
+                        onChange={handleCityChange}
+                        placeholder={t("auth:register.city_placeholder")}
+                        options={(language === "ur" ? pakistanCitiesUr : pakistanCitiesEn).map(c => ({
+                          label: c.name,
+                          value: c.name,
+                          description: c.state
+                        }))}
+                        leftIcon={<MapIcon className="h-4 w-4" />}
+                      />
+                    ) : (
+                      <Input
+                        label={t("auth:register.city_label")}
+                        placeholder={t("auth:register.city_placeholder")}
+                        value={form.city}
+                        onChange={(e) => setField("city", e.target.value)}
+                        leftIcon={<MapIcon className="h-4 w-4" />}
+                      />
+                    )}
+
                     <Input
-                      label="Business Email"
-                      placeholder="admin@domain.com"
-                      value={form.email}
-                      onChange={(e) => setField("email", e.target.value)}
-                      leftIcon={<Mail className="h-4 w-4" />}
+                      label={t("auth:register.state_label")}
+                      placeholder={t("auth:register.state_placeholder")}
+                      value={form.state}
+                      onChange={(e) => setField("state", e.target.value)}
+                    />
+
+                    <Input
+                      label={t("postal_code")}
+                      placeholder={t("postal_code_placeholder")}
+                      value={form.postal_code}
+                      onChange={(e) => setField("postal_code", e.target.value)}
+                      leftIcon={<Hash className="h-4 w-4" />}
                     />
                   </div>
+
+                  {form.country === "Others" && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                      <Input
+                        label={t("auth:register.custom_country_label")}
+                        placeholder={t("auth:register.custom_country_placeholder")}
+                        value={customCountry}
+                        onChange={(e) => setCustomCountry(e.target.value)}
+                        leftIcon={<Globe className="h-4 w-4" />}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2 group">
-                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">Headquarters / Physical Address</label>
-                  <textarea className="w-full min-h-[100px] bg-background" placeholder="Building, Street, City, Country..." value={form.address} onChange={(e) => setField("address", e.target.value)} rows={3} />
+                  <label className="block text-[10px] font-black uppercase text-text-muted ml-1 tracking-wider">{t("physical_address")}</label>
+                  <textarea
+                    className={`w-full min-h-[100px] bg-background p-4 rounded-xl border border-border focus:border-primary outline-none transition-all ${direction === 'rtl' ? 'text-right' : 'text-left'}`}
+                    placeholder={t("physical_address_placeholder")}
+                    value={form.address}
+                    onChange={(e) => setField("address", e.target.value)}
+                    rows={3}
+                    dir={direction}
+                  />
                 </div>
               </div>
             </div>
@@ -347,7 +468,7 @@ export function ProfileModule() {
         <div className="sticky bottom-4 z-50 rounded-2xl border border-border bg-card/80 backdrop-blur-xl p-4 shadow-2xl shadow-primary/10 flex items-center justify-between">
           <div className="hidden md:flex items-center gap-2 ml-4">
             <div className="w-2 h-2 rounded-full bg-success animate-pulse"></div>
-            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">Master Identity Locked</span>
+            <span className="text-xs font-bold text-text-muted uppercase tracking-widest">{t("master_identity_locked")}</span>
           </div>
 
           <Button
@@ -356,7 +477,7 @@ export function ProfileModule() {
             className="w-full md:w-auto px-12 py-6 text-sm uppercase tracking-widest"
             leftIcon={!saving && <ShieldCheck className="h-5 w-5" />}
           >
-            {saving ? "Updating Records..." : "Synchronize Identity"}
+            {saving ? t("updating_records") : t("synchronize_identity")}
           </Button>
         </div>
       </form>

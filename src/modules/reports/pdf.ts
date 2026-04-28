@@ -381,3 +381,23 @@ export function printDeliveryChallan(
     try { window.print(); } catch (e) { console.error("[Print] Error:", e); }
   }, 150);
 }
+
+/** Opens a live preview of the challan in a separate popup window */
+export function previewDeliveryChallan(
+  challan: DeliveryChallan,
+  customFields: ChallanCustomField[] = []
+) {
+  const companyLogo = useAuthStore.getState().companyLogo;
+  const html = buildChallanHtml(challan, companyLogo, customFields);
+
+  const popup = window.open("", `challan-preview-${challan.id}`, "width=900,height=1100,resizable=yes,scrollbars=yes");
+  if (!popup) {
+    console.error("[Preview] Popup was blocked.");
+    return;
+  }
+  popup.document.open();
+  popup.document.write(html);
+  popup.document.close();
+  popup.focus();
+}
+

@@ -5,14 +5,17 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./lib/i18n";
 import { disableRightClick } from "./utils/security";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Disable right-click globally
 disableRightClick();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

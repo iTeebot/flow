@@ -21,6 +21,7 @@ interface SearchableSelectProps {
   disabled?: boolean;
   openDirection?: 'up' | 'down';
   className?: string;
+  leftIcon?: React.ReactNode;
 }
 
 export const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -34,6 +35,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   disabled = false,
   openDirection = 'down',
   className = '',
+  leftIcon,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -76,9 +78,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   };
 
   return (
-    <div className="w-full space-y-1.5" ref={containerRef}>
+    <div className="w-full space-y-1.5" ref={containerRef} dir={dir}>
       {label && (
-        <label className="block text-[10px] font-black text-text-muted uppercase tracking-widest ps-1">
+        <label className={`block text-[10px] font-black text-text-muted uppercase tracking-widest ${isRtl ? 'pe-1' : 'ps-1'}`}>
           {label}
         </label>
       )}
@@ -89,15 +91,20 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           onClick={handleToggle}
           disabled={disabled}
           className={`
-            w-full h-[46px] flex items-center justify-between bg-background border border-border rounded-xl px-4 text-sm transition-all outline-none
-            ${isRtl ? 'text-right' : 'text-left'}
-            ${isOpen ? 'border-primary ring-4 ring-primary/10' : ''}
-            ${error ? 'border-error focus:border-error focus:ring-error/10' : ''}
+            w-full h-[46px] flex items-center justify-between bg-background border rounded-xl px-4 text-sm transition-all outline-none
+            ${isRtl ? 'flex-row-reverse text-right' : 'flex-row text-left'}
+            ${error 
+              ? 'border-2 border-error focus:border-error ring-4 ring-error/20' 
+              : isOpen 
+                ? 'border-primary ring-4 ring-primary/10' 
+                : 'border-border'
+            }
             ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
             ${className}
           `}
         >
-          <div className="flex items-center gap-2 truncate">
+          <div className={`flex items-center gap-2 truncate ${isRtl ? 'flex-row-reverse' : 'flex-row'}`}>
+            {leftIcon && <span className="text-text-muted/40 shrink-0">{leftIcon}</span>}
             {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
             <span className={selectedOption ? 'text-text-primary' : 'text-text-muted/40'}>
               {selectedOption ? selectedOption.label : placeholder}
@@ -141,10 +148,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                     onClick={() => handleSelect(option)}
                     className={`
                       w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors
+                      ${isRtl ? 'flex-row-reverse text-right' : 'flex-row text-left'}
                       ${option.value === value ? 'bg-primary/10 text-primary font-bold' : 'text-text-primary hover:bg-surface-hover'}
                     `}
                   >
-                    <div className="flex items-center gap-2 truncate">
+                    <div className={`flex items-center gap-2 truncate ${isRtl ? 'flex-row-reverse' : 'flex-row'}`}>
                       {option.icon && <span className="shrink-0">{option.icon}</span>}
                       <div className={`flex flex-col ${isRtl ? 'items-end' : 'items-start'}`}>
                         <span className="truncate">{option.label}</span>
@@ -163,7 +171,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       </div>
 
       {error && (
-        <p className="text-[10px] font-bold text-error ps-1 animate-in slide-in-from-top-1 duration-200">
+        <p className={`text-[10px] font-bold text-error animate-in slide-in-from-top-1 duration-200 ${isRtl ? 'pe-1' : 'ps-1'}`}>
           {error}
         </p>
       )}

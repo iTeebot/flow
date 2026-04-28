@@ -8,6 +8,14 @@
     "core:webview:allow-print",
     "opener:default",
     "opener:allow-open-path",
-    "opener:allow-reveal-item-in-dir"
+    "opener:allow-reveal-item-in-dir",
+    "dialog:default",
+    "fs:default",
+    "fs:allow-stat",
+    "fs:allow-write-text-file",
+    "fs:allow-home-write-recursive",
+    "fs:allow-download-write-recursive",
+    "fs:allow-document-write-recursive",
+    "fs:allow-desktop-write-recursive"
   ]
 }

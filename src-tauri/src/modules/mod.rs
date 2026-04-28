@@ -7,3 +7,4 @@ pub mod invoices;
 pub mod delivery_challan;
 pub mod inventory;
 pub mod dashboard;
+pub mod security;

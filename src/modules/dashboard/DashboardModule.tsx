@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   LineChart,
   Line,
@@ -25,8 +26,10 @@ import {
 import { getDashboardSummary, type DashboardSummary } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { formatCurrency } from "../../lib/utils";
+import { Table } from "../../components/ui/Table";
 
 export function DashboardModule() {
+  const { t } = useTranslation("dashboard");
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,7 +58,7 @@ export function DashboardModule() {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
         <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-        <p className="text-sm text-text-muted animate-pulse">Calculating master metrics...</p>
+        <p className="text-sm text-text-muted animate-pulse">{t("loading")}</p>
       </div>
     );
   }
@@ -63,7 +66,7 @@ export function DashboardModule() {
   if (!data) {
     return (
       <div className="rounded-xl border border-error/20 bg-error/5 p-8 text-center text-error border-dashed">
-        Critical error retriving system telemetry. Please refresh.
+        {t("error")}
       </div>
     );
   }
@@ -75,22 +78,22 @@ export function DashboardModule() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Executive Summary</h1>
-          <p className="text-sm text-text-muted mt-1">Operational intelligence and real-time business health</p>
+          <h1 className="text-3xl font-bold tracking-tight text-text-primary">{t("title")}</h1>
+          <p className="text-sm text-text-muted mt-1">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 text-[10px] font-black uppercase text-text-muted bg-surface/50 border border-border px-3 py-1.5 rounded-full">
           <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse mr-1"></div>
-          Live Feed Active
+          {t("live_feed")}
         </div>
       </div>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Asset Catalog', value: data.kpi.total_products, icon: Package, color: 'bg-primary/10 text-primary', sub: 'Total SKU count' },
-          { label: 'Active Clients', value: data.kpi.total_customers, icon: Users, color: 'bg-success/10 text-success', sub: 'Registered database' },
-          { label: 'Revenue Pool', value: formatCurrency(data.kpi.total_sales, currency), icon: Coins, color: 'bg-warning/10 text-warning', sub: 'Cumulative revenue' },
-          { label: 'Open Logistics', value: data.kpi.pending_deliveries, icon: FileText, color: 'bg-error/10 text-error', sub: 'Pending deliveries' }
+          { label: t("asset_catalog"), value: data.kpi.total_products, icon: Package, color: 'bg-primary/10 text-primary', sub: t("sku_count") },
+          { label: t("active_clients"), value: data.kpi.total_customers, icon: Users, color: 'bg-success/10 text-success', sub: t("registered_database") },
+          { label: t("revenue_pool"), value: formatCurrency(data.kpi.total_sales, currency), icon: Coins, color: 'bg-warning/10 text-warning', sub: t("cumulative_revenue") },
+          { label: t("open_logistics"), value: data.kpi.pending_deliveries, icon: FileText, color: 'bg-error/10 text-error', sub: t("pending_deliveries") }
         ].map((kpi, idx) => (
           <div key={idx} className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm transition-all hover:shadow-xl hover:border-primary/20 hover:scale-[1.02]">
             <div className="flex items-center justify-between">
@@ -119,9 +122,9 @@ export function DashboardModule() {
           <div className="border-b border-border bg-surface/30 px-6 py-5 flex items-center justify-between">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2 uppercase tracking-wide">
               <TrendingUp className="h-4 w-4 text-primary" />
-              Revenue Performance Flow
+              {t("revenue_performance")}
             </h3>
-            <span className="text-[10px] font-bold text-text-muted bg-surface border border-border/50 px-2 py-0.5 rounded uppercase">7-Day Window</span>
+            <span className="text-[10px] font-bold text-text-muted bg-surface border border-border/50 px-2 py-0.5 rounded uppercase">{t("7_day_window")}</span>
           </div>
           <div className="p-6 flex-1">
             {data.sales_trend.length > 0 ? (
@@ -160,7 +163,7 @@ export function DashboardModule() {
                     strokeWidth={4}
                     dot={{ fill: "#0284C7", r: 4, strokeWidth: 2, stroke: "#fff" }}
                     activeDot={{ r: 8, strokeWidth: 0 }}
-                    name="Daily Revenue"
+                    name={t("daily_revenue")}
                     animationDuration={1500}
                   />
                 </LineChart>
@@ -168,7 +171,7 @@ export function DashboardModule() {
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-text-muted space-y-2 opacity-40">
                 <History className="h-10 w-10" />
-                <p className="text-sm italic">Historical flow pending accumulation</p>
+                <p className="text-sm italic">{t("no_history")}</p>
               </div>
             )}
           </div>
@@ -179,7 +182,7 @@ export function DashboardModule() {
           <div className="border-b border-border bg-surface/30 px-6 py-5">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2 uppercase tracking-wide">
               <Activity className="h-4 w-4 text-primary" />
-              Event Stream
+              {t("event_stream")}
             </h3>
           </div>
           <div className="p-4 flex-1 overflow-y-auto max-h-[380px] space-y-4">
@@ -199,7 +202,7 @@ export function DashboardModule() {
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-text-muted/40 text-center p-8">
                 <Activity className="h-12 w-12 mb-2" />
-                <p className="text-xs font-bold uppercase">No events logged</p>
+                <p className="text-xs font-bold uppercase">{t("no_events")}</p>
               </div>
             )}
           </div>
@@ -208,55 +211,58 @@ export function DashboardModule() {
 
       {/* Secondary Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Inventory Table */}
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="border-b border-border bg-surface/30 px-6 py-5 flex items-center justify-between">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2 uppercase tracking-wide">
               <Package className="h-4 w-4 text-primary" />
-              Strategic Inventory Valuation
+              {t("inventory_valuation")}
             </h3>
           </div>
           <div className="p-2 overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-[10px] font-black uppercase text-text-muted tracking-widest bg-surface/30">
-                  <th className="px-4 py-3 text-left">Article</th>
-                  <th className="px-4 py-3 text-left">Level</th>
-                  <th className="px-4 py-3 text-right">Valuation</th>
-                  <th className="px-4 py-3 text-right">Weight</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {data.inventory_status.slice(0, 6).map((item, index) => {
-                  const totalValue = data.inventory_status.reduce((sum, i) => sum + i.stock_value, 0);
-                  const percentage = totalValue > 0 ? (item.stock_value / totalValue) * 100 : 0;
-                  return (
-                    <tr key={index} className="group hover:bg-surface/50 transition-colors">
-                      <td className="px-4 py-4">
-                        <div className="text-xs font-bold text-text-primary">{item.product_name}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className={`h-1.5 w-1.5 rounded-full ${item.stock_qty < 10 ? 'bg-error' : 'bg-success'}`}></div>
-                          <span className="text-xs font-medium text-text-muted">{item.stock_qty} <span className="text-[9px] opacity-40">UNITS</span></span>
+            <Table
+              data={data.inventory_status.slice(0, 6)}
+              keyExtractor={(_, index) => index}
+              columns={[
+                {
+                  header: t("article"),
+                  accessor: (item) => <div className="text-xs font-bold text-text-primary">{item.product_name}</div>
+                },
+                {
+                  header: t("level"),
+                  accessor: (item) => (
+                    <div className="flex items-center gap-2">
+                      <div className={`h-1.5 w-1.5 rounded-full ${item.stock_qty < 10 ? 'bg-error' : 'bg-success'}`}></div>
+                      <span className="text-xs font-medium text-text-muted">
+                        {item.stock_qty} <span className="text-[9px] opacity-40">{t("units")}</span>
+                      </span>
+                    </div>
+                  )
+                },
+                {
+                  header: t("valuation"),
+                  headerClassName: "text-right",
+                  className: "text-right",
+                  accessor: (item) => <div className="text-xs font-black text-text-primary">{formatCurrency(item.stock_value, currency)}</div>
+                },
+                {
+                  header: t("weight"),
+                  headerClassName: "text-right",
+                  className: "text-right",
+                  accessor: (item) => {
+                    const totalValue = data.inventory_status.reduce((sum, i) => sum + i.stock_value, 0);
+                    const percentage = totalValue > 0 ? (item.stock_value / totalValue) * 100 : 0;
+                    return (
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[9px] font-black text-primary">{percentage.toFixed(1)}%</span>
+                        <div className="h-1 w-16 rounded-full bg-surface">
+                          <div className="h-1 rounded-full bg-primary" style={{ width: `${percentage}%` }}></div>
                         </div>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="text-xs font-black text-text-primary">{formatCurrency(item.stock_value, currency)}</div>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="text-[9px] font-black text-primary">{percentage.toFixed(1)}%</span>
-                          <div className="h-1 w-16 rounded-full bg-surface">
-                            <div className="h-1 rounded-full bg-primary" style={{ width: `${percentage}%` }}></div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    );
+                  }
+                }
+              ]}
+            />
           </div>
         </div>
 
@@ -265,7 +271,7 @@ export function DashboardModule() {
           <div className="border-b border-border bg-surface/30 px-6 py-5 flex items-center justify-between">
             <h3 className="text-sm font-bold text-text-primary flex items-center gap-2 uppercase tracking-wide">
               <History className="h-4 w-4 text-primary" />
-              Equity Distribution
+              {t("equity_distribution")}
             </h3>
           </div>
           <div className="p-6">
@@ -302,7 +308,7 @@ export function DashboardModule() {
               </ResponsiveContainer>
             ) : (
               <div className="h-[320px] flex items-center justify-center text-text-muted/30">
-                No equity data to visualize
+                {t("no_equity")}
               </div>
             )}
           </div>

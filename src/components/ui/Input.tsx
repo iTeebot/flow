@@ -40,12 +40,15 @@ export const Input: React.FC<InputProps> = ({
           <input
             id={inputId}
           className={`
-            w-full h-[46px] bg-background border border-border rounded-xl py-3 text-sm transition-all outline-none
-            focus:border-primary focus:ring-4 focus:ring-primary/10
+            w-full h-[46px] bg-background border rounded-xl py-3 text-sm transition-all outline-none
+            focus:ring-4
             placeholder:text-text-muted/40
             ${leftIcon ? 'ps-12' : 'ps-4'}
             ${rightIcon ? 'pe-12' : 'pe-4'}
-            ${error ? 'border-error focus:border-error focus:ring-error/10' : ''}
+            ${error 
+              ? 'border-2 border-error focus:border-error ring-4 ring-error/20' 
+              : 'border-border focus:border-primary focus:ring-primary/10'
+            }
             ${className}
           `}
             {...props}

@@ -12,5 +12,8 @@
   "quantity": "مقدار",
   "status": "حیثیت",
   "total": "کل",
-  "currency": "کرنسی"
+  "currency": "کرنسی",
+  "table": {
+    "no_data": "کوئی ڈیٹا دستیاب نہیں ہے"
+  }
 }

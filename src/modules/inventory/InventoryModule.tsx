@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
-import { Plus, Edit, Trash2, Package, TrendingUp, Search } from "lucide-react";
-import { createProduct, listProducts, updateProduct, deleteProduct, adjustStock, type Product } from "./api";
+import { useTranslation } from "react-i18next";
+import { Plus, Edit, Trash2, Package, TrendingUp, Search, ArrowUpDown } from "lucide-react";
+import { listProducts, deleteProduct, adjustStock, type Product } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { formatCurrency } from "../../lib/utils";
-import { SortableHeader } from "../../components/SortableHeader";
 import { TableActions } from "../../components/TableActions";
 import { TablePagination } from "../shared/TablePagination";
 import { useToastStore } from "../../store/toastStore";
+import { Table } from "../../components/ui/Table";
+import { CreateProductModal } from "../../components/modals/CreateProductModal";
+import { Select } from "../../components/ui/Select";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 
 export function InventoryModule() {
+  const { t } = useTranslation("inventory");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -25,16 +31,7 @@ export function InventoryModule() {
 
   const { companyId, currency } = useAuthStore();
 
-  // For demo purposes, using a hardcoded company_id if not available
-  // In a real app, this would come from user/company context
   const currentCompanyId = companyId || 1;
-
-  const [formData, setFormData] = useState({
-    name: "",
-    sku: "",
-    stock_qty: 0,
-    price: 0,
-  });
 
   const [stockAdjustment, setStockAdjustment] = useState({
     quantity_change: 0,
@@ -47,7 +44,7 @@ export function InventoryModule() {
     }
   }, [currentCompanyId]);
 
-  const loadProducts = async () => {
+  const loadProducts = async (retryCount = 0) => {
     if (!currentCompanyId) return;
 
     try {
@@ -55,55 +52,30 @@ export function InventoryModule() {
       const data = await listProducts(currentCompanyId);
       setProducts(data);
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to load products", "error");
+      if (retryCount < 3) {
+        // Wait 500ms and try again
+        await new Promise(r => setTimeout(r, 500));
+        return loadProducts(retryCount + 1);
+      }
+      addToast(err instanceof Error ? err.message : t("toast_load_failed"), "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingProduct) {
-        await updateProduct({
-          id: editingProduct.id,
-          ...formData,
-        });
-      } else {
-        await createProduct({
-          company_id: currentCompanyId,
-          ...formData,
-        });
-      }
-      await loadProducts();
-      setShowAddForm(false);
-      setEditingProduct(null);
-      setFormData({ name: "", sku: "", stock_qty: 0, price: 0 });
-      addToast(editingProduct ? "Product updated successfully." : "New product registered.", "success");
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to save product", "error");
-    }
-  };
-
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      sku: product.sku,
-      stock_qty: product.stock_qty,
-      price: product.price,
-    });
     setShowAddForm(true);
   };
 
   const handleDelete = async (productId: number) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!confirm(t("delete_confirm"))) return;
     try {
       await deleteProduct(productId);
       await loadProducts();
-      addToast("Product removed from inventory.", "success");
+      addToast(t("toast_removed"), "success");
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to delete product", "error");
+      addToast(err instanceof Error ? err.message : t("toast_save_failed"), "error");
     }
   };
 
@@ -119,25 +91,16 @@ export function InventoryModule() {
       await loadProducts();
       setAdjustingStock(null);
       setStockAdjustment({ quantity_change: 0, reason: "" });
-      addToast("Stock levels adjusted.", "success");
+      addToast(t("toast_adjust_success"), "success");
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to adjust stock", "error");
+      addToast(err instanceof Error ? err.message : t("toast_adjust_failed"), "error");
     }
   };
 
-  const handleSort = (key: "name" | "sku" | "stock_qty" | "price") => {
-    if (sortBy === key) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(key);
-      setSortOrder("asc");
-    }
-  };
 
   const resetForm = () => {
     setShowAddForm(false);
     setEditingProduct(null);
-    setFormData({ name: "", sku: "", stock_qty: 0, price: 0 });
   };
 
   const filteredProducts = products
@@ -155,12 +118,21 @@ export function InventoryModule() {
       return matchesSearch && matchesStock;
     })
     .sort((a, b) => {
-      if (sortBy === "name" || sortBy === "sku") {
-        const base = a[sortBy].localeCompare(b[sortBy]);
+      const field = sortBy;
+      const valA = a[field];
+      const valB = b[field];
+
+      if (typeof valA === "string" && typeof valB === "string") {
+        const base = valA.localeCompare(valB);
         return sortOrder === "asc" ? base : -base;
       }
-      const base = a[sortBy] - b[sortBy];
-      return sortOrder === "asc" ? base : -base;
+      
+      if (typeof valA === "number" && typeof valB === "number") {
+        const base = valA - valB;
+        return sortOrder === "asc" ? base : -base;
+      }
+
+      return 0;
     });
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
@@ -170,7 +142,7 @@ export function InventoryModule() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-text-muted">Loading inventory...</div>
+        <div className="text-text-muted">{t("loading")}</div>
       </div>
     );
   }
@@ -180,117 +152,28 @@ export function InventoryModule() {
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Inventory Assets</h1>
-          <p className="text-sm text-text-muted mt-1">Manage your product catalog and real-time stock levels</p>
+          <h1 className="text-3xl font-bold tracking-tight text-text-primary">{t("title")}</h1>
+          <p className="text-sm text-text-muted mt-1">{t("subtitle")}</p>
         </div>
-        <button
+        <Button
           onClick={() => setShowAddForm(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98]"
+          leftIcon={<Plus className="h-4 w-4" />}
         >
-          <Plus className="h-4 w-4" />
-          Create
-        </button>
+          {t("create_btn")}
+        </Button>
       </div>
 
-      {showAddForm && (
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-in slide-in-from-top-4 duration-300">
-          <div className="border-b border-border bg-surface/50 px-6 py-4">
-            <h2 className="text-lg font-bold text-text-primary">
-              {editingProduct ? "Edit Product Details" : "Register New Product"}
-            </h2>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="group">
-                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                  Product Name <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => {
-                    const name = e.target.value;
-                    let baseSku = name.trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-                    if (!baseSku && name) baseSku = "ITEM";
-                    
-                    const exists = products.some(p => p.sku === baseSku);
-                    const finalSku = exists ? `${baseSku}-${Date.now().toString().slice(-4)}` : baseSku;
-                    
-                    setFormData({ ...formData, name, sku: finalSku });
-                  }}
-                  placeholder="e.g. Premium Cotton Tee"
-                  className="w-full"
-                />
-              </div>
-
-              <div className="group">
-                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                  SKU / Identifier <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  readOnly
-                  value={formData.sku}
-                  placeholder="Auto-generated"
-                  className="w-full bg-surface/50 cursor-not-allowed opacity-80"
-                />
-              </div>
-
-              <div className="group">
-                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                  Initial Stock Qty
-                </label>
-                <div className="relative">
-                  <Package className="input-icon-left h-4 w-4 text-text-muted" />
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={formData.stock_qty}
-                    onChange={(e) => setFormData({ ...formData, stock_qty: parseInt(e.target.value) || 0 })}
-                    className="w-full input-with-icon"
-                  />
-                </div>
-              </div>
-
-              <div className="group">
-                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                  Unit Price ({currency})
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  min="0"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                  className="w-full"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 pt-4 border-t border-border">
-              <button
-                type="submit"
-                className="rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                {editingProduct ? "Update Portfolio" : "Confirm & Save Product"}
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="rounded-lg border border-border bg-background px-6 py-2.5 text-sm font-semibold text-text-primary hover:bg-surface"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <CreateProductModal
+        isOpen={showAddForm}
+        onClose={resetForm}
+        onSuccess={() => {
+          loadProducts();
+          resetForm();
+        }}
+        companyId={currentCompanyId}
+        existingProducts={products}
+        editingProduct={editingProduct}
+      />
 
       {adjustingStock && (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-in slide-in-from-top-4 duration-300">
@@ -298,22 +181,21 @@ export function InventoryModule() {
             <div className="rounded-full bg-primary/10 p-2">
               <Plus className="h-4 w-4 text-primary" />
             </div>
-            <h2 className="text-lg font-bold text-text-primary">Stock Adjustment</h2>
+            <h2 className="text-lg font-bold text-text-primary">{t("adjust_title")}</h2>
           </div>
           <div className="p-6">
             <p className="mb-6 text-sm text-text-muted">
-              Modifying inventory for <span className="font-bold text-text-primary">{adjustingStock.name}</span>.
-              Current level: <span className="font-bold text-primary">{adjustingStock.stock_qty}</span>
+              {t("adjust_desc", { name: adjustingStock.name, qty: adjustingStock.stock_qty })}
             </p>
             <form onSubmit={handleStockAdjustment} className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
-                <label className="block text-[10px] font-black uppercase text-text-muted mb-1 ml-1">Quantity Change</label>
+                <label className="block text-[10px] font-black uppercase text-text-muted mb-1 ml-1">{t("adjust_qty_change")}</label>
                 <input
                   type="number"
                   required
                   value={stockAdjustment.quantity_change}
                   onChange={(e) => setStockAdjustment({ ...stockAdjustment, quantity_change: parseInt(e.target.value) || 0 })}
-                  placeholder="Use - to reduce, + to add"
+                  placeholder={t("adjust_placeholder")}
                   className="w-full"
                 />
               </div>
@@ -322,14 +204,14 @@ export function InventoryModule() {
                   type="submit"
                   className="rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  Apply Change
+                  {t("adjust_apply")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setAdjustingStock(null)}
                   className="rounded-lg border border-border bg-background px-6 py-2.5 text-sm font-semibold text-text-primary hover:bg-surface"
                 >
-                  Close
+                  {t("adjust_close")}
                 </button>
               </div>
             </form>
@@ -343,167 +225,163 @@ export function InventoryModule() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
               <Package className="h-5 w-5 text-primary" />
-              Stock Overview
+              {t("stock_overview")}
               <span className="ml-1 text-xs font-medium px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border">
                 {filteredProducts.length}
               </span>
             </h2>
 
             {/* Filters */}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 lg:w-3/4">
-              <div className="relative group lg:col-span-2">
-                <Search className="input-icon-left h-3.5 w-3.5 text-text-muted group-focus-within:text-primary transition-colors" />
-                <input
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-5 lg:w-[85%]">
+              <div className="md:col-span-2">
+                <Input
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
                     setPage(1);
                   }}
-                  placeholder="Search articles and assets..."
-                  className="w-full input-with-icon pr-4 py-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-text-muted/50"
+                  placeholder={t("search_placeholder")}
+                  leftIcon={<Search className="h-4 w-4" />}
+                  className="h-[46px]"
                 />
               </div>
 
-              <select
+              <Select
                 value={stockFilter}
                 onChange={(e) => {
-                  setStockFilter(e.target.value as "all" | "in-stock" | "low-stock" | "out-of-stock");
+                  setStockFilter(e.target.value as any);
                   setPage(1);
                 }}
-                className="text-xs"
-              >
-                <option value="all">All Inventory</option>
-                <option value="in-stock">In Stock Only</option>
-                <option value="low-stock">Warning (Low)</option>
-                <option value="out-of-stock">Depleted (Out)</option>
-              </select>
+                options={[
+                  { label: t("filter_all"), value: "all" },
+                  { label: t("filter_in_stock"), value: "in-stock" },
+                  { label: t("filter_low_stock"), value: "low-stock" },
+                  { label: t("filter_out_of_stock"), value: "out-of-stock" },
+                ]}
+              />
 
-              <select
+              <Select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "name" | "sku" | "stock_qty" | "price")}
-                className="text-xs"
+                onChange={(e) => setSortBy(e.target.value as any)}
+                options={[
+                  { label: t("sort_name"), value: "name" },
+                  { label: t("sort_sku"), value: "sku" },
+                  { label: t("sort_stock"), value: "stock_qty" },
+                  { label: t("sort_price"), value: "price" },
+                ]}
+              />
+
+              <Button
+                variant="secondary"
+                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                className="h-[46px] w-full"
+                title={sortOrder === "asc" ? "Ascending" : "Descending"}
+                leftIcon={<ArrowUpDown className={`h-4 w-4 transition-transform duration-300 ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />}
               >
-                <option value="name">Sort by Name</option>
-                <option value="sku">Sort by SKU</option>
-                <option value="stock_qty">Sort by Stock</option>
-                <option value="price">Sort by Price</option>
-              </select>
+                <span className="uppercase tracking-widest text-[10px]">{sortOrder}</span>
+              </Button>
             </div>
           </div>
         </div>
-
-        {filteredProducts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="rounded-full bg-surface p-4 mb-4 border border-border">
-              <Package className="h-10 w-10 text-text-muted/30" />
-            </div>
-            <p className="text-text-muted font-medium">No inventory products found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-surface/50 border-b border-border">
-                  <SortableHeader
-                    label="Product Identity"
-                    sortKey="name"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="SKU Code"
-                    sortKey="sku"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Stock Level"
-                    sortKey="stock_qty"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Unit Valuation"
-                    sortKey="price"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <th className="sticky right-0 z-10 bg-surface/90 w-14 px-2 py-4 text-right text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-[-4px_0_10px_rgba(0,0,0,0.1)] backdrop-blur-sm"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paginatedProducts.map((product) => (
-                  <tr key={product.id} className="group hover:bg-surface/30 transition-all duration-200">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-text-primary text-sm">{product.name}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-xs px-2 py-1 rounded bg-surface border border-border text-text-muted">
-                        {product.sku}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full ${product.stock_qty === 0 ? 'bg-error animate-pulse' : product.stock_qty < 10 ? 'bg-warning' : 'bg-success'}`} />
-                        <span className={`text-sm font-bold ${product.stock_qty === 0 ? 'text-error' : product.stock_qty < 10 ? 'text-warning' : 'text-text-primary'}`}>
-                          {product.stock_qty} <span className="text-[10px] opacity-60 font-medium">UNIT{product.stock_qty !== 1 ? 'S' : ''}</span>
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-text-primary text-sm">{formatCurrency(product.price, currency)}</div>
-                    </td>
-                    <td className="sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-4 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm">
-                      <div className="flex items-center justify-end">
-                        <TableActions
-                          actions={[
-                            {
-                              label: "Edit Details",
-                              icon: Edit,
-                              onClick: () => handleEdit(product)
-                            },
-                            {
-                              label: "Adjust Inventory",
-                              icon: TrendingUp,
-                              onClick: () => setAdjustingStock(product)
-                            },
-                            {
-                              label: "Purge Record",
-                              icon: Trash2,
-                              onClick: () => handleDelete(product.id),
-                              variant: "danger"
-                            }
-                          ]}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {filteredProducts.length > 0 && (
-          <div className="border-t border-border bg-surface/20">
-            <TablePagination
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={filteredProducts.length}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-            />
-          </div>
-        )}
       </div>
+
+      {filteredProducts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="rounded-full bg-surface p-4 mb-4 border border-border">
+            <Package className="h-10 w-10 text-text-muted/30" />
+          </div>
+          <p className="text-text-muted font-medium">{t("no_products")}</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table
+            data={paginatedProducts}
+            keyExtractor={(product) => product.id.toString()}
+            columns={[
+              {
+                header: t("col_product"),
+                accessor: (product) => (
+                  <div>
+                    <div className="font-bold text-text-primary text-sm">{product.name}</div>
+                    {product.description && (
+                      <div className="text-[11px] text-text-muted mt-0.5 line-clamp-1 max-w-[200px]">
+                        {product.description}
+                      </div>
+                    )}
+                  </div>
+                )
+              },
+              {
+                header: t("col_sku"),
+                accessor: (product) => (
+                  <span className="font-mono text-xs px-2 py-1 rounded bg-surface border border-border text-text-muted">
+                    {product.sku}
+                  </span>
+                )
+              },
+              {
+                header: t("col_stock"),
+                accessor: (product) => (
+                  <div className="flex items-center gap-2">
+                    <div className={`h-2 w-2 rounded-full ${product.stock_qty === 0 ? 'bg-error animate-pulse' : product.stock_qty < 10 ? 'bg-warning' : 'bg-success'}`} />
+                    <span className={`text-sm font-bold ${product.stock_qty === 0 ? 'text-error' : product.stock_qty < 10 ? 'text-warning' : 'text-text-primary'}`}>
+                      {product.stock_qty} <span className="text-[10px] opacity-60 font-medium">{product.stock_qty === 1 ? t("unit") : t("units")}</span>
+                    </span>
+                  </div>
+                )
+              },
+              {
+                header: t("col_valuation"),
+                accessor: (product) => <div className="font-bold text-text-primary text-sm">{formatCurrency(product.price, currency)}</div>
+              },
+              {
+                header: "",
+                className: "sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-4 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm",
+                accessor: (product) => (
+                  <div className="flex items-center justify-end">
+                    <TableActions
+                      actions={[
+                        {
+                          label: t("edit_details"),
+                          icon: Edit,
+                          onClick: () => handleEdit(product)
+                        },
+                        {
+                          label: t("adjust_inventory"),
+                          icon: TrendingUp,
+                          onClick: () => setAdjustingStock(product)
+                        },
+                        {
+                          label: t("purge_record"),
+                          icon: Trash2,
+                          onClick: () => handleDelete(product.id),
+                          variant: "danger"
+                        }
+                      ]}
+                    />
+                  </div>
+                )
+              }
+            ]}
+          />
+        </div>
+      )}
+
+      {filteredProducts.length > 0 && (
+        <div className="border-t border-border bg-surface/20">
+          <TablePagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={filteredProducts.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

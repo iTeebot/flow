@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { MoreVertical } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { getLanguageDirection } from "../utils/layout";
 
 export type ActionItem = {
   label: string;
@@ -14,6 +16,8 @@ interface TableActionsProps {
 }
 
 export function TableActions({ actions }: TableActionsProps) {
+  const { i18n } = useTranslation();
+  const dir = getLanguageDirection(i18n.language);
   const [isOpen, setIsOpen] = useState(false);
   const [menuRect, setMenuRect] = useState<{ top: number; left: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -22,11 +26,18 @@ export function TableActions({ actions }: TableActionsProps) {
   const updatePosition = () => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      // Position menu to align its right edge with trigger's right edge
-      setMenuRect({
-        top: rect.bottom + window.scrollY,
-        left: rect.right + window.scrollX - 176, // 176px is w-44
-      });
+      // Position menu to align based on direction
+      if (dir === "rtl") {
+        setMenuRect({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX,
+        });
+      } else {
+        setMenuRect({
+          top: rect.bottom + window.scrollY,
+          left: rect.right + window.scrollX - 176, // 176px is w-44
+        });
+      }
     }
   };
 
@@ -80,7 +91,7 @@ export function TableActions({ actions }: TableActionsProps) {
             top: `${menuRect.top}px`,
             left: `${menuRect.left}px`,
           }}
-          className="z-[9999] w-44 origin-top-right rounded-xl border border-border bg-card shadow-2xl shadow-navy/90 animate-in fade-in zoom-in-95 duration-100 ring-1 ring-white/5"
+          className={`z-[9999] w-44 ${dir === 'rtl' ? 'origin-top-left' : 'origin-top-right'} rounded-xl border border-border bg-card shadow-2xl shadow-navy/90 animate-in fade-in zoom-in-95 duration-100 ring-1 ring-white/5`}
         >
           <div className="p-1 space-y-0.5">
             {actions.map((action, idx) => (

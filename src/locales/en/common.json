@@ -12,5 +12,8 @@
   "quantity": "Quantity",
   "status": "Status",
   "total": "Total",
-  "currency": "Currency"
+  "currency": "Currency",
+  "table": {
+    "no_data": "No data available"
+  }
 }

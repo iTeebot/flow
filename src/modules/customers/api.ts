@@ -7,6 +7,8 @@ export type Customer = {
   tax_registration_number?: string | null;
   phone?: string | null;
   address?: string | null;
+  city?: string | null;
+  state?: string | null;
 };
 
 export type CreateCustomerInput = {
@@ -15,6 +17,8 @@ export type CreateCustomerInput = {
   tax_registration_number?: string | null;
   phone?: string | null;
   address?: string | null;
+  city?: string | null;
+  state?: string | null;
 };
 
 export type UpdateCustomerInput = {
@@ -23,6 +27,8 @@ export type UpdateCustomerInput = {
   tax_registration_number?: string | null;
   phone?: string | null;
   address?: string | null;
+  city?: string | null;
+  state?: string | null;
 };
 
 export async function createCustomer(input: CreateCustomerInput) {

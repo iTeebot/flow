@@ -1,0 +1,17 @@
+{
+  "dashboard": "ڈیش بورڈ",
+  "delivery_challan": "ڈیلیوری چالان",
+  "inventory": "انونٹری",
+  "customers": "گاہک",
+  "invoices": "انوائسز",
+  "profile": "پروفائل",
+  "settings": "سیٹنگز",
+  "info": "معلومات",
+  "collapse": "سکیڑیں",
+  "expand_sidebar": "سائڈ بار پھیلائیں",
+  "collapse_sidebar": "سائڈ بار سکیڑیں",
+  "loading": "لوڈ ہو رہا ہے...",
+  "loading_module": "ماڈیول لوڈ ہو رہا ہے...",
+  "no_route_matched": "کوئی راستہ نہیں ملا: ",
+  "logout": "لاگ آؤٹ"
+}

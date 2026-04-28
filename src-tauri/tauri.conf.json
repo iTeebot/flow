@@ -13,8 +13,11 @@
     "windows": [
       {
         "title": "Teebot Flow",
-        "width": 800,
-        "height": 600
+        "width": 960,
+        "height": 680,
+        "minWidth": 960,
+        "minHeight": 680,
+        "resizable": true
       }
     ],
     "security": {
@@ -24,6 +27,14 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "fileAssociations": [
+      {
+        "ext": ["tbf"],
+        "name": "Teebot Flow Backup",
+        "description": "Backup file for Teebot Flow workspace",
+        "role": "Editor"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

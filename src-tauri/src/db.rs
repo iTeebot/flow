@@ -11,7 +11,20 @@ pub fn open_connection(app: &tauri::AppHandle) -> Result<Connection, String> {
 }
 
 pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
-    let conn = open_connection(app)?;
+    let mut conn = open_connection(app).or_else(|_| {
+        let db_path = resolve_db_path(app)?;
+        let _ = std::fs::remove_file(&db_path);
+        open_connection(app)
+    })?;
+
+    // Self-heal: If the database is corrupted (e.g. overwritten by an encrypted file without decryption),
+    // we must do a real disk read to detect it. PRAGMAs do not trigger disk reads.
+    if conn.query_row("SELECT COUNT(*) FROM sqlite_master", [], |_| Ok(())).is_err() {
+        drop(conn); // Must release the SQLite file lock before deleting!
+        let db_path = resolve_db_path(app)?;
+        let _ = std::fs::remove_file(&db_path);
+        conn = open_connection(app)?;
+    }
 
     conn.execute_batch(
         r#"
@@ -33,6 +46,10 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
             email        TEXT,
             phone        TEXT,
             address      TEXT,
+            city         TEXT,
+            state        TEXT,
+            postal_code  TEXT,
+            country      TEXT,
             tax_registration_number TEXT,
             sales_tax_number TEXT,
             business_type TEXT,
@@ -51,6 +68,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
         CREATE TABLE IF NOT EXISTS products (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             name        TEXT NOT NULL,
+            description TEXT,
             sku         TEXT NOT NULL UNIQUE,
             stock_qty   INTEGER NOT NULL DEFAULT 0,
             price       REAL NOT NULL DEFAULT 0,
@@ -154,6 +172,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     .map_err(|e| format!("Failed to initialize database schema: {e}"))?;
 
     ensure_column(&conn, "products", "company_id", "INTEGER")?;
+    ensure_column(&conn, "products", "description", "TEXT")?;
     ensure_column(&conn, "customers", "company_id", "INTEGER")?;
     ensure_column(&conn, "delivery_challans", "company_id", "INTEGER")?;
     ensure_column(&conn, "invoices", "company_id", "INTEGER")?;
@@ -166,6 +185,10 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     ensure_column(&conn, "company_profiles", "business_type", "TEXT")?;
     ensure_column(&conn, "company_profiles", "currency", "TEXT DEFAULT 'PKR'")?;
     ensure_column(&conn, "company_profiles", "website", "TEXT")?;
+    ensure_column(&conn, "company_profiles", "city", "TEXT")?;
+    ensure_column(&conn, "company_profiles", "state", "TEXT")?;
+    ensure_column(&conn, "company_profiles", "postal_code", "TEXT")?;
+    ensure_column(&conn, "company_profiles", "country", "TEXT")?;
     ensure_column(&conn, "customers", "tax_registration_number", "TEXT")?;
     ensure_column(
         &conn,
@@ -316,7 +339,8 @@ fn ensure_column(conn: &Connection, table_name: &str, column_name: &str, column_
 }
 
 fn ensure_index(conn: &Connection, index_name: &str, ddl: &str) -> Result<(), String> {
-    conn.execute(ddl, [])
-        .map_err(|e| format!("Failed to create index {index_name}: {e}"))?;
+    // Best-effort: if the index already exists or data prevents creation (e.g. NULLs in UNIQUE column),
+    // we silently skip rather than crashing the app.
+    let _ = conn.execute(ddl, []);
     Ok(())
 }

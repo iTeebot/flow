@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
 import { Info, ExternalLink, Globe, Package, Server, HardDrive, Cpu, Shield, Heart } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { getAppInfo, type AppInfo } from "./api";
 import { APP_VERSION, PRODUCT_NAME } from "../../lib/version";
+import { useEffect, useState } from "react";
 
 export function InfoModule() {
+  const { t } = useTranslation("info");
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -13,7 +15,7 @@ export function InfoModule() {
         const appInfo = await getAppInfo();
         setInfo(appInfo);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load app info");
+        setError(err instanceof Error ? err.message : t("load_error"));
       }
     };
     load();
@@ -21,23 +23,23 @@ export function InfoModule() {
 
   const buildFields = info
     ? [
-        { label: "Product", value: info.product_name, icon: Package },
-        { label: "Version", value: APP_VERSION, icon: Shield },
-        { label: "Build Profile", value: info.build_profile, icon: Server },
-        { label: "Platform", value: info.target_os, icon: Cpu },
-        { label: "Database", value: info.db_file_name, icon: HardDrive },
-      ]
+      { label: t("product"), value: info.product_name, icon: Package },
+      { label: t("version"), value: APP_VERSION, icon: Shield },
+      { label: t("build_profile"), value: info.build_profile, icon: Server },
+      { label: t("platform"), value: info.target_os, icon: Cpu },
+      { label: t("database"), value: info.db_file_name, icon: HardDrive },
+    ]
     : [];
 
   const links = [
     {
-      label: "Teebot Labs",
-      desc: "Company website and developer portal",
+      label: t("teebot_labs"),
+      desc: t("teebot_labs_desc"),
       url: "https://www.iteebot.com",
     },
     {
-      label: "Product Page",
-      desc: "Official Teebot Flow landing page",
+      label: t("product_page"),
+      desc: t("product_page_desc"),
       url: "https://teebot-flow.iteebot.com",
     },
   ];
@@ -45,9 +47,9 @@ export function InfoModule() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary">Info</h1>
+        <h1 className="text-2xl font-bold text-text-primary">{t("title")}</h1>
         <p className="text-sm text-text-muted">
-          Version, build details, developer information, and product links.
+          {t("subtitle")}
         </p>
       </div>
 
@@ -59,7 +61,7 @@ export function InfoModule() {
       <div className="rounded-md border border-border bg-card p-5">
         <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-text-primary">
           <Info className="h-4 w-4 text-primary" />
-          Build Information
+          {t("build_info")}
         </h2>
         {info ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -83,7 +85,7 @@ export function InfoModule() {
             ))}
           </div>
         ) : (
-          <p className="text-text-muted text-sm">Loading build information...</p>
+          <p className="text-text-muted text-sm">{t("loading_build_info")}</p>
         )}
       </div>
 
@@ -91,11 +93,10 @@ export function InfoModule() {
       <div className="rounded-md border border-border bg-card p-5">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-primary">
           <Heart className="h-4 w-4 text-pink-500" />
-          About {PRODUCT_NAME}
+          {t("about_product", { product: PRODUCT_NAME })}
         </h2>
         <p className="text-sm leading-relaxed text-text-muted">
-          {PRODUCT_NAME} is a local-first ERP desktop app designed for operational workflows such as
-          delivery challans, invoices, inventory, customer records, reporting, and business controls.
+          {t("about_product_desc", { product: PRODUCT_NAME })}
         </p>
       </div>
 
@@ -103,7 +104,7 @@ export function InfoModule() {
       <div className="rounded-md border border-border bg-card p-5">
         <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-text-primary">
           <Globe className="h-4 w-4 text-primary" />
-          Links
+          {t("links")}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {links.map((link) => (

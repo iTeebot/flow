@@ -1,4 +1,5 @@
 import { type CSSProperties, type ComponentType, useEffect, lazy, Suspense } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import {
   ChevronLeft,
@@ -11,18 +12,21 @@ import {
   UserCircle2,
   Settings,
   Users,
+  LogOut,
 } from "lucide-react";
 import "./App.css";
 import { theme } from "./theme";
 import { type ModuleKey, useUiStore } from "./store/uiStore";
 import { getLanguageDirection } from "./utils/layout";
 import { ToastContainer } from "./components/ToastContainer";
+import { GlobalRestoreHandler } from "./components/GlobalRestoreHandler";
 import { LandingPage } from "./pages/LandingPage";
 import { isTauri } from "./lib/platform";
 
 // Lazy-loaded Business Modules
 const DashboardModule = lazy(() => import("./modules/dashboard/DashboardModule").then(m => ({ default: m.DashboardModule })));
 const DeliveryChallanModule = lazy(() => import("./modules/deliveryChallan/DeliveryChallanModule").then(m => ({ default: m.DeliveryChallanModule })));
+const CreateDeliveryChallanModule = lazy(() => import("./modules/deliveryChallan/CreateDeliveryChallanModule").then(m => ({ default: m.CreateDeliveryChallanModule })));
 const InventoryModule = lazy(() => import("./modules/inventory/InventoryModule").then(m => ({ default: m.InventoryModule })));
 const CustomersModule = lazy(() => import("./modules/customers/CustomersModule").then(m => ({ default: m.CustomersModule })));
 const InvoicesModule = lazy(() => import("./modules/invoices/InvoicesModule").then(m => ({ default: m.InvoicesModule })));
@@ -30,44 +34,49 @@ const ProfileModule = lazy(() => import("./modules/profile/ProfileModule").then(
 const SettingsModule = lazy(() => import("./modules/settings/SettingsModule").then(m => ({ default: m.SettingsModule })));
 const InfoModule = lazy(() => import("./modules/info/InfoModule").then(m => ({ default: m.InfoModule })));
 
-const LoadingFallback = () => (
-  <div className="flex h-full w-full items-center justify-center animate-in fade-in duration-500">
-    <div className="flex flex-col items-center gap-4">
-      <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Loading Module...</span>
+const LoadingFallback = () => {
+  const { t } = useTranslation("sidebar");
+  return (
+    <div className="flex h-full w-full items-center justify-center animate-in fade-in duration-500">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">{t("loading_module")}</span>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const navItems: {
   id: ModuleKey;
-  label: string;
+  labelKey: string;
   path: string;
   note?: string;
   icon: ComponentType<{ className?: string }>;
 }[] = [
-    { id: "dashboard", label: "Dashboard", path: "/app/dashboard", icon: LayoutDashboard },
+    { id: "dashboard", labelKey: "dashboard", path: "/app/dashboard", icon: LayoutDashboard },
     {
       id: "delivery-challan",
-      label: "Delivery Challan",
+      labelKey: "delivery_challan",
       path: "/app/delivery-challan",
       icon: ClipboardList,
     },
-    { id: "inventory", label: "Inventory", path: "/app/inventory", icon: Package },
-    { id: "customers", label: "Customers", path: "/app/customers", icon: Users },
-    // { id: "reports", label: "Reports", path: "/app/reports", icon: BarChart3 },
-    { id: "invoices", label: "Invoices", path: "/app/invoices", icon: FileBadge2 },
-    { id: "profile", label: "Profile", path: "/app/profile", icon: UserCircle2 },
-    { id: "settings", label: "Settings", path: "/app/settings", icon: Settings },
-    { id: "info", label: "Info", path: "/app/info", icon: Info },
+    { id: "inventory", labelKey: "inventory", path: "/app/inventory", icon: Package },
+    { id: "customers", labelKey: "customers", path: "/app/customers", icon: Users },
+    { id: "invoices", labelKey: "invoices", path: "/app/invoices", icon: FileBadge2 },
+    { id: "profile", labelKey: "profile", path: "/app/profile", icon: UserCircle2 },
+    { id: "settings", labelKey: "settings", path: "/app/settings", icon: Settings },
+    { id: "info", labelKey: "info", path: "/app/info", icon: Info },
   ];
 
 import { useAuthStore } from "./store/authStore";
 import { LoginView } from "./modules/auth/LoginView";
 import { RegisterView } from "./modules/auth/RegisterView";
+import { OnboardingView } from "./modules/auth/OnboardingView";
 import { getCompanyProfile } from "./modules/companyProfile/api";
+import { useState } from "react";
 
 function AppContent() {
+  const { t, i18n } = useTranslation("sidebar");
   const location = useLocation();
   const {
     isAuthenticated,
@@ -75,7 +84,8 @@ function AppContent() {
     isLoading,
     checkRegistration,
     companyId,
-    setCurrency
+    setCurrency,
+    logout
   } = useAuthStore();
 
   const {
@@ -88,12 +98,14 @@ function AppContent() {
     themeMode,
     language
   } = useUiStore();
+  const [showRegistration, setShowRegistration] = useState(false);
 
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dir = getLanguageDirection(language);
   }, [language]);
-  const currentLabel = navItems.find((item) => item.id === activeModule)?.label ?? "Teebot Flow";
+  const activeNavItem = navItems.find((item) => item.id === activeModule);
+  const currentLabel = activeNavItem ? t(activeNavItem.labelKey) : "Teebot Flow";
 
   useEffect(() => {
     checkRegistration();
@@ -140,15 +152,36 @@ function AppContent() {
   }
 
   if (isLoading) {
-    return <div className="flex h-screen items-center justify-center bg-background text-text-primary">Loading...</div>;
+    return <div className="flex h-screen items-center justify-center bg-background text-text-primary">{t("loading")}</div>;
   }
 
   if (!isAuthenticated) {
-    return isRegistered ? <LoginView /> : <RegisterView />;
+    if (isRegistered) {
+      return (
+        <>
+          <LoginView />
+          <ToastContainer />
+        </>
+      );
+    }
+    return showRegistration ? (
+      <>
+        <RegisterView onBack={() => setShowRegistration(false)} />
+        <ToastContainer />
+      </>
+    ) : (
+      <>
+        <OnboardingView onSelectRegister={() => setShowRegistration(true)} />
+        <ToastContainer />
+      </>
+    );
   }
+
+  const direction = getLanguageDirection(i18n.language);
 
   return (
     <div
+      dir={direction}
       className="h-screen overflow-hidden bg-background text-text-primary"
       style={
         {
@@ -188,13 +221,16 @@ function AppContent() {
 
             <button
               type="button"
-              onClick={toggleSidebar}
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+               onClick={toggleSidebar}
+              title={sidebarCollapsed ? t("expand_sidebar") : t("collapse_sidebar")}
               className={`inline-flex items-center justify-center rounded-lg border border-border bg-card text-xs font-medium text-text-primary transition hover:border-primary hover:bg-primary/10 ${sidebarCollapsed ? "h-9 w-full" : "w-fit gap-1 px-3 py-1.5"
                 }`}
             >
-              {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-              {!sidebarCollapsed ? "Collapse" : null}
+              {sidebarCollapsed 
+                ? (direction === 'rtl' ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)
+                : (direction === 'rtl' ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />)
+              }
+              {!sidebarCollapsed ? t("collapse") : null}
             </button>
           </div>
 
@@ -211,11 +247,11 @@ function AppContent() {
                     : "border-transparent text-text-muted hover:border-border hover:bg-card hover:text-text-primary"
                   } ${sidebarCollapsed ? "flex h-9 items-center justify-center px-0 shrink-0" : "px-3 py-2 shrink-0"}`
                 }
-                title={sidebarCollapsed ? item.label : undefined}
+                title={sidebarCollapsed ? t(item.labelKey) : undefined}
               >
                 <div className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}>
                   <item.icon className="h-4 w-4 shrink-0" />
-                  {!sidebarCollapsed ? <span className="text-sm font-medium">{item.label}</span> : null}
+                  {!sidebarCollapsed ? <span className="text-sm font-medium">{t(item.labelKey)}</span> : null}
                 </div>
                 {!sidebarCollapsed && item.note ? (
                   <small className="mt-1 block text-[11px] uppercase tracking-wide text-cyan/90">{item.note}</small>
@@ -223,6 +259,18 @@ function AppContent() {
               </NavLink>
             ))}
           </nav>
+
+          {/* Footer Area: Logout */}
+          <div className="px-4 py-4 mt-auto border-t border-border/50">
+            <button
+              onClick={() => logout()}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-error hover:bg-error/10 transition-colors w-full ${sidebarCollapsed ? 'justify-center' : ''}`}
+              title={sidebarCollapsed ? t("logout") : undefined}
+            >
+              <LogOut className="h-4 w-4 shrink-0" />
+              {!sidebarCollapsed && <span>{t("logout")}</span>}
+            </button>
+          </div>
         </aside>
 
         <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden">
@@ -244,6 +292,8 @@ function AppContent() {
                 <Route path="/app" element={<Navigate to="/app/delivery-challan" replace />} />
                 <Route path="/app/dashboard" element={<DashboardModule />} />
                 <Route path="/app/delivery-challan" element={<DeliveryChallanModule />} />
+                <Route path="/app/delivery-challan/create" element={<CreateDeliveryChallanModule />} />
+                <Route path="/app/delivery-challan/edit" element={<CreateDeliveryChallanModule />} />
                 <Route path="/app/inventory" element={<InventoryModule />} />
                 <Route path="/app/customers" element={<CustomersModule />} />
                 {/* <Route path="/app/reports" element={<ReportsModule />} /> */}
@@ -251,13 +301,14 @@ function AppContent() {
                 <Route path="/app/profile" element={<ProfileModule />} />
                 <Route path="/app/settings" element={<SettingsModule />} />
                 <Route path="/app/info" element={<InfoModule />} />
-                <Route path="*" element={<div className="p-10 text-text-muted">No route matched: {location.pathname}</div>} />
+                <Route path="*" element={<div className="p-10 text-text-muted">{t("no_route_matched")} {location.pathname}</div>} />
               </Routes>
             </Suspense>
           </main>
         </div>
       </div>
       <ToastContainer />
+      <GlobalRestoreHandler />
     </div>
   );
 }

@@ -4,6 +4,7 @@ export type Product = {
   id: number;
   company_id: number;
   name: string;
+  description?: string | null;
   sku: string;
   stock_qty: number;
   price: number;
@@ -13,6 +14,7 @@ export type Product = {
 export type CreateProductInput = {
   company_id: number;
   name: string;
+  description?: string | null;
   sku: string;
   stock_qty: number;
   price: number;
@@ -21,6 +23,7 @@ export type CreateProductInput = {
 export type UpdateProductInput = {
   id: number;
   name: string;
+  description?: string | null;
   sku: string;
   stock_qty: number;
   price: number;

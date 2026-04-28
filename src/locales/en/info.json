@@ -1,0 +1,19 @@
+{
+  "load_error": "Failed to load app info",
+  "product": "Product",
+  "version": "Version",
+  "build_profile": "Build Profile",
+  "platform": "Platform",
+  "database": "Database",
+  "teebot_labs": "Teebot Labs",
+  "teebot_labs_desc": "Company website and developer portal",
+  "product_page": "Product Page",
+  "product_page_desc": "Official Teebot Flow landing page",
+  "title": "Info",
+  "subtitle": "Version, build details, developer information, and product links.",
+  "build_info": "Build Information",
+  "loading_build_info": "Loading build information...",
+  "about_product": "About {{product}}",
+  "about_product_desc": "{{product}} is a local-first ERP desktop app designed for operational workflows such as delivery challans, invoices, inventory, customer records, reporting, and business controls.",
+  "links": "Links"
+}

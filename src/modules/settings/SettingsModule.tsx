@@ -1,23 +1,35 @@
 import { useEffect, useState } from "react";
-import { Monitor, Moon, Sun, Database, Globe, Layers, Folder } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Monitor, Moon, Sun, Database, Globe, Layers, Folder, Download, Upload, ShieldAlert, Lock, Key } from "lucide-react";
 import { useUiStore, type ThemeMode } from "../../store/uiStore";
-import { createBackup, getBackupInfo } from "./api";
+import { createBackup, getBackupInfo, exportBackup, generateRecoveryKey } from "./api";
 import { useToastStore } from "../../store/toastStore";
-import { openPath } from "../../lib/api";
-
-const languageOptions = [
-  { value: "en", label: "English (US)" },
-  { value: "hi", label: "हिन्दी (Hindi)" },
-  { value: "gu", label: "ગુજરાતી (Gujarati)" },
-  { value: "ur", label: "اردو (Urdu)" },
-];
+import { openPath, invoke } from "../../lib/api";
+import { SearchableSelect } from "../../components/ui/SearchableSelect";
+import languagesData from "../../assets/languages.json";
+import { RestoreConfirmModal } from "../../components/modals/RestoreConfirmModal";
+import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
 
 export function SettingsModule() {
-  const { themeMode, setThemeMode, resolvedTheme } = useUiStore();
+  const { t } = useTranslation("settings");
+  const { themeMode, setThemeMode, resolvedTheme, language, setLanguage } = useUiStore();
   const [backupAt, setBackupAt] = useState<string | null>(null);
   const [backupPath, setBackupPath] = useState<string | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
+  const [encryptionKey, setEncryptionKey] = useState<string | null>(localStorage.getItem("teebot_recovery_key"));
   const { addToast } = useToastStore();
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [pendingFile, setPendingFile] = useState<{
+    path: string;
+    name: string;
+    size: string;
+    date: string;
+  } | null>(null);
+
+  const languageOptions = languagesData.languages.map((l) => ({
+    label: l.nativeName || l.name,
+    value: l.code,
+  }));
 
   useEffect(() => {
     const loadBackupInfo = async () => {
@@ -36,26 +48,122 @@ export function SettingsModule() {
     if (!backupPath) return;
     try {
       await openPath(backupPath);
-      addToast("Opening backup directory...", "info");
+      addToast(t("opening_backup_dir"), "info");
     } catch {
-      addToast("Failed to reveal folder.", "error");
+      addToast(t("reveal_folder_error"), "error");
     }
   };
 
   const handleThemeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
-    addToast(`Interface theme set to ${mode}`, "info");
+    addToast(t("theme_set", { mode }), "info");
   };
 
   const handleCreateBackup = async () => {
     try {
       setBackupBusy(true);
-      const info = await createBackup();
+      const info = await createBackup(encryptionKey || undefined);
       setBackupAt(info.last_backup_at ?? null);
       setBackupPath(info.backup_path ?? null);
-      addToast("System backup completed successfully.", "success");
+      addToast(t("backup_success", "Backup generated successfully"), "success");
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to create backup", "error");
+      addToast(err instanceof Error ? err.message : t("backup_error"), "error");
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const path = await save({
+        title: t("export_backup_title", "Export Teebot Backup"),
+        defaultPath: `teebot-flow-backup-${new Date().toISOString().split('T')[0]}.tbf`,
+        filters: [{ name: "Teebot Backup", extensions: ["tbf"] }]
+      });
+
+      if (path) {
+        setBackupBusy(true);
+        await exportBackup(path, encryptionKey || undefined);
+        addToast(t("export_success", "Backup exported successfully!"), "success");
+      }
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : t("export_error", "Failed to export backup"), "error");
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleImportBackup = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "Teebot Backup", extensions: ["tbf"] }]
+      });
+
+      if (selected) {
+        const { stat } = await import("@tauri-apps/plugin-fs");
+        const fileStat = await stat(selected);
+        const fileName = selected.split(/[\\\/]/).pop() || selected;
+
+        setPendingFile({
+          path: selected,
+          name: fileName,
+          size: `${(fileStat.size / (1024 * 1024)).toFixed(2)} MB`,
+          date: fileStat.mtime ? new Date(fileStat.mtime).toLocaleString() : new Date().toLocaleString()
+        });
+        setShowRestoreConfirm(true);
+      }
+    } catch (err) {
+      addToast(t("import_error", "Failed to select backup"), "error");
+    }
+  };
+
+  const executeRestore = async (key?: string) => {
+    if (!pendingFile) return;
+    setBackupBusy(true);
+    try {
+      await invoke("restore_database", { path: pendingFile.path, encryptionKey: key });
+      addToast(t("restore_success", "Database restored successfully!"), "success");
+      window.location.reload();
+    } catch (err) {
+      console.error("Restore error:", err);
+      const msg = typeof err === 'string' ? err : (err instanceof Error ? err.message : "Unknown error");
+      addToast(msg, "error");
+    } finally {
+      setBackupBusy(false);
+      setShowRestoreConfirm(false);
+      setPendingFile(null);
+    }
+  };
+
+  const handleGenerateKey = async () => {
+    try {
+      setBackupBusy(true);
+      const newKey = await generateRecoveryKey();
+
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const path = await save({
+        title: "Save Master Recovery Key",
+        defaultPath: "teebot-recovery-key.txt",
+        filters: [{ name: "Text Document", extensions: ["txt"] }]
+      });
+
+      if (path) {
+        const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+        await writeTextFile(path, `TEEBOT FLOW MASTER RECOVERY KEY\n\nKEEP THIS SAFE. IF LOST, YOUR ENCRYPTED BACKUPS CANNOT BE RESTORED.\n\nKEY: ${newKey}`);
+
+        localStorage.setItem("teebot_recovery_key", newKey);
+        setEncryptionKey(newKey);
+        addToast(t("key_generated", "Military-grade encryption enabled! Key saved to device."), "success");
+      } else {
+        addToast(t("key_cancelled", "You must save the file to enable encryption."), "error");
+      }
+    } catch (err) {
+      console.error("Generate key error:", err);
+      const msg = typeof err === 'string' ? err : (err instanceof Error ? err.message : "Unknown error");
+      addToast(t("key_error", `Failed to generate key: ${msg}`), "error");
     } finally {
       setBackupBusy(false);
     }
@@ -65,8 +173,8 @@ export function SettingsModule() {
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header Section */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-text-primary">System Configuration</h1>
-        <p className="text-sm text-text-muted mt-1">Manage global preferences, appearance, and data integrity</p>
+        <h1 className="text-3xl font-bold tracking-tight text-text-primary">{t("title")}</h1>
+        <p className="text-sm text-text-muted mt-1">{t("subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -75,17 +183,17 @@ export function SettingsModule() {
           <div className="border-b border-border bg-surface/30 px-6 py-5">
             <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
               <Layers className="h-5 w-5 text-primary" />
-              Visual Identity
+              {t("visual_identity")}
             </h2>
-            <p className="text-xs text-text-muted mt-1">Choose how Teebot looks on your display</p>
+            <p className="text-xs text-text-muted mt-1">{t("visual_identity_desc")}</p>
           </div>
 
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[
-                { mode: 'system', icon: Monitor, label: 'Auto' },
-                { mode: 'light', icon: Sun, label: 'Light' },
-                { mode: 'dark', icon: Moon, label: 'Dark' }
+                { mode: 'system', icon: Monitor, label: t("theme_auto") },
+                { mode: 'light', icon: Sun, label: t("theme_light") },
+                { mode: 'dark', icon: Moon, label: t("theme_dark") }
               ].map(({ mode, icon: Icon, label }) => (
                 <button
                   key={mode}
@@ -103,8 +211,8 @@ export function SettingsModule() {
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-lg bg-surface/50 border border-border/50">
-              <span className="text-xs font-medium text-text-muted">Currently active theme resolved as:</span>
-              <span className="text-xs font-black text-primary uppercase tracking-tighter">{resolvedTheme} MODE</span>
+              <span className="text-xs font-medium text-text-muted">{t("active_theme_resolved")}</span>
+              <span className="text-xs font-black text-primary uppercase tracking-tighter">{resolvedTheme} {t("mode")}</span>
             </div>
           </div>
         </div>
@@ -114,34 +222,76 @@ export function SettingsModule() {
           <div className="border-b border-border bg-surface/30 px-6 py-5">
             <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
               <Globe className="h-5 w-5 text-primary" />
-              Internationalization
+              {t("localization")}
             </h2>
-            <p className="text-xs text-text-muted mt-1">Select your preferred system language</p>
+            <p className="text-xs text-text-muted mt-1">{t("localization_desc")}</p>
           </div>
 
           <div className="p-6 space-y-6">
             <div className="space-y-2">
-              <label className="block text-[11px] font-bold uppercase text-text-muted ml-1 tracking-wider">Regional Dialect</label>
-              <select
-                className="w-full"
-                defaultValue="en"
-              >
-                {languageOptions.map((language) => (
-                  <option key={language.value} value={language.value}>
-                    {language.label}
-                  </option>
-                ))}
-              </select>
+              <SearchableSelect
+                label={t("regional_dialect")}
+                options={languageOptions}
+                value={language}
+                onChange={(val) => {
+                  setLanguage(val as any);
+                  addToast(t("language_updated", { lang: val }), "success");
+                }}
+              />
             </div>
             <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
               <div className="p-2 rounded-lg bg-primary/10">
                 <Monitor className="h-4 w-4 text-primary" />
               </div>
               <p className="text-xs leading-relaxed text-text-primary/70">
-                <span className="font-bold text-primary mr-1">Cloud Update:</span>
-                Full multilingual support is being rolled out. Some specialized modules may remain in English during the transition phase.
+                <span className="font-bold text-primary mr-1">{t("cloud_update")}</span>
+                {t("cloud_update_desc")}
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Security Section */}
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden h-fit">
+          <div className="border-b border-border bg-surface/30 px-6 py-5">
+            <h2 className="text-lg font-bold text-error flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5" />
+              {t("encryption", "Military-Grade Encryption")}
+            </h2>
+            <p className="text-xs text-text-muted mt-1">{t("encryption_desc", "Secure your local and cloud backups")}</p>
+          </div>
+
+          <div className="p-6 space-y-6">
+            {encryptionKey ? (
+              <div className="p-4 rounded-xl border border-success/30 bg-success/5 flex items-center gap-4">
+                <div className="p-3 bg-success/10 rounded-lg">
+                  <Lock className="h-6 w-6 text-success" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-text-primary">{t("encryption_active", "Encryption is Active")}</h3>
+                  <p className="text-xs text-text-muted mt-1">{t("encryption_active_desc", "All new backups are encrypted with AES-256-GCM.")}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-error/5 border border-error/20">
+                  <ShieldAlert className="h-5 w-5 text-error shrink-0 mt-0.5" />
+                  <p className="text-xs leading-relaxed text-text-primary/80">
+                    <span className="font-bold text-error mr-1">{t("warning", "WARNING:")}</span>
+                    {t("encryption_warning", "Your backups are currently unencrypted. Anyone with access to the file can read your financial data.")}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerateKey}
+                  disabled={backupBusy}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-error px-6 py-3.5 text-xs font-black uppercase tracking-widest text-error-foreground shadow-lg shadow-error/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+                >
+                  <Key className="h-4 w-4" />
+                  {t("generate_key", "Generate Recovery Key")}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -150,23 +300,23 @@ export function SettingsModule() {
           <div className="border-b border-border bg-surface/30 px-6 py-5">
             <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
               <Database className="h-5 w-5 text-primary" />
-              Data Integrity & Backups
+              {t("data_integrity")}
             </h2>
-            <p className="text-xs text-text-muted mt-1">Ensure your business records are safe and recoverable</p>
+            <p className="text-xs text-text-muted mt-1">{t("data_integrity_desc")}</p>
           </div>
 
           <div className="p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-10 bg-gradient-to-br from-card to-surface/30">
             <div className="space-y-6 max-w-2xl">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
                 <div className="space-y-2">
-                  <p className="text-[10px] font-black uppercase text-text-muted tracking-widest border-l-2 border-primary/30 pl-2">Last Synchronization</p>
+                  <p className="text-[10px] font-black uppercase text-text-muted tracking-widest border-l-2 border-primary/30 pl-2">{t("last_sync")}</p>
                   <p className="text-sm font-bold text-text-primary pl-2">
-                    {backupAt ? new Date(backupAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : "No History Found"}
+                    {backupAt ? new Date(backupAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : t("no_history")}
                   </p>
                 </div>
                 {backupPath && (
                   <div className="space-y-2">
-                    <p className="text-[10px] font-black uppercase text-text-muted tracking-widest border-l-2 border-primary/30 pl-2">Security Archive Path</p>
+                    <p className="text-[10px] font-black uppercase text-text-muted tracking-widest border-l-2 border-primary/30 pl-2">{t("security_archive_path")}</p>
                     <div className="pl-2 flex items-center gap-2 group">
                       <p className="text-[11px] font-mono text-primary truncate max-w-full bg-primary/5 px-2 py-1.5 rounded border border-primary/10 flex-1" title={backupPath}>
                         {backupPath}
@@ -174,7 +324,7 @@ export function SettingsModule() {
                       <button
                         onClick={handleRevealFolder}
                         className="p-1.5 rounded-lg bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 text-text-muted hover:text-primary transition-all shadow-sm"
-                        title="Reveal in Finder/Explorer"
+                        title={t("reveal_in_finder")}
                       >
                         <Folder className="h-3.5 w-3.5" />
                       </button>
@@ -183,11 +333,31 @@ export function SettingsModule() {
                 )}
               </div>
               <p className="text-xs text-text-muted/70 italic leading-relaxed border-t border-border/40 pt-4">
-                Protect your catalog, customer directory, and financial records by creating regular offline security copies. These can be used to restore your data in case of hardware failure.
+                {t("backup_desc")}
               </p>
             </div>
 
-            <div className="shrink-0">
+            <div className="shrink-0 flex flex-col sm:flex-row gap-4">
+              <button
+                type="button"
+                onClick={handleImportBackup}
+                disabled={backupBusy}
+                className="w-full sm:w-auto flex items-center justify-center gap-3 rounded-xl border border-primary/30 bg-surface px-8 py-5 text-sm font-black uppercase tracking-widest text-primary shadow-xl transition-all hover:scale-[1.05] active:scale-[0.95] disabled:opacity-50 h-fit whitespace-nowrap"
+              >
+                <Upload className="h-5 w-5 shrink-0" />
+                <span>{t("import_backup", "Import Backup")}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportBackup}
+                disabled={backupBusy}
+                className="w-full sm:w-auto flex items-center justify-center gap-3 rounded-xl border border-primary/30 bg-surface px-8 py-5 text-sm font-black uppercase tracking-widest text-primary shadow-xl transition-all hover:scale-[1.05] active:scale-[0.95] disabled:opacity-50 h-fit whitespace-nowrap"
+              >
+                <Download className="h-5 w-5 shrink-0" />
+                <span>{t("export_to_device", "Export to Device")}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleCreateBackup}
@@ -197,12 +367,31 @@ export function SettingsModule() {
                 {backupBusy ? (
                   <div className="w-5 h-5 border-3 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
                 ) : <Database className="h-5 w-5 shrink-0" />}
-                <span>{backupBusy ? "Securing Data..." : "Generate Backup Now"}</span>
+                <span>{backupBusy ? t("securing_data") : t("generate_backup")}</span>
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {pendingFile && (
+        <RestoreConfirmModal
+          isOpen={showRestoreConfirm}
+          onClose={() => {
+            setShowRestoreConfirm(false);
+            setPendingFile(null);
+          }}
+          onConfirm={executeRestore}
+          fileInfo={pendingFile}
+          isLoading={backupBusy}
+        />
+      )}
+
+      <FullscreenLoader
+        isVisible={backupBusy && !showRestoreConfirm}
+        message={t("securing_data", "Processing Data")}
+        subMessage={t("backup_wait_msg", "Please wait while we securely process your financial data. Do not close the app.")}
+      />
     </div>
   );
 }

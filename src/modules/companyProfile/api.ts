@@ -12,6 +12,11 @@ export type CompanyProfile = {
   business_type?: string | null;
   currency?: string | null;
   website?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  logo_base64?: string | null;
 };
 
 export type CreateCompanyProfileInput = {
@@ -25,6 +30,11 @@ export type CreateCompanyProfileInput = {
   business_type?: string | null;
   currency?: string | null;
   website?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+  country?: string | null;
+  logo_base64?: string | null;
 };
 
 export type UpdateCompanyProfileInput = CreateCompanyProfileInput & {

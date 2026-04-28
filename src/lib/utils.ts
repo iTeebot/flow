@@ -1,7 +1,7 @@
 /**
  * Formats a numeric value as a currency string based on the provided currency code.
  */
-export function formatCurrency(value: number, currencyCode: string = "USD"): string {
+export function formatCurrency(value: number, currencyCode: string = "PKR"): string {
   try {
     return new Intl.NumberFormat(navigator.language, {
       style: "currency",

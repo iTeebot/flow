@@ -6,6 +6,7 @@ pub struct Product {
     pub id: i64,
     pub company_id: i64,
     pub name: String,
+    pub description: Option<String>,
     pub sku: String,
     pub stock_qty: i64,
     pub price: f64,
@@ -16,6 +17,7 @@ pub struct Product {
 pub struct CreateProductInput {
     pub company_id: i64,
     pub name: String,
+    pub description: Option<String>,
     pub sku: String,
     pub stock_qty: i64,
     pub price: f64,
@@ -25,6 +27,7 @@ pub struct CreateProductInput {
 pub struct UpdateProductInput {
     pub id: i64,
     pub name: String,
+    pub description: Option<String>,
     pub sku: String,
     pub stock_qty: i64,
     pub price: f64,
@@ -67,10 +70,11 @@ pub fn create_product(app: tauri::AppHandle, input: CreateProductInput) -> Resul
     }
 
     conn.execute(
-        "INSERT INTO products (company_id, name, sku, stock_qty, price) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO products (company_id, name, description, sku, stock_qty, price) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         (
             input.company_id,
             &input.name,
+            &input.description,
             &input.sku,
             input.stock_qty,
             input.price,
@@ -87,6 +91,7 @@ pub fn create_product(app: tauri::AppHandle, input: CreateProductInput) -> Resul
         id,
         company_id: input.company_id,
         name: input.name,
+        description: input.description,
         sku: input.sku,
         stock_qty: input.stock_qty,
         price: input.price,
@@ -103,7 +108,7 @@ pub fn list_products(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Produ
     let conn = db::open_connection(&app)?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, company_id, name, sku, stock_qty, price, created_at
+            "SELECT id, company_id, name, description, sku, stock_qty, price, created_at
              FROM products
              WHERE company_id = ?1 AND deleted_at IS NULL
              ORDER BY created_at DESC",
@@ -116,10 +121,11 @@ pub fn list_products(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Produ
                 id: row.get(0)?,
                 company_id: row.get(1)?,
                 name: row.get(2)?,
-                sku: row.get(3)?,
-                stock_qty: row.get(4)?,
-                price: row.get(5)?,
-                created_at: row.get(6)?,
+                description: row.get(3)?,
+                sku: row.get(4)?,
+                stock_qty: row.get(5)?,
+                price: row.get(6)?,
+                created_at: row.get(7)?,
             })
         })
         .map_err(|e| format!("Failed to fetch products: {e}"))?;
@@ -152,8 +158,8 @@ pub fn update_product(app: tauri::AppHandle, input: UpdateProductInput) -> Resul
     let conn = db::open_connection(&app)?;
     
     conn.execute(
-        "UPDATE products SET name = ?1, sku = ?2, stock_qty = ?3, price = ?4 WHERE id = ?5",
-        (&input.name, &input.sku, input.stock_qty, input.price, input.id),
+        "UPDATE products SET name = ?1, description = ?2, sku = ?3, stock_qty = ?4, price = ?5 WHERE id = ?6",
+        (&input.name, &input.description, &input.sku, input.stock_qty, input.price, input.id),
     )
     .map_err(|e| format!("Failed to update product: {e}"))?;
 
@@ -169,6 +175,7 @@ pub fn update_product(app: tauri::AppHandle, input: UpdateProductInput) -> Resul
         id: input.id,
         company_id,
         name: input.name,
+        description: input.description,
         sku: input.sku,
         stock_qty: input.stock_qty,
         price: input.price,
@@ -220,11 +227,11 @@ pub fn adjust_stock(app: tauri::AppHandle, input: AdjustStockInput) -> Result<Pr
     )
     .map_err(|e| format!("Failed to adjust stock: {e}"))?;
 
-    let (company_id, name, sku, price, created_at): (i64, String, String, f64, String) = conn
+    let (company_id, name, description, sku, price, created_at): (i64, String, Option<String>, String, f64, String) = conn
         .query_row(
-            "SELECT company_id, name, sku, price, created_at FROM products WHERE id = ?1",
+            "SELECT company_id, name, description, sku, price, created_at FROM products WHERE id = ?1",
             [input.product_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
         )
         .map_err(|_| "Product not found".to_string())?;
 
@@ -232,6 +239,7 @@ pub fn adjust_stock(app: tauri::AppHandle, input: AdjustStockInput) -> Result<Pr
         id: input.product_id,
         company_id,
         name,
+        description,
         sku,
         stock_qty: new_stock,
         price,

@@ -26,7 +26,7 @@ export function Sidebar({ type }: SidebarProps) {
   const direction = getLanguageDirection(language);
   const BackIcon = getBackIcon(direction);
 
-  const languageOptions = languagesData.map((l) => ({
+  const languageOptions = languagesData.languages.map((l: any) => ({
     label: l.nativeName || l.name,
     value: l.code,
   }));

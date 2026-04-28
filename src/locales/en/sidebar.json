@@ -1,0 +1,17 @@
+{
+  "dashboard": "Dashboard",
+  "delivery_challan": "Delivery Challan",
+  "inventory": "Inventory",
+  "customers": "Customers",
+  "invoices": "Invoices",
+  "profile": "Profile",
+  "settings": "Settings",
+  "info": "Info",
+  "collapse": "Collapse",
+  "expand_sidebar": "Expand sidebar",
+  "collapse_sidebar": "Collapse sidebar",
+  "loading": "Loading...",
+  "loading_module": "Loading Module...",
+  "no_route_matched": "No route matched: ",
+  "logout": "Logout"
+}

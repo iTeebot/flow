@@ -6,6 +6,7 @@ export interface User {
   username: string;
   full_name: string | null;
   role: string;
+  currency: string | null;
 }
 
 interface AuthState {
@@ -23,6 +24,8 @@ interface AuthState {
   setCurrency: (currency: string) => void;
   setCompanyLogo: (logo: string | null) => void;
   logout: () => void;
+  resetSystem: () => Promise<void>;
+  checkSession: () => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -37,6 +40,31 @@ export const useAuthStore = create<AuthState>((set) => ({
   checkRegistration: async () => {
     try {
       const registered = await invoke<boolean>("is_registered");
+      if (registered) {
+        // Try to recover session if user was logged in
+        const savedUser = localStorage.getItem("teebot_user");
+        if (savedUser) {
+          try {
+            const user = JSON.parse(savedUser);
+            const response = await invoke<any>("validate_session", { userId: user.id });
+            const userCurrency = response.user?.currency || "USD";
+            localStorage.setItem("currency", userCurrency);
+            if (response.logo_base64) {
+              localStorage.setItem("companyLogo", response.logo_base64);
+            }
+            set({ 
+              user: response.user, 
+              companyId: response.company_id, 
+              currency: userCurrency,
+              companyLogo: response.logo_base64 || localStorage.getItem("companyLogo"),
+              isAuthenticated: true 
+            });
+          } catch {
+            localStorage.removeItem("teebot_user");
+            set({ isAuthenticated: false });
+          }
+        }
+      }
       set({ isRegistered: registered, isLoading: false });
     } catch (error) {
       console.error("Failed to check registration:", error);
@@ -49,10 +77,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       const response = await invoke<any>("login", { username, password });
       const userCurrency = response.user?.currency || "USD";
       localStorage.setItem("currency", userCurrency);
+      localStorage.setItem("teebot_user", JSON.stringify(response.user));
+      if (response.logo_base64) {
+        localStorage.setItem("companyLogo", response.logo_base64);
+      }
       set({ 
         user: response.user, 
         companyId: response.company_id, 
         currency: userCurrency,
+        companyLogo: response.logo_base64 || localStorage.getItem("companyLogo"),
         isAuthenticated: true 
       });
     } catch (error) {
@@ -66,10 +99,14 @@ export const useAuthStore = create<AuthState>((set) => ({
       const response = await invoke<any>("register", { input: data });
       const userCurrency = response.user?.currency || "USD";
       localStorage.setItem("currency", userCurrency);
+      if (response.logo_base64) {
+        localStorage.setItem("companyLogo", response.logo_base64);
+      }
       set({ 
         user: response.user, 
         companyId: response.company_id, 
         currency: userCurrency,
+        companyLogo: response.logo_base64 || localStorage.getItem("companyLogo"),
         isAuthenticated: true, 
         isRegistered: true 
       });
@@ -98,7 +135,45 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    localStorage.removeItem("teebot_user");
     set({ user: null, companyId: null, currency: "USD", companyLogo: null, isAuthenticated: false });
+  },
+  resetSystem: async () => {
+    try {
+      await invoke("reset_database");
+      localStorage.clear();
+      set({ 
+        user: null, 
+        companyId: null, 
+        currency: "USD", 
+        companyLogo: null, 
+        isAuthenticated: false, 
+        isRegistered: false 
+      });
+    } catch (error) {
+      console.error("System reset failed:", error);
+      throw error;
+    }
+  },
+  checkSession: async () => {
+    const savedUser = localStorage.getItem("teebot_user");
+    if (!savedUser) return false;
+
+    try {
+      const user = JSON.parse(savedUser);
+      const response = await invoke<any>("validate_session", { userId: user.id });
+      set({ 
+        user: response.user, 
+        companyId: response.company_id, 
+        currency: response.user?.currency || "USD",
+        isAuthenticated: true 
+      });
+      return true;
+    } catch {
+      localStorage.removeItem("teebot_user");
+      set({ user: null, isAuthenticated: false });
+      return false;
+    }
   },
 }));
 

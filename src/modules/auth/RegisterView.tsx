@@ -3,7 +3,19 @@ import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/authStore";
 import { useUiStore } from "../../store/uiStore";
 import currencies from "../../assets/currencies.json";
-import pakistanCities from "../../assets/countries/Pakistan.json";
+import languagesData from "../../assets/languages.json";
+import pakistanCitiesEn from "../../assets/countries/Pakistan.en.json";
+
+// Dynamic Urdu cities fallback logic
+let pakistanCitiesUr: any[] = pakistanCitiesEn;
+try {
+  // @ts-ignore
+  const urData = await import("../../assets/countries/Pakistan.ur.json");
+  if (urData && urData.default) pakistanCitiesUr = urData.default;
+} catch (e) {
+  // Fallback already set to en
+}
+
 import {
   Eye,
   EyeOff,
@@ -18,13 +30,18 @@ import {
   Map as MapIcon,
   Hash,
   IdCard,
-  Globe2
+  Globe2,
+  ArrowLeft
 } from "lucide-react";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import { Sidebar } from "./Sidebar";
-import { getLanguageDirection, getForwardIcon, getBackIcon } from "../../utils/layout";
+import { getLanguageDirection, getForwardIcon } from "../../utils/layout";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
+import { validatePakistaniPhone, validateUSPhone, validateGenericPhone } from "../../utils/validations/phone";
+import { validateEmail } from "../../utils/validations/email";
+import { validatePakistaniCNIC, validatePakistaniNTN } from "../../utils/validations/identity";
+import { formatPakistaniCNIC, stripNonDigits, stripNonAlphaNumeric } from "../../utils/formatters";
 
 interface Currency {
   symbol: string;
@@ -36,14 +53,13 @@ interface Currency {
   name_plural: string;
 }
 
-export function RegisterView() {
+export function RegisterView({ onBack }: { onBack: () => void }) {
   const { t } = useTranslation("auth");
   const { register } = useAuthStore();
   const { language } = useUiStore();
 
   const direction = getLanguageDirection(language);
   const ForwardIcon = getForwardIcon(direction);
-  const BackIcon = getBackIcon(direction);
 
   const [currenciesList, setCurrenciesList] = useState<Currency[]>([]);
 
@@ -62,7 +78,31 @@ export function RegisterView() {
   const [city, setCity] = useState("");
   const [stateRegion, setStateRegion] = useState("");
   const [postalCode, setPostalCode] = useState("");
-  const country = "Pakistan"; // Fixed for now
+  const [country, setCountry] = useState("Pakistan");
+  const [customCountry, setCustomCountry] = useState("");
+
+  const countryOptions = languagesData.countries.map(c => ({
+    label: language === "ur" ? c.ur : c.en,
+    value: c.code,
+    icon: <Globe2 className="h-4 w-4" />
+  }));
+
+  const labels = country === "US" ? {
+    id: "Identity Number (SSN/ITIN)",
+    tax: "Business ID (EIN)",
+    idPlaceholder: "e.g. 000-00-0000",
+    taxPlaceholder: "e.g. 00-0000000"
+  } : country === "Pakistan" ? {
+    id: t("register.cnic_label"),
+    tax: t("register.tax_label"),
+    idPlaceholder: t("register.cnic_placeholder"),
+    taxPlaceholder: t("register.tax_placeholder")
+  } : {
+    id: "Identity Number",
+    tax: "Business ID",
+    idPlaceholder: "Enter identity number",
+    taxPlaceholder: "Enter business ID"
+  };
 
   // 3. Security
   const [password, setPassword] = useState("");
@@ -71,8 +111,7 @@ export function RegisterView() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [error, setError] = useState("");
-
-
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const currencyArray = Object.values(currencies) as Currency[];
@@ -81,33 +120,136 @@ export function RegisterView() {
 
   const handleCityChange = (val: string) => {
     setCity(val);
-    const selected = pakistanCities.find(c => c.name === val);
+    const citiesData = language === "ur" ? pakistanCitiesUr : pakistanCitiesEn;
+    const selected = citiesData.find(c => c.name === val);
     if (selected) {
       setStateRegion(selected.state);
+    }
+    // Clear city error if it exists
+    if (validationErrors.city) {
+      setValidationErrors(prev => {
+        const next = { ...prev };
+        delete next.city;
+        return next;
+      });
+    }
+  };
+
+  const handleCountryChange = (val: string) => {
+    setCountry(val);
+    setCity("");
+    setStateRegion("");
+    if (val === "US") setCurrency("USD");
+    else if (val === "Pakistan") setCurrency("PKR");
+
+    // Clear country error
+    if (validationErrors.country) {
+      setValidationErrors(prev => {
+        const next = { ...prev };
+        delete next.country;
+        return next;
+      });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setValidationErrors({});
 
-    if (!fullName || !companyName || !cnic || !taxId || !email || !address || !city || !stateRegion || !password || !confirmPassword) {
-      setError(t("register.error_fill_required"));
-      return;
+    const newErrors: Record<string, string> = {};
+    let firstError = "";
+
+    const checkRequired = (value: string, key: string, labelKey: string) => {
+      if (!value || value.trim() === "") {
+        newErrors[key] = " ";
+        if (!firstError) {
+          firstError = t("register.error_field_required", {
+            field: t(labelKey).replace('*', '').trim()
+          });
+        }
+        return false;
+      }
+      return true;
+    };
+
+    // 1. Identity & Business
+    checkRequired(fullName, "fullName", "register.fullname_label");
+    checkRequired(companyName, "companyName", "register.org_label");
+
+    if (country === "Pakistan") {
+      if (checkRequired(cnic, "cnic", "register.cnic_label")) {
+        if (!validatePakistaniCNIC(cnic)) {
+          newErrors.cnic = " ";
+          if (!firstError) firstError = t("register.error_invalid_cnic");
+        }
+      }
+      if (checkRequired(taxId, "taxId", "register.tax_label")) {
+        if (!validatePakistaniNTN(taxId)) {
+          newErrors.taxId = " ";
+          if (!firstError) firstError = t("register.error_invalid_ntn");
+        }
+      }
+    } else {
+      checkRequired(cnic, "cnic", country === "US" ? "register.cnic_label_us" : "register.cnic_label");
+      checkRequired(taxId, "taxId", country === "US" ? "register.tax_label_us" : "register.tax_label");
     }
 
-    if (password !== confirmPassword) {
-      setError(t("register.error_mismatch"));
-      return;
+    // 2. Contact & Location
+    if (checkRequired(email, "email", "register.email_label")) {
+      if (!validateEmail(email)) {
+        newErrors.email = " ";
+        if (!firstError) firstError = t("register.error_invalid_email");
+      }
     }
-    if (password.length < 8) {
-      setError(t("register.error_length"));
+
+    // Phone is optional but validated if present
+    if (phone) {
+      const isPak = country === "Pakistan";
+      const isUS = country === "US";
+      const isValid = isPak ? validatePakistaniPhone(phone) : isUS ? validateUSPhone(phone) : validateGenericPhone(phone);
+      if (!isValid) {
+        newErrors.phone = " ";
+        if (!firstError) firstError = t("register.error_invalid_phone");
+      }
+    }
+
+    checkRequired(address, "address", "register.address_label");
+    checkRequired(city, "city", "register.city_label");
+    checkRequired(stateRegion, "stateRegion", "register.state_label");
+
+    if (!country) {
+      newErrors.country = " ";
+      if (!firstError) firstError = t("register.error_field_required", { field: t("register.country_label").replace('*', '').trim() });
+    } else if (country === "Others") {
+      checkRequired(customCountry, "customCountry", "register.custom_country_label");
+    }
+
+    // 3. Security
+    if (checkRequired(password, "password", "register.password_label")) {
+      if (password.length < 8) {
+        newErrors.password = " ";
+        if (!firstError) firstError = t("register.error_length");
+      }
+    }
+
+    if (checkRequired(confirmPassword, "confirmPassword", "register.confirm_password_label")) {
+      if (password !== confirmPassword) {
+        newErrors.confirmPassword = " ";
+        if (!firstError) firstError = t("register.error_mismatch");
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setValidationErrors(newErrors);
+      setError(firstError);
       return;
     }
 
     try {
       await register({
         username: email,
+        email,
         password,
         full_name: fullName,
         company_name: companyName,
@@ -120,16 +262,13 @@ export function RegisterView() {
         city,
         state: stateRegion,
         postal_code: postalCode,
-        country,
+        country: country === "Others" ? customCountry : country,
         website: "",
       });
     } catch (err: any) {
-      setError(err?.toString() ?? t("register.error_failed"));
+      setError(err?.toString() || t("register.error_failed"));
     }
   };
-
-
-
 
   return (
     <div className="h-screen bg-background flex items-center justify-center p-4">
@@ -157,7 +296,7 @@ export function RegisterView() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <form onSubmit={handleSubmit} noValidate className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto pr-1 space-y-6">
 
               {/* ── All Fields ── */}
@@ -169,18 +308,38 @@ export function RegisterView() {
                     type="text"
                     required
                     value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      if (validationErrors.fullName) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.fullName;
+                          return next;
+                        });
+                      }
+                    }}
                     placeholder={t("register.fullname_placeholder")}
                     leftIcon={<UserIcon className="h-4 w-4" />}
+                    error={validationErrors.fullName}
                   />
                   <Input
                     label={t("register.org_label")}
                     type="text"
                     required
                     value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
+                    onChange={(e) => {
+                      setCompanyName(e.target.value);
+                      if (validationErrors.companyName) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.companyName;
+                          return next;
+                        });
+                      }
+                    }}
                     placeholder={t("register.org_placeholder")}
                     leftIcon={<Building2 className="h-4 w-4" />}
+                    error={validationErrors.companyName}
                   />
                 </div>
 
@@ -190,38 +349,88 @@ export function RegisterView() {
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (validationErrors.email) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.email;
+                          return next;
+                        });
+                      }
+                    }}
                     placeholder={t("register.email_placeholder")}
                     leftIcon={<Mail className="h-4 w-4" />}
+                    error={validationErrors.email}
                   />
                   <Input
                     label={t("register.phone_label")}
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (validationErrors.phone) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.phone;
+                          return next;
+                        });
+                      }
+                    }}
                     placeholder={t("register.phone_placeholder")}
                     leftIcon={<Phone className="h-4 w-4" />}
+                    error={validationErrors.phone}
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Input
-                    label={t("register.cnic_label")}
+                    label={labels.id}
                     type="text"
                     required
-                    value={cnic}
-                    onChange={(e) => setCnic(e.target.value)}
-                    placeholder={t("register.cnic_placeholder")}
+                    value={country === "Pakistan" ? formatPakistaniCNIC(cnic) : cnic}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (country === "Pakistan") {
+                        val = stripNonDigits(val).slice(0, 13);
+                      }
+                      setCnic(val);
+                      if (validationErrors.cnic) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.cnic;
+                          return next;
+                        });
+                      }
+                    }}
+                    placeholder={labels.idPlaceholder}
                     leftIcon={<IdCard className="h-4 w-4" />}
+                    error={validationErrors.cnic}
+                    maxLength={country === "Pakistan" ? 15 : undefined}
                   />
                   <Input
-                    label={t("register.tax_label")}
+                    label={labels.tax}
                     type="text"
                     required
                     value={taxId}
-                    onChange={(e) => setTaxId(e.target.value)}
-                    placeholder={t("register.tax_placeholder")}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (country === "Pakistan") {
+                        val = stripNonAlphaNumeric(val).slice(0, 7);
+                      }
+                      setTaxId(val);
+                      if (validationErrors.taxId) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.taxId;
+                          return next;
+                        });
+                      }
+                    }}
+                    placeholder={labels.taxPlaceholder}
                     leftIcon={<Fingerprint className="h-4 w-4" />}
+                    error={validationErrors.taxId}
+                    maxLength={country === "Pakistan" ? 7 : undefined}
                   />
                 </div>
 
@@ -230,54 +439,152 @@ export function RegisterView() {
                   type="text"
                   required
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    if (validationErrors.address) {
+                      setValidationErrors(prev => {
+                        const next = { ...prev };
+                        delete next.address;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder={t("register.address_placeholder")}
                   leftIcon={<MapPin className="h-4 w-4" />}
+                  error={validationErrors.address}
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <SearchableSelect
-                    label={t("register.city_label")}
-                    value={city}
-                    onChange={handleCityChange}
-                    placeholder={t("register.city_placeholder")}
-                    openDirection="down"
-                    options={pakistanCities.map(c => ({
-                      label: c.name,
-                      value: c.name,
-                      description: c.state
-                    }))}
-                  />
+                  {country === "Pakistan" ? (
+                    <SearchableSelect
+                      label={t("register.city_label")}
+                      value={city}
+                      onChange={handleCityChange}
+                      placeholder={t("register.city_placeholder")}
+                      openDirection="down"
+                      options={(language === "ur" ? pakistanCitiesUr : pakistanCitiesEn).map(c => ({
+                        label: c.name,
+                        value: c.name,
+                        description: c.state
+                      }))}
+                      error={validationErrors.city}
+                    />
+                  ) : (
+                    <Input
+                      label={t("register.city_label")}
+                      type="text"
+                      required
+                      value={city}
+                      onChange={(e) => {
+                        setCity(e.target.value);
+                        if (validationErrors.city) {
+                          setValidationErrors(prev => {
+                            const next = { ...prev };
+                            delete next.city;
+                            return next;
+                          });
+                        }
+                      }}
+                      placeholder={t("register.city_placeholder")}
+                      leftIcon={<MapIcon className="h-4 w-4" />}
+                      error={validationErrors.city}
+                    />
+                  )}
                   <Input
                     label={t("register.state_label")}
                     type="text"
                     required
-                    readOnly
+                    readOnly={country === "Pakistan"}
                     value={stateRegion}
-                    placeholder={t("register.state_placeholder")}
+                    onChange={(e) => {
+                      setStateRegion(e.target.value);
+                      if (validationErrors.stateRegion) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.stateRegion;
+                          return next;
+                        });
+                      }
+                    }}
+                    placeholder={country === "Pakistan" ? t("register.state_placeholder_auto") || "Auto-selected" : t("register.state_placeholder_manual") || "Enter state/region"}
                     leftIcon={<MapIcon className="h-4 w-4" />}
-                    className="bg-surface cursor-not-allowed opacity-70"
+                    className={country === "Pakistan" ? "bg-surface cursor-not-allowed opacity-70" : ""}
+                    error={validationErrors.stateRegion}
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <Input
+                  <SearchableSelect
                     label={t("register.country_label")}
-                    type="text"
-                    readOnly
                     value={country}
-                    leftIcon={<Globe2 className="h-4 w-4" />}
-                    className="bg-surface cursor-not-allowed opacity-70"
+                    onChange={handleCountryChange}
+                    options={countryOptions}
+                    error={validationErrors.country}
                   />
-                  <Input
-                    label={t("register.postal_label")}
-                    type="text"
-                    value={postalCode}
-                    onChange={(e) => setPostalCode(e.target.value)}
-                    placeholder={t("register.postal_placeholder")}
-                    leftIcon={<Hash className="h-4 w-4" />}
-                  />
+                  {country === "Others" ? (
+                    <Input
+                      label={t("register.custom_country_label") || "Country Name"}
+                      type="text"
+                      required
+                      value={customCountry}
+                      onChange={(e) => {
+                        setCustomCountry(e.target.value);
+                        if (validationErrors.customCountry) {
+                          setValidationErrors(prev => {
+                            const next = { ...prev };
+                            delete next.customCountry;
+                            return next;
+                          });
+                        }
+                      }}
+                      placeholder={t("register.custom_country_placeholder") || "Enter your country name"}
+                      leftIcon={<Globe2 className="h-4 w-4" />}
+                      error={validationErrors.customCountry}
+                    />
+                  ) : (
+                    <Input
+                      label={t("register.postal_label")}
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => {
+                        setPostalCode(e.target.value);
+                        if (validationErrors.postalCode) {
+                          setValidationErrors(prev => {
+                            const next = { ...prev };
+                            delete next.postalCode;
+                            return next;
+                          });
+                        }
+                      }}
+                      placeholder={t("register.postal_placeholder")}
+                      leftIcon={<Hash className="h-4 w-4" />}
+                      error={validationErrors.postalCode}
+                    />
+                  )}
                 </div>
+
+                {country === "Others" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Input
+                      label={t("register.postal_label")}
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => {
+                        setPostalCode(e.target.value);
+                        if (validationErrors.postalCode) {
+                          setValidationErrors(prev => {
+                            const next = { ...prev };
+                            delete next.postalCode;
+                            return next;
+                          });
+                        }
+                      }}
+                      placeholder={t("register.postal_placeholder")}
+                      leftIcon={<Hash className="h-4 w-4" />}
+                      error={validationErrors.postalCode}
+                    />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Input
@@ -285,9 +592,19 @@ export function RegisterView() {
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (validationErrors.password) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.password;
+                          return next;
+                        });
+                      }
+                    }}
                     placeholder={t("register.password_placeholder")}
                     leftIcon={<Lock className="h-4 w-4" />}
+                    error={validationErrors.password}
                     rightIcon={
                       <button
                         type="button"
@@ -303,9 +620,19 @@ export function RegisterView() {
                     type={showConfirmPassword ? "text" : "password"}
                     required
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (validationErrors.confirmPassword) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.confirmPassword;
+                          return next;
+                        });
+                      }
+                    }}
                     placeholder={t("register.confirm_password_placeholder")}
                     leftIcon={<Lock className="h-4 w-4" />}
+                    error={validationErrors.confirmPassword}
                     rightIcon={
                       <button
                         type="button"
@@ -321,7 +648,16 @@ export function RegisterView() {
                 <SearchableSelect
                   label={t("register.currency_label")}
                   value={currency}
-                  onChange={(val) => setCurrency(val)}
+                  onChange={(val) => {
+                    setCurrency(val);
+                    if (validationErrors.currency) {
+                      setValidationErrors(prev => {
+                        const next = { ...prev };
+                        delete next.currency;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder={t("register.currency_choose")}
                   openDirection="up"
                   options={currenciesList.map((curr) => ({
@@ -329,13 +665,24 @@ export function RegisterView() {
                     value: curr.code,
                     description: curr.name_plural
                   }))}
+                  error={validationErrors.currency}
                 />
               </div>
             </div>
 
 
-            {/* Submit */}
-            <div className="flex items-center justify-end pt-8 shrink-0 border-t border-border/50 mt-6">
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-8 shrink-0 border-t border-border/50 mt-6">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onBack}
+                leftIcon={<ArrowLeft className="h-4 w-4" />}
+                className="px-6"
+              >
+                {t("register.back_button")}
+              </Button>
+
               <Button
                 type="submit"
                 className="px-8 py-3 text-xs uppercase tracking-widest"

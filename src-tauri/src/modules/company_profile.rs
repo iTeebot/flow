@@ -14,6 +14,10 @@ pub struct CompanyProfile {
     pub business_type: Option<String>,
     pub currency: Option<String>,
     pub website: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub postal_code: Option<String>,
+    pub country: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,6 +32,10 @@ pub struct CreateCompanyProfileInput {
     pub business_type: Option<String>,
     pub currency: Option<String>,
     pub website: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub postal_code: Option<String>,
+    pub country: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,6 +51,10 @@ pub struct UpdateCompanyProfileInput {
     pub business_type: Option<String>,
     pub currency: Option<String>,
     pub website: Option<String>,
+    pub city: Option<String>,
+    pub state: Option<String>,
+    pub postal_code: Option<String>,
+    pub country: Option<String>,
 }
 
 #[tauri::command]
@@ -56,7 +68,7 @@ pub fn create_company_profile(
 
     let conn = db::open_connection(&app)?;
     conn.execute(
-        "INSERT INTO company_profiles (company_name, tax_registration_number, owner_name, email, phone, address, sales_tax_number, business_type, currency, website) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO company_profiles (company_name, tax_registration_number, owner_name, email, phone, address, sales_tax_number, business_type, currency, website, city, state, postal_code, country) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         (
             &input.company_name,
             &input.tax_registration_number,
@@ -68,6 +80,10 @@ pub fn create_company_profile(
             &input.business_type,
             &input.currency,
             &input.website,
+            &input.city,
+            &input.state,
+            &input.postal_code,
+            &input.country,
         ),
     )
     .map_err(|e| format!("Failed to create company profile: {e}"))?;
@@ -85,6 +101,10 @@ pub fn create_company_profile(
         business_type: input.business_type,
         currency: input.currency,
         website: input.website,
+        city: input.city,
+        state: input.state,
+        postal_code: input.postal_code,
+        country: input.country,
     })
 }
 
@@ -93,7 +113,7 @@ pub fn list_company_profiles(app: tauri::AppHandle) -> Result<Vec<CompanyProfile
     let conn = db::open_connection(&app)?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, company_name, tax_registration_number, owner_name, email, phone, address, sales_tax_number, business_type, currency, website
+            "SELECT id, company_name, tax_registration_number, owner_name, email, phone, address, sales_tax_number, business_type, currency, website, city, state, postal_code, country
              FROM company_profiles
              WHERE deleted_at IS NULL
              ORDER BY id DESC",
@@ -114,6 +134,10 @@ pub fn list_company_profiles(app: tauri::AppHandle) -> Result<Vec<CompanyProfile
                 business_type: row.get(8)?,
                 currency: row.get(9)?,
                 website: row.get(10)?,
+                city: row.get(11)?,
+                state: row.get(12)?,
+                postal_code: row.get(13)?,
+                country: row.get(14)?,
             })
         })
         .map_err(|e| format!("Failed to fetch company profiles: {e}"))?;
@@ -132,7 +156,7 @@ pub fn get_company_profile(app: tauri::AppHandle, company_id: i64) -> Result<Com
     }
     let conn = db::open_connection(&app)?;
     conn.query_row(
-        "SELECT id, company_name, tax_registration_number, owner_name, email, phone, address, sales_tax_number, business_type, currency, website
+        "SELECT id, company_name, tax_registration_number, owner_name, email, phone, address, sales_tax_number, business_type, currency, website, city, state, postal_code, country
          FROM company_profiles
          WHERE id = ?1 AND deleted_at IS NULL",
         [company_id],
@@ -149,6 +173,10 @@ pub fn get_company_profile(app: tauri::AppHandle, company_id: i64) -> Result<Com
                 business_type: row.get(8)?,
                 currency: row.get(9)?,
                 website: row.get(10)?,
+                city: row.get(11)?,
+                state: row.get(12)?,
+                postal_code: row.get(13)?,
+                country: row.get(14)?,
             })
         },
     )
@@ -170,8 +198,9 @@ pub fn update_company_profile(
     conn.execute(
         "UPDATE company_profiles
          SET company_name = ?1, tax_registration_number = ?2, owner_name = ?3, email = ?4, phone = ?5, address = ?6,
-             sales_tax_number = ?7, business_type = ?8, currency = ?9, website = ?10
-         WHERE id = ?11",
+             sales_tax_number = ?7, business_type = ?8, currency = ?9, website = ?10,
+             city = ?11, state = ?12, postal_code = ?13, country = ?14
+         WHERE id = ?15",
         (
             &input.company_name,
             &input.tax_registration_number,
@@ -183,6 +212,10 @@ pub fn update_company_profile(
             &input.business_type,
             &input.currency,
             &input.website,
+            &input.city,
+            &input.state,
+            &input.postal_code,
+            &input.country,
             &input.id,
         ),
     )

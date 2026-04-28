@@ -1,5 +1,12 @@
+@font-face {
+  font-family: 'Noto Nastaliq Urdu';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./assets/fonts/NotoNastaliqUrdu.woff2') format('woff2');
+}
+
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
 
 /* Language specific font overrides */
 [lang="ur"] {

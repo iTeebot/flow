@@ -1,12 +1,31 @@
-[
-    {
-        "name": "English",
-        "nativeName": "English",
-        "code": "en"
-    },
-    {
-        "name": "Urdu",
-        "nativeName": "اردو",
-        "code": "ur"
-    }
-]
+{
+    "languages": [
+        {
+            "name": "English",
+            "nativeName": "English",
+            "code": "en"
+        },
+        {
+            "name": "Urdu",
+            "nativeName": "اردو",
+            "code": "ur"
+        }
+    ],
+    "countries": [
+        {
+            "en": "Pakistan",
+            "ur": "پاکستان",
+            "code": "Pakistan"
+        },
+        {
+            "en": "United States",
+            "ur": "امریکہ",
+            "code": "US"
+        },
+        {
+            "en": "Others",
+            "ur": "دیگر",
+            "code": "Others"
+        }
+    ]
+}

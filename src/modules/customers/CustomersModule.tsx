@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 import { Plus, Edit, Trash2, Users, Search } from "lucide-react";
-import { createCustomer, listCustomers, updateCustomer, deleteCustomer, type Customer } from "./api";
+import { listCustomers, deleteCustomer, type Customer } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { TablePagination } from "../shared/TablePagination";
-import { SortableHeader } from "../../components/SortableHeader";
 import { TableActions } from "../../components/TableActions";
 import { useToastStore } from "../../store/toastStore";
+import { useTranslation } from "react-i18next";
+import { Table } from "../../components/ui/Table";
+import { Select } from "../../components/ui/Select";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
 
 export function CustomersModule() {
+  const { t } = useTranslation("customers");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -27,13 +33,6 @@ export function CustomersModule() {
   // In a real app, this would come from user/company context
   const currentCompanyId = companyId || 1;
 
-  const [formData, setFormData] = useState({
-    name: "",
-    tax_registration_number: "",
-    phone: "",
-    address: "",
-  });
-
   useEffect(() => {
     if (currentCompanyId) {
       loadCustomers();
@@ -48,71 +47,33 @@ export function CustomersModule() {
       const data = await listCustomers(currentCompanyId);
       setCustomers(data);
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to load customers", "error");
+      addToast(err instanceof Error ? err.message : t("toast_load_failed"), "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingCustomer) {
-        await updateCustomer({
-          id: editingCustomer.id,
-          ...formData,
-        });
-      } else {
-        await createCustomer({
-          company_id: currentCompanyId,
-          ...formData,
-        });
-      }
-      await loadCustomers();
-      setShowAddForm(false);
-      setEditingCustomer(null);
-      setFormData({ name: "", tax_registration_number: "", phone: "", address: "" });
-      addToast(editingCustomer ? "Customer profile updated." : "New customer registered.", "success");
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to save customer", "error");
-    }
-  };
-
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
-    setFormData({
-      name: customer.name,
-      tax_registration_number: customer.tax_registration_number || "",
-      phone: customer.phone || "",
-      address: customer.address || "",
-    });
     setShowAddForm(true);
   };
 
   const handleDelete = async (customerId: number) => {
-    if (!confirm("Are you sure you want to delete this customer?")) return;
+    if (!confirm(t("delete_confirm"))) return;
     try {
       await deleteCustomer(customerId);
       await loadCustomers();
-      addToast("Customer record deleted successfully.", "success");
+      addToast(t("toast_removed"), "success");
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to delete customer", "error");
+      addToast(err instanceof Error ? err.message : t("toast_save_failed"), "error");
     }
   };
 
-  const handleSort = (key: "name" | "phone" | "tax") => {
-    if (sortBy === key) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(key);
-      setSortOrder("asc");
-    }
-  };
+
 
   const resetForm = () => {
     setShowAddForm(false);
     setEditingCustomer(null);
-    setFormData({ name: "", tax_registration_number: "", phone: "", address: "" });
   };
 
   const filteredCustomers = customers
@@ -154,7 +115,7 @@ export function CustomersModule() {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-text-muted">Loading customers...</div>
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
       </div>
     );
   }
@@ -164,100 +125,24 @@ export function CustomersModule() {
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Customer Directory</h1>
-          <p className="text-sm text-text-muted mt-1">Manage your customer database and contact profiles</p>
+          <h1 className="text-3xl font-bold tracking-tight text-text-primary">{t("title")}</h1>
+          <p className="text-sm text-text-muted mt-1">{t("subtitle")}</p>
         </div>
-        <button
+        <Button
           onClick={() => setShowAddForm(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98]"
+          leftIcon={<Plus className="h-4 w-4" />}
         >
-          <Plus className="h-4 w-4" />
-          Create
-        </button>
+          {t("create_btn")}
+        </Button>
       </div>
 
-      {showAddForm && (
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-in slide-in-from-top-4 duration-300">
-          <div className="border-b border-border bg-surface/50 px-6 py-4">
-            <h2 className="text-lg font-bold text-text-primary">
-              {editingCustomer ? "Edit Contact Profile" : "New Customer Onboarding"}
-            </h2>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                  Customer Name <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Acme Corp / John Doe"
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                  Tax Registration Number
-                </label>
-                <input
-                  type="text"
-                  value={formData.tax_registration_number}
-                  onChange={(e) => setFormData({ ...formData, tax_registration_number: e.target.value })}
-                  placeholder="TIN / VAT / GST"
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+1 (555) 000-0000"
-                  className="w-full"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
-                  Physical Address
-                </label>
-                <textarea
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  rows={3}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-text-primary text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all placeholder:text-text-muted/40"
-                  placeholder="Street address, City, Country"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 pt-4 border-t border-border">
-              <button
-                type="submit"
-                className="rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
-              >
-                {editingCustomer ? "Save Changes" : "Create Customer Account"}
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="rounded-lg border border-border bg-background px-6 py-2.5 text-sm font-semibold text-text-primary hover:bg-surface"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <CreateCustomerModal
+        isOpen={showAddForm}
+        onClose={resetForm}
+        onSuccess={loadCustomers}
+        companyId={currentCompanyId}
+        editingCustomer={editingCustomer}
+      />
 
       {/* List Container */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
@@ -265,48 +150,57 @@ export function CustomersModule() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
-              Manage Contacts
+              {t("manage_contacts")}
               <span className="ml-1 text-xs font-medium px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border">
                 {filteredCustomers.length}
               </span>
             </h2>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 lg:w-3/4">
-              <div className="relative group lg:col-span-2">
-                <Search className="input-icon-left h-3.5 w-3.5 text-text-muted group-focus-within:text-primary transition-colors" />
-                <input
+              <div className="md:col-span-1">
+                <Input
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
                     setPage(1);
                   }}
-                  placeholder="Search customer database..."
-                  className="w-full input-with-icon pr-4 py-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-text-muted/50"
+                  placeholder={t("search_placeholder")}
+                  leftIcon={<Search className="h-4 w-4" />}
+                  className="h-[46px]"
                 />
               </div>
 
-              <select
+              <Select
                 value={phoneFilter}
                 onChange={(e) => {
-                  setPhoneFilter(e.target.value as "all" | "with-phone" | "without-phone");
+                  setPhoneFilter(e.target.value as any);
                   setPage(1);
                 }}
-                className="text-xs"
-              >
-                <option value="all">All Phones</option>
-                <option value="with-phone">Has Phone</option>
-                <option value="without-phone">No Phone</option>
-              </select>
+                options={[
+                  { label: t("filter_all"), value: "all" },
+                  { label: t("filter_with_phone"), value: "with-phone" },
+                  { label: t("filter_without_phone"), value: "without-phone" },
+                ]}
+              />
 
-              <select
+              <Select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "name" | "phone" | "tax")}
-                className="text-xs"
+                onChange={(e) => setSortBy(e.target.value as any)}
+                options={[
+                  { label: t("sort_name"), value: "name" },
+                  { label: t("sort_phone"), value: "phone" },
+                  { label: t("sort_tax"), value: "tax" },
+                ]}
+              />
+
+              <Button
+                variant="secondary"
+                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                className="h-[46px] w-full"
+                leftIcon={<Plus className={`h-4 w-4 transition-transform duration-300 ${sortOrder === 'desc' ? 'rotate-180' : ''} hidden`} />}
               >
-                <option value="name">Sort by Name</option>
-                <option value="phone">Sort by Phone</option>
-                <option value="tax">Sort by Tax ID</option>
-              </select>
+                <span className="uppercase tracking-widest text-[10px]">{sortOrder}</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -316,82 +210,74 @@ export function CustomersModule() {
             <div className="rounded-full bg-surface p-4 mb-4 border border-border">
               <Users className="h-10 w-10 text-text-muted/30" />
             </div>
-            <p className="text-text-muted font-medium">No customers matched your criteria</p>
+            <p className="text-text-muted font-medium">{t("no_customers")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-surface/50 border-b border-border">
-                  <SortableHeader
-                    label="Customer Name"
-                    sortKey="name"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Phone Number"
-                    sortKey="phone"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Tax ID / TIN"
-                    sortKey="tax"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-text-muted">Physical Address</th>
-                  <th className="sticky right-0 z-10 bg-surface/90 w-14 px-2 py-4 text-right text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-[-4px_0_10px_rgba(0,0,0,0.1)] backdrop-blur-sm"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paginatedCustomers.map((customer) => (
-                  <tr key={customer.id} className="group hover:bg-surface/30 transition-all duration-200">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-text-primary text-sm">{customer.name}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-text-primary font-mono tracking-tighter">
-                        {customer.phone || <span className="text-text-muted/30">---</span>}
+            <Table
+              data={paginatedCustomers}
+              keyExtractor={(customer) => customer.id}
+              columns={[
+                {
+                  header: t("col_name"),
+                  accessor: (customer) => <div className="font-bold text-text-primary text-sm">{customer.name}</div>
+                },
+                {
+                  header: t("col_phone"),
+                  accessor: (customer) => (
+                    <div className="text-sm text-text-primary font-mono tracking-tighter">
+                      {customer.phone || <span className="text-text-muted/30">---</span>}
+                    </div>
+                  )
+                },
+                {
+                  header: t("col_tax"),
+                  accessor: (customer) => (
+                    <span className="text-xs font-medium px-2 py-1 rounded bg-surface border border-border text-text-muted">
+                      {customer.tax_registration_number || t("not_assigned")}
+                    </span>
+                  )
+                },
+                {
+                  header: t("col_address"),
+                  accessor: (customer) => (
+                    <div className="flex flex-col gap-0.5">
+                      <div className="text-xs text-text-primary/80 font-medium max-w-xs truncate" title={customer.address || ""}>
+                        {customer.address || t("no_address")}
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs font-medium px-2 py-1 rounded bg-surface border border-border text-text-muted">
-                        {customer.tax_registration_number || "NOT_ASSIGNED"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-xs text-text-muted max-w-xs truncate" title={customer.address || ""}>
-                        {customer.address || "No address provided"}
-                      </div>
-                    </td>
-                    <td className="sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-4 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm">
-                      <div className="flex items-center justify-end">
-                        <TableActions
-                          actions={[
-                            {
-                              label: "Modify Profile",
-                              icon: Edit,
-                              onClick: () => handleEdit(customer)
-                            },
-                            {
-                              label: "Remove Contact",
-                              icon: Trash2,
-                              onClick: () => handleDelete(customer.id),
-                              variant: "danger"
-                            }
-                          ]}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      {(customer.city || customer.state) && (
+                        <div className="text-[10px] text-text-muted font-bold uppercase tracking-tight">
+                          {[customer.city, customer.state].filter(Boolean).join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  )
+                },
+                {
+                  header: "",
+                  className: "sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-4 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm",
+                  accessor: (customer) => (
+                    <div className="flex items-center justify-end">
+                      <TableActions
+                        actions={[
+                          {
+                            label: t("modify_profile"),
+                            icon: Edit,
+                            onClick: () => handleEdit(customer)
+                          },
+                          {
+                            label: t("remove_contact"),
+                            icon: Trash2,
+                            onClick: () => handleDelete(customer.id),
+                            variant: "danger"
+                          }
+                        ]}
+                      />
+                    </div>
+                  )
+                }
+              ]}
+            />
           </div>
         )}
 
