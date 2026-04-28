@@ -338,7 +338,7 @@ fn ensure_column(conn: &Connection, table_name: &str, column_name: &str, column_
     Ok(())
 }
 
-fn ensure_index(conn: &Connection, index_name: &str, ddl: &str) -> Result<(), String> {
+fn ensure_index(conn: &Connection, _index_name: &str, ddl: &str) -> Result<(), String> {
     // Best-effort: if the index already exists or data prevents creation (e.g. NULLs in UNIQUE column),
     // we silently skip rather than crashing the app.
     let _ = conn.execute(ddl, []);
