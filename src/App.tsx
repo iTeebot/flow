@@ -30,6 +30,8 @@ const CreateDeliveryChallanModule = lazy(() => import("./modules/deliveryChallan
 const InventoryModule = lazy(() => import("./modules/inventory/InventoryModule").then(m => ({ default: m.InventoryModule })));
 const CustomersModule = lazy(() => import("./modules/customers/CustomersModule").then(m => ({ default: m.CustomersModule })));
 const InvoicesModule = lazy(() => import("./modules/invoices/InvoicesModule").then(m => ({ default: m.InvoicesModule })));
+const QuotationsModule = lazy(() => import("./modules/quotations/QuotationsModule").then(m => ({ default: m.QuotationsModule })));
+const CreateQuotationModule = lazy(() => import("./modules/quotations/CreateQuotationModule").then(m => ({ default: m.CreateQuotationModule })));
 const ProfileModule = lazy(() => import("./modules/profile/ProfileModule").then(m => ({ default: m.ProfileModule })));
 const SettingsModule = lazy(() => import("./modules/settings/SettingsModule").then(m => ({ default: m.SettingsModule })));
 const InfoModule = lazy(() => import("./modules/info/InfoModule").then(m => ({ default: m.InfoModule })));
@@ -60,9 +62,10 @@ const navItems: {
       path: "/app/delivery-challan",
       icon: ClipboardList,
     },
+    { id: "quotations", labelKey: "quotations", path: "/app/quotations", icon: FileBadge2 },
     { id: "inventory", labelKey: "inventory", path: "/app/inventory", icon: Package },
     { id: "customers", labelKey: "customers", path: "/app/customers", icon: Users },
-    { id: "invoices", labelKey: "invoices", path: "/app/invoices", icon: FileBadge2 },
+    { id: "invoices", labelKey: "invoices", path: "/app/invoices", icon: ClipboardList },
     { id: "profile", labelKey: "profile", path: "/app/profile", icon: UserCircle2 },
     { id: "settings", labelKey: "settings", path: "/app/settings", icon: Settings },
     { id: "info", labelKey: "info", path: "/app/info", icon: Info },
@@ -294,6 +297,9 @@ function AppContent() {
                 <Route path="/app/delivery-challan" element={<DeliveryChallanModule />} />
                 <Route path="/app/delivery-challan/create" element={<CreateDeliveryChallanModule />} />
                 <Route path="/app/delivery-challan/edit" element={<CreateDeliveryChallanModule />} />
+                <Route path="/app/quotations" element={<QuotationsModule />} />
+                <Route path="/app/quotations/create" element={<CreateQuotationModule />} />
+                <Route path="/app/quotations/edit" element={<CreateQuotationModule />} />
                 <Route path="/app/inventory" element={<InventoryModule />} />
                 <Route path="/app/customers" element={<CustomersModule />} />
                 {/* <Route path="/app/reports" element={<ReportsModule />} /> */}

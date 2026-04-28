@@ -1,6 +1,7 @@
 {
   "dashboard": "Dashboard",
   "delivery_challan": "Delivery Challan",
+  "quotations": "Quotations",
   "inventory": "Inventory",
   "customers": "Customers",
   "invoices": "Invoices",

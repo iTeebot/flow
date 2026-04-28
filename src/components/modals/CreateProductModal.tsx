@@ -11,7 +11,7 @@ import { useEffect } from 'react';
 interface CreateProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (product?: Product) => void;
   companyId: number;
   existingProducts: Product[];
   editingProduct?: Product | null;
@@ -61,13 +61,13 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
         });
         addToast(t("toast_updated"), "success");
       } else {
-        await createProduct({
+        const created = await createProduct({
           company_id: companyId,
           ...form
         });
         addToast(t("toast_created"), "success");
+        onSuccess(created);
       }
-      onSuccess();
       onClose();
     } catch (err) {
       addToast(err instanceof Error ? err.message : t("toast_save_failed"), "error");

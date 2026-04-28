@@ -27,7 +27,7 @@ try {
 interface CreateCustomerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (customer?: Customer) => void;
   companyId: number;
   editingCustomer?: Customer | null;
 }
@@ -123,13 +123,13 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
         });
         addToast(t("toast_updated"), "success");
       } else {
-        await createCustomer({
+        const created = await createCustomer({
           company_id: companyId,
           ...form
         });
         addToast(t("toast_created"), "success");
+        onSuccess(created);
       }
-      onSuccess();
       onClose();
     } catch (err) {
       addToast(err instanceof Error ? err.message : t("toast_save_failed"), "error");

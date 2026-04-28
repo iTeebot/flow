@@ -147,12 +147,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
   ];
 
   return (
-    <div className="h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl h-auto md:h-[88vh] min-h-[600px] bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-500">
+    <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
+      <div className="w-full max-w-5xl h-full md:h-[88vh] min-h-[600px] bg-surface border-x md:border border-border md:rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] animate-in fade-in zoom-in-95 duration-500">
         
         <Sidebar type="register" />
 
-        <div className="flex-1 p-6 lg:p-10 flex flex-col justify-center bg-surface overflow-y-auto">
+        <div className="w-full p-6 lg:p-10 flex flex-col justify-center bg-surface overflow-y-auto">
           <header className="mb-8 text-center md:text-left">
             <h2 className="text-3xl font-black text-text-primary tracking-tight mb-2">
               {t("onboarding.welcome_title")}

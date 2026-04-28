@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
-import { Plus, Edit, Trash2, Users, Search } from "lucide-react";
+import { Edit, Trash2, Users, Search, ArrowUpDown } from "lucide-react";
 import { listCustomers, deleteCustomer, type Customer } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { TablePagination } from "../shared/TablePagination";
-import { TableActions } from "../../components/TableActions";
 import { useToastStore } from "../../store/toastStore";
 import { useTranslation } from "react-i18next";
-import { Table } from "../../components/ui/Table";
 import { Select } from "../../components/ui/Select";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
+import { ModulePage } from "../../components/ModulePage";
+import { DataTable } from "../../components/DataTable";
 
 export function CustomersModule() {
   const { t } = useTranslation("customers");
@@ -76,6 +76,15 @@ export function CustomersModule() {
     setEditingCustomer(null);
   };
 
+  const handleSort = (key: any) => {
+    if (sortBy === key) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(key);
+      setSortOrder("asc");
+    }
+  };
+
   const filteredCustomers = customers
     .filter((customer) => {
       const search = searchTerm.trim().toLowerCase();
@@ -121,21 +130,62 @@ export function CustomersModule() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-text-primary">{t("title")}</h1>
-          <p className="text-sm text-text-muted mt-1">{t("subtitle")}</p>
-        </div>
-        <Button
-          onClick={() => setShowAddForm(true)}
-          leftIcon={<Plus className="h-4 w-4" />}
-        >
-          {t("create_btn")}
-        </Button>
-      </div>
+    <ModulePage
+      title={t("title")}
+      subtitle={t("subtitle")}
+      loading={loading}
+      action={{
+        label: t("create_btn"),
+        onClick: () => setShowAddForm(true)
+      }}
+      listIcon={<Users className="h-5 w-5" />}
+      listTitle={t("manage_contacts")}
+      count={filteredCustomers.length}
+      filterBar={
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 w-full">
+          <div className="md:col-span-2">
+            <Input
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
+              placeholder={t("search_placeholder")}
+              leftIcon={<Search className="h-4 w-4" />}
+              className="h-[46px]"
+            />
+          </div>
 
+          <Select
+            value={phoneFilter}
+            onChange={(e) => {
+              setPhoneFilter(e.target.value as any);
+              setPage(1);
+            }}
+            options={[
+              { label: t("filter_all"), value: "all" },
+              { label: t("filter_with_phone"), value: "with-phone" },
+              { label: t("filter_without_phone"), value: "without-phone" },
+            ]}
+          />
+        </div>
+      }
+      pagination={
+        filteredCustomers.length > 0 && (
+          <TablePagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={filteredCustomers.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        )
+      }
+    >
       <CreateCustomerModal
         isOpen={showAddForm}
         onClose={resetForm}
@@ -144,159 +194,69 @@ export function CustomersModule() {
         editingCustomer={editingCustomer}
       />
 
-      {/* List Container */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-surface/30 px-6 py-5">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              {t("manage_contacts")}
-              <span className="ml-1 text-xs font-medium px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border">
-                {filteredCustomers.length}
-              </span>
-            </h2>
-
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 lg:w-3/4">
-              <div className="md:col-span-1">
-                <Input
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder={t("search_placeholder")}
-                  leftIcon={<Search className="h-4 w-4" />}
-                  className="h-[46px]"
-                />
+      <DataTable
+        data={paginatedCustomers}
+        keyExtractor={(item) => item.id}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={handleSort}
+        emptyIcon={<Users className="h-10 w-10 text-text-muted/30" />}
+        emptyMessage={t("no_customers")}
+        columns={[
+          {
+            header: t("col_name"),
+            sortKey: "name",
+            accessor: (customer) => (
+              <div className="font-bold text-text-primary text-sm">{customer.name}</div>
+            )
+          },
+          {
+            header: t("col_phone"),
+            sortKey: "phone",
+            accessor: (customer) => (
+              <div className="text-sm text-text-primary font-mono tracking-tighter">
+                {customer.phone || <span className="text-text-muted/30">---</span>}
               </div>
-
-              <Select
-                value={phoneFilter}
-                onChange={(e) => {
-                  setPhoneFilter(e.target.value as any);
-                  setPage(1);
-                }}
-                options={[
-                  { label: t("filter_all"), value: "all" },
-                  { label: t("filter_with_phone"), value: "with-phone" },
-                  { label: t("filter_without_phone"), value: "without-phone" },
-                ]}
-              />
-
-              <Select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                options={[
-                  { label: t("sort_name"), value: "name" },
-                  { label: t("sort_phone"), value: "phone" },
-                  { label: t("sort_tax"), value: "tax" },
-                ]}
-              />
-
-              <Button
-                variant="secondary"
-                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                className="h-[46px] w-full"
-                leftIcon={<Plus className={`h-4 w-4 transition-transform duration-300 ${sortOrder === 'desc' ? 'rotate-180' : ''} hidden`} />}
-              >
-                <span className="uppercase tracking-widest text-[10px]">{sortOrder}</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {filteredCustomers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="rounded-full bg-surface p-4 mb-4 border border-border">
-              <Users className="h-10 w-10 text-text-muted/30" />
-            </div>
-            <p className="text-text-muted font-medium">{t("no_customers")}</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table
-              data={paginatedCustomers}
-              keyExtractor={(customer) => customer.id}
-              columns={[
-                {
-                  header: t("col_name"),
-                  accessor: (customer) => <div className="font-bold text-text-primary text-sm">{customer.name}</div>
-                },
-                {
-                  header: t("col_phone"),
-                  accessor: (customer) => (
-                    <div className="text-sm text-text-primary font-mono tracking-tighter">
-                      {customer.phone || <span className="text-text-muted/30">---</span>}
-                    </div>
-                  )
-                },
-                {
-                  header: t("col_tax"),
-                  accessor: (customer) => (
-                    <span className="text-xs font-medium px-2 py-1 rounded bg-surface border border-border text-text-muted">
-                      {customer.tax_registration_number || t("not_assigned")}
-                    </span>
-                  )
-                },
-                {
-                  header: t("col_address"),
-                  accessor: (customer) => (
-                    <div className="flex flex-col gap-0.5">
-                      <div className="text-xs text-text-primary/80 font-medium max-w-xs truncate" title={customer.address || ""}>
-                        {customer.address || t("no_address")}
-                      </div>
-                      {(customer.city || customer.state) && (
-                        <div className="text-[10px] text-text-muted font-bold uppercase tracking-tight">
-                          {[customer.city, customer.state].filter(Boolean).join(", ")}
-                        </div>
-                      )}
-                    </div>
-                  )
-                },
-                {
-                  header: "",
-                  className: "sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-4 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm",
-                  accessor: (customer) => (
-                    <div className="flex items-center justify-end">
-                      <TableActions
-                        actions={[
-                          {
-                            label: t("modify_profile"),
-                            icon: Edit,
-                            onClick: () => handleEdit(customer)
-                          },
-                          {
-                            label: t("remove_contact"),
-                            icon: Trash2,
-                            onClick: () => handleDelete(customer.id),
-                            variant: "danger"
-                          }
-                        ]}
-                      />
-                    </div>
-                  )
-                }
-              ]}
-            />
-          </div>
-        )}
-
-        {filteredCustomers.length > 0 && (
-          <div className="border-t border-border bg-surface/20">
-            <TablePagination
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={filteredCustomers.length}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-            />
-          </div>
-        )}
-      </div>
-    </div>
+            )
+          },
+          {
+            header: t("col_tax"),
+            sortKey: "tax",
+            accessor: (customer) => (
+              <span className="text-[11px] font-bold px-2 py-1 rounded bg-primary/5 border border-primary/10 text-primary uppercase tracking-tight">
+                {customer.tax_registration_number || t("not_assigned")}
+              </span>
+            )
+          },
+          {
+            header: t("col_address"),
+            accessor: (customer) => (
+              <div className="flex flex-col gap-0.5">
+                <div className="text-xs text-text-primary/80 font-medium max-w-xs truncate" title={customer.address || ""}>
+                  {customer.address || t("no_address")}
+                </div>
+                {(customer.city || customer.state) && (
+                  <div className="text-[10px] text-text-muted font-bold uppercase tracking-tight">
+                    {[customer.city, customer.state].filter(Boolean).join(", ")}
+                  </div>
+                )}
+              </div>
+            )
+          }
+        ]}
+        actions={(customer) => [
+          {
+            label: t("common:edit", "Edit"),
+            icon: Edit,
+            onClick: () => handleEdit(customer)
+          },
+          {
+            label: t("common:delete", "Delete"),
+            icon: Trash2,
+            onClick: () => handleDelete(customer.id)
+          }
+        ]}
+      />
+    </ModulePage>
   );
 }

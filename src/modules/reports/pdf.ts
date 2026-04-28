@@ -1,8 +1,11 @@
 import { jsPDF } from "jspdf";
-import { invoke, openPath } from "../../lib/api";
+import { invoke, openPath, isTauri } from "../../lib/api";
 import type { DeliveryChallan } from "../deliveryChallan/api";
 import { useAuthStore } from "../../store/authStore";
 import challanTemplate from "./html/index.html?raw";
+import quotationTemplate from "./html/quotation.html?raw";
+import type { Quotation } from "../quotations/api";
+import { getCompanyProfile } from "../companyProfile/api";
 
 export type ChallanCustomField = {
   id: string;
@@ -78,7 +81,7 @@ function buildChallanHtml(
         </div>`
         )
         .join("")
-      : `<div style="font-size:12px;color:#d1d5db;font-style:italic;">No custom fields</div>`;
+      : ``;
 
   return challanTemplate
     .replace("{{LOGO_HTML}}", logoHtml)
@@ -89,6 +92,88 @@ function buildChallanHtml(
     .replace("{{ITEM_ROWS}}", itemRows)
     .replace("{{EMPTY_ROWS}}", emptyRows)
     .replace("{{TOTAL_QTY}}", String(totalQty))
+    .replace("{{APP_VERSION}}", APP_VERSION);
+}
+
+function buildQuotationHtml(
+  quotation: Quotation,
+  companyLogo: string | null,
+  company: any // CompanyProfile
+): string {
+  const displayDate = new Date(quotation.created_at).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const validUntil = new Date(new Date(quotation.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const logoHtml = companyLogo
+    ? `<img src="${companyLogo}" style="height:52px;width:52px;object-fit:contain;border-radius:6px;background:#fff;padding:3px;margin-right:12px;" />`
+    : "";
+
+  const itemRows = quotation.items
+    .map(
+      (item, idx) => `
+      <tr style="background:${idx % 2 === 0 ? "#fff" : "#f8fafc"};">
+        <td class="col-description" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;">
+          <div style="font-weight:700;color:#0f172a;">${item.product_name}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:2px;">${item.description}</div>
+        </td>
+        <td class="col-qty" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;text-align:center;font-weight:700;">${item.quantity}</td>
+        <td class="col-rate" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;text-align:right;color:#64748b;">${company.currency} ${item.rate.toLocaleString()}</td>
+        <td class="col-amount" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;text-align:right;font-weight:700;color:#0f172a;">${company.currency} ${item.amount.toLocaleString()}</td>
+      </tr>`
+    )
+    .join("");
+
+  const emptyRowCount = Math.max(0, 5 - quotation.items.length);
+  const emptyRows = Array.from({ length: emptyRowCount })
+    .map(
+      () => `
+      <tr>
+        <td class="col-description" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;">&nbsp;</td>
+        <td class="col-qty" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;"></td>
+        <td class="col-rate" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;"></td>
+        <td class="col-amount" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;"></td>
+      </tr>`
+    )
+    .join("");
+
+  const notesHtml = quotation.notes 
+    ? `<div class="notes"><h4>Notes & Terms</h4>${quotation.notes}</div>` 
+    : "";
+
+  const subtotal = quotation.total_amount;
+  const total = quotation.total_amount;
+
+  return quotationTemplate
+    .replace("{{LOGO_HTML}}", logoHtml)
+    .replace(/{{QUOTE_NUMBER}}/g, quotation.quote_number)
+    .replace(/{{COMPANY_NAME}}/g, company.company_name || "Company Name")
+    .replace("{{COMPANY_ADDRESS}}", company.address || "")
+    .replace("{{COMPANY_CITY}}", company.city || "")
+    .replace("{{COMPANY_STATE}}", company.state || "")
+    .replace("{{COMPANY_POSTAL}}", company.postal_code || "")
+    .replace("{{COMPANY_PHONE}}", company.phone || "")
+    .replace("{{COMPANY_EMAIL}}", company.email || "")
+    .replace("{{COMPANY_WEBSITE}}", company.website || "")
+    .replace("{{CUSTOMER_NAME}}", quotation.customer_name)
+    .replace("{{CUSTOMER_ADDRESS}}", quotation.customer_address || "No address provided")
+    .replace("{{CUSTOMER_PHONE}}", quotation.customer_phone || "No phone provided")
+    .replace("{{DATE}}", displayDate)
+    .replace("{{VALID_UNTIL}}", validUntil)
+    .replace("{{STATUS}}", quotation.status)
+    .replace("{{ITEM_ROWS}}", itemRows)
+    .replace("{{EMPTY_ROWS}}", emptyRows)
+    .replace("{{CURRENCY}}", company.currency || "PKR")
+    .replace("{{SUBTOTAL}}", subtotal.toLocaleString())
+    .replace("{{TOTAL}}", total.toLocaleString())
+    .replace("{{NOTES_HTML}}", notesHtml)
     .replace("{{APP_VERSION}}", APP_VERSION);
 }
 
@@ -369,35 +454,221 @@ export function printDeliveryChallan(
   const companyLogo = useAuthStore.getState().companyLogo;
   const html = buildChallanHtml(challan, companyLogo, customFields);
 
-  let printRoot = document.getElementById("print-root");
-  if (!printRoot) {
-    printRoot = document.createElement("div");
-    printRoot.id = "print-root";
-    document.body.appendChild(printRoot);
+  // Use a hidden iframe for printing to prevent style leakage
+  let iframe = document.getElementById("print-iframe") as HTMLIFrameElement;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = "print-iframe";
+    iframe.style.position = "absolute";
+    iframe.style.width = "0px";
+    iframe.style.height = "0px";
+    iframe.style.border = "none";
+    iframe.style.visibility = "hidden";
+    document.body.appendChild(iframe);
   }
-  printRoot.innerHTML = html;
 
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (!doc) return;
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  // Wait for resources (like logo) to load
   setTimeout(() => {
-    try { window.print(); } catch (e) { console.error("[Print] Error:", e); }
-  }, 150);
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (e) {
+      console.error("[Print] Error:", e);
+    }
+  }, 300);
 }
 
-/** Opens a live preview of the challan in a separate popup window */
-export function previewDeliveryChallan(
+// ── Live Preview System ──────────────────────────────────────────
+// Keeps a reference to the open preview window so we can update it reactively.
+let _previewPopup: Window | null = null;
+let _previewLabel: string | null = null;
+const PREVIEW_FILE = "challan-live-preview.html";
+
+/** Build HTML and export for reuse */
+export function buildPreviewHtml(
+  challan: DeliveryChallan,
+  customFields: ChallanCustomField[] = []
+): string {
+  const companyLogo = useAuthStore.getState().companyLogo;
+  return buildChallanHtml(challan, companyLogo, customFields);
+}
+
+/** Opens (or re-focuses) the live preview window */
+export async function previewDeliveryChallan(
   challan: DeliveryChallan,
   customFields: ChallanCustomField[] = []
 ) {
-  const companyLogo = useAuthStore.getState().companyLogo;
-  const html = buildChallanHtml(challan, companyLogo, customFields);
+  const html = buildPreviewHtml(challan, customFields);
 
-  const popup = window.open("", `challan-preview-${challan.id}`, "width=900,height=1100,resizable=yes,scrollbars=yes");
-  if (!popup) {
-    console.error("[Preview] Popup was blocked.");
-    return;
+  if (isTauri()) {
+    try {
+      const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+      const { writeTextFile, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+      const { convertFileSrc } = await import("@tauri-apps/api/core");
+      const { tempDir } = await import("@tauri-apps/api/path");
+
+      // Write HTML to a stable temp file (reused for updates)
+      await writeTextFile(PREVIEW_FILE, html, { baseDir: BaseDirectory.Temp });
+
+      // Check if previous preview window is still alive
+      if (_previewLabel) {
+        const existing = await WebviewWindow.getByLabel(_previewLabel);
+        if (existing) {
+          // Reload the content in the existing window
+          const tmpDir = await tempDir();
+          const assetUrl = convertFileSrc(`${tmpDir}${PREVIEW_FILE}`);
+          await (existing as any).eval(`window.location.replace("${assetUrl}")`);
+          await (existing as any).setFocus?.();
+          return;
+        }
+      }
+
+      // Get the asset URL and open a new window
+      const tmpDir = await tempDir();
+      const filePath = `${tmpDir}${PREVIEW_FILE}`;
+      const assetUrl = convertFileSrc(filePath);
+
+      const label = `challan-preview`;
+      _previewLabel = label;
+
+      const webview = new WebviewWindow(label, {
+        url: assetUrl,
+        title: `Challan Preview — ${challan.dc_number}`,
+        width: 900,
+        height: 1000,
+        resizable: true,
+        center: true,
+      });
+
+      webview.once("tauri://error", (e) => {
+        console.error("[Tauri Preview] Window error:", e);
+        _previewLabel = null;
+      });
+
+      webview.once("tauri://destroyed", () => {
+        _previewLabel = null;
+      });
+    } catch (err) {
+      console.error("[Tauri Preview] Failed:", err);
+      _previewLabel = null;
+    }
+  } else {
+    // Web mode: reuse the same popup window
+    if (_previewPopup && !_previewPopup.closed) {
+      _previewPopup.document.open();
+      _previewPopup.document.write(html);
+      _previewPopup.document.close();
+      _previewPopup.focus();
+    } else {
+      _previewPopup = window.open("", "challan-live-preview", "width=900,height=1100,resizable=yes,scrollbars=yes");
+      if (!_previewPopup) {
+        console.error("[Preview] Popup was blocked.");
+        return;
+      }
+      _previewPopup.document.open();
+      _previewPopup.document.write(html);
+      _previewPopup.document.close();
+      _previewPopup.focus();
+    }
   }
-  popup.document.open();
-  popup.document.write(html);
-  popup.document.close();
-  popup.focus();
 }
 
+/** Updates the already-open preview window without re-focusing it. Silently no-ops if no preview is open. */
+export async function updateLivePreview(
+  challan: DeliveryChallan,
+  customFields: ChallanCustomField[] = []
+) {
+  const html = buildPreviewHtml(challan, customFields);
+
+  if (isTauri()) {
+    if (!_previewLabel) return;
+    try {
+      const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+
+      const existing = await WebviewWindow.getByLabel(_previewLabel);
+      if (!existing) { _previewLabel = null; return; }
+
+      // Inject HTML directly via document.write to bypass caching
+      const escaped = html
+        .replace(/\\/g, '\\\\')
+        .replace(/`/g, '\\`')
+        .replace(/\$/g, '\\$');
+      await (existing as any).eval(`
+        document.open();
+        document.write(\`${escaped}\`);
+        document.close();
+      `);
+    } catch {
+      // Preview window was probably closed
+      _previewLabel = null;
+    }
+  } else {
+    if (!_previewPopup || _previewPopup.closed) { _previewPopup = null; return; }
+    _previewPopup.document.open();
+    _previewPopup.document.write(html);
+    _previewPopup.document.close();
+  }
+}
+
+export async function printQuotation(quotation: Quotation) {
+  const companyLogo = useAuthStore.getState().companyLogo;
+  const companyId = useAuthStore.getState().companyId;
+  if (!companyId) throw new Error("Company ID not found");
+  
+  const company = await getCompanyProfile(companyId);
+  const html = buildQuotationHtml(quotation, companyLogo, company);
+
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (doc) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      document.body.removeChild(iframe);
+    }, 500);
+  }
+}
+
+export async function downloadQuotationPdf(quotation: Quotation) {
+  const companyLogo = useAuthStore.getState().companyLogo;
+  const companyId = useAuthStore.getState().companyId;
+  if (!companyId) throw new Error("Company ID not found");
+
+  const company = await getCompanyProfile(companyId);
+  const html = buildQuotationHtml(quotation, companyLogo, company);
+
+  const doc = new jsPDF("p", "pt", "a4");
+  await doc.html(html, {
+    callback: async (doc) => {
+      const pdfBase64 = toBase64(doc.output("arraybuffer"));
+      const filename = `Quotation-${quotation.quote_number}.pdf`;
+      await invoke("save_delivery_challan_pdf", { filename, base64Data: pdfBase64 });
+    },
+    width: 595,
+    windowWidth: 595,
+  });
+}
+
+export function buildQuotationPreviewHtml(quotation: Quotation, company: any): string {
+  const companyLogo = useAuthStore.getState().companyLogo;
+  return buildQuotationHtml(quotation, companyLogo, company);
+}

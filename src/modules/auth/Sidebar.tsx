@@ -22,6 +22,7 @@ export function Sidebar({ type }: SidebarProps) {
   const { t } = useTranslation("auth");
   const { themeMode, setThemeMode, language, setLanguage } = useUiStore();
   const [view, setView] = useState<"form" | "info">("form");
+  const isUrdu = language === "ur";
 
   const direction = getLanguageDirection(language);
   const BackIcon = getBackIcon(direction);
@@ -47,11 +48,11 @@ export function Sidebar({ type }: SidebarProps) {
             {type === "login" ? (
               <>
                 <div>
-                  <h2 className="text-xl lg:text-2xl font-black text-text-primary leading-tight tracking-tight">
+                  <h2 className={`${isUrdu ? "text-base lg:text-lg" : "text-xl lg:text-2xl"} font-black text-text-primary leading-tight tracking-tight`}>
                     {t("sidebar.login_title")}<br />
                     <span className="text-primary italic">{t("sidebar.login_subtitle")}</span>
                   </h2>
-                  <p className="text-xs lg:text-sm text-text-muted leading-relaxed mt-2.5 lg:mt-3">
+                  <p className={`${isUrdu ? "text-[10.5px] lg:text-[11.5px]" : "text-xs lg:text-sm"} text-text-muted leading-relaxed mt-2.5 lg:mt-3`}>
                     {t("sidebar.login_desc")}
                   </p>
                 </div>
@@ -59,11 +60,11 @@ export function Sidebar({ type }: SidebarProps) {
             ) : (
               <>
                 <div>
-                  <h2 className="text-xl lg:text-2xl font-black text-text-primary leading-tight tracking-tight">
+                  <h2 className={`${isUrdu ? "text-base lg:text-lg" : "text-xl lg:text-2xl"} font-black text-text-primary leading-tight tracking-tight`}>
                     {t("sidebar.register_title")}<br />
                     <span className="text-primary italic">{t("sidebar.register_subtitle")}</span>
                   </h2>
-                  <p className="text-xs lg:text-sm text-text-muted leading-relaxed mt-2.5 lg:mt-3">
+                  <p className={`${isUrdu ? "text-[10.5px] lg:text-[11.5px]" : "text-xs lg:text-sm"} text-text-muted leading-relaxed mt-2.5 lg:mt-3`}>
                     {t("sidebar.register_desc")}
                   </p>
                 </div>
@@ -72,15 +73,15 @@ export function Sidebar({ type }: SidebarProps) {
                   <div className="flex items-start gap-3">
                     <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-success shrink-0" />
                     <div>
-                      <p className="text-xs font-bold text-text-primary">{t("sidebar.privacy_first")}</p>
-                      <p className="text-[11px] text-text-muted mt-0.5">{t("sidebar.privacy_desc")}</p>
+                      <p className={`${isUrdu ? "text-[10.5px]" : "text-xs"} font-bold text-text-primary`}>{t("sidebar.privacy_first")}</p>
+                      <p className={`${isUrdu ? "text-[9.5px]" : "text-[11px]"} text-text-muted mt-0.5`}>{t("sidebar.privacy_desc")}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
                     <div>
-                      <p className="text-xs font-bold text-text-primary">{t("sidebar.zero_latency")}</p>
-                      <p className="text-[11px] text-text-muted mt-0.5">{t("sidebar.latency_desc")}</p>
+                      <p className={`${isUrdu ? "text-[10.5px]" : "text-xs"} font-bold text-text-primary`}>{t("sidebar.zero_latency")}</p>
+                      <p className={`${isUrdu ? "text-[9.5px]" : "text-[11px]"} text-text-muted mt-0.5`}>{t("sidebar.latency_desc")}</p>
                     </div>
                   </div>
                 </div>
@@ -90,7 +91,7 @@ export function Sidebar({ type }: SidebarProps) {
             <button
               type="button"
               onClick={() => setView("info")}
-              className="flex items-center gap-2 text-[10px] font-black text-primary hover:text-primary/70 transition-colors uppercase tracking-[0.15em] pt-1"
+              className={`flex items-center gap-2 ${isUrdu ? "text-[9px]" : "text-[10px]"} font-black text-primary hover:text-primary/70 transition-colors uppercase tracking-[0.15em] pt-1`}
             >
               <Info className="h-3.5 w-3.5" />
               {type === "login" ? t("sidebar.system_blueprint") : t("sidebar.technical_details")}
@@ -101,23 +102,23 @@ export function Sidebar({ type }: SidebarProps) {
             <button
               type="button"
               onClick={() => setView("form")}
-              className="flex items-center gap-1.5 text-[10px] font-black text-text-muted hover:text-text-primary transition-colors uppercase tracking-widest mb-2"
+              className={`flex items-center gap-1.5 ${isUrdu ? "text-[8.5px]" : "text-[10px]"} font-black text-text-muted hover:text-text-primary transition-colors uppercase tracking-widest mb-2`}
             >
               <BackIcon className="h-3.5 w-3.5" />
               {t("sidebar.return")}
             </button>
-            <h3 className="text-sm font-black text-text-primary">{t("sidebar.system_blueprint")}</h3>
+            <h3 className={`${isUrdu ? "text-[11px]" : "text-sm"} font-black text-text-primary`}>{t("sidebar.system_blueprint")}</h3>
             <div className="space-y-3 lg:space-y-4">
               <div className="p-3 lg:p-4 rounded-xl bg-surface/60 border border-border">
-                <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{t("sidebar.privacy_security")}</p>
-                <p className="text-[11px] text-text-muted leading-relaxed">{t("sidebar.privacy_security_desc")}</p>
+                <p className={`font-black text-primary uppercase tracking-widest mb-1 ${isUrdu ? "text-[8.5px]" : "text-[10px]"}`}>{t("sidebar.privacy_security")}</p>
+                <p className={`${isUrdu ? "text-[9.5px]" : "text-[11px]"} text-text-muted leading-relaxed`}>{t("sidebar.privacy_security_desc")}</p>
               </div>
               <div className="p-4 lg:p-5 rounded-2xl bg-primary/5 border border-primary/20 space-y-3">
                 <div className="flex items-center gap-2">
                   <Heart className="h-3.5 w-3.5 text-pink-500 fill-pink-500/20" />
-                  <p className="text-[10px] font-black text-text-primary uppercase tracking-wider">{t("sidebar.teebot_labs")}</p>
+                  <p className={`${isUrdu ? "text-[8.5px]" : "text-[10px]"} font-black text-text-primary uppercase tracking-wider`}>{t("sidebar.teebot_labs")}</p>
                 </div>
-                <p className="text-[11px] text-text-muted leading-relaxed italic">
+                <p className={`${isUrdu ? "text-[9.5px]" : "text-[11px]"} text-text-muted leading-relaxed italic`}>
                   {t("sidebar.developed_by")}
                 </p>
                 <div className="space-y-1.5 pt-1">

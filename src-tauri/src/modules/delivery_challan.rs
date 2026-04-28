@@ -321,3 +321,68 @@ pub fn save_delivery_challan_pdf(filename: String, base64_data: String) -> Resul
 
     Ok(output_path.to_string_lossy().to_string())
 }
+
+#[tauri::command]
+pub fn delete_delivery_challan(app: tauri::AppHandle, dc_id: i64) -> Result<(), String> {
+    if dc_id <= 0 {
+        return Err("Invalid delivery challan ID".to_string());
+    }
+
+    let mut conn = db::open_connection(&app)?;
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Failed to start transaction: {e}"))?;
+
+    // Verify the challan exists and isn't already deleted
+    let exists: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM delivery_challans WHERE id = ?1 AND deleted_at IS NULL)",
+            [dc_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("Failed to check delivery challan: {e}"))?;
+
+    if !exists {
+        return Err("Delivery challan not found".to_string());
+    }
+
+    // Restore stock for all items in this challan
+    let mut stmt = tx
+        .prepare("SELECT product_id, quantity FROM dc_items WHERE dc_id = ?1 AND deleted_at IS NULL")
+        .map_err(|e| format!("Failed to prepare items query: {e}"))?;
+
+    let items: Vec<(i64, i64)> = stmt
+        .query_map([dc_id], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| format!("Failed to fetch items: {e}"))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    drop(stmt);
+
+    for (product_id, quantity) in &items {
+        tx.execute(
+            "UPDATE products SET stock_qty = stock_qty + ?1 WHERE id = ?2",
+            params![quantity, product_id],
+        )
+        .map_err(|e| format!("Failed to restore stock: {e}"))?;
+    }
+
+    // Soft-delete the items
+    tx.execute(
+        "UPDATE dc_items SET deleted_at = datetime('now') WHERE dc_id = ?1",
+        [dc_id],
+    )
+    .map_err(|e| format!("Failed to delete challan items: {e}"))?;
+
+    // Soft-delete the challan
+    tx.execute(
+        "UPDATE delivery_challans SET deleted_at = datetime('now') WHERE id = ?1",
+        [dc_id],
+    )
+    .map_err(|e| format!("Failed to delete delivery challan: {e}"))?;
+
+    tx.commit()
+        .map_err(|e| format!("Failed to commit deletion: {e}"))?;
+
+    Ok(())
+}

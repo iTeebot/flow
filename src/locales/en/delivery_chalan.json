@@ -15,7 +15,7 @@
   "items": "Items",
   "created_at": "Created At",
   "add_custom_fields": "Add Custom Fields",
-  "edit_layout": "Edit Layout / Content",
+  "edit_layout": "Edit",
   "print_doc": "Print Document",
   "save_pdf": "Save as PDF",
   "downloading": "Downloading...",
@@ -34,5 +34,12 @@
   "add_to_challan": "Add to Challan",
   "confirm_btn": "✓ Confirm & Create Challan",
   "live_preview": "Live Preview",
-  "back": "Back"
+  "back": "Back",
+  "all_time": "All Time",
+  "today": "Today",
+  "last7": "Last 7 Days",
+  "last30": "Last 30 Days",
+  "search_placeholder": "Search documents...",
+  "confirm_delete_title": "Delete Delivery Challan?",
+  "confirm_delete_desc": "Are you sure you want to delete {{dc_number}}? This will permanently remove the record and restore stock levels for all items."
 }

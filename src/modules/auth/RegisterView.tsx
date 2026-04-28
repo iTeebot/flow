@@ -60,6 +60,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
   const direction = getLanguageDirection(language);
   const ForwardIcon = getForwardIcon(direction);
+  const isUrdu = language === "ur";
 
   const [currenciesList, setCurrenciesList] = useState<Currency[]>([]);
 
@@ -271,26 +272,26 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl h-auto md:h-[88vh] min-h-[600px] bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-in fade-in zoom-in-95 duration-500">
+    <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
+      <div className="w-full max-w-5xl h-full md:h-[88vh] min-h-[600px] bg-surface border-x md:border border-border md:rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] animate-in fade-in zoom-in-95 duration-500">
 
         <Sidebar type="register" />
 
         {/* ── Form Area ── */}
-        <div className="flex-1 p-8 lg:p-12 flex flex-col overflow-hidden bg-surface">
+        <div className="w-full p-8 lg:p-12 flex flex-col overflow-hidden bg-surface">
 
           {/* Header */}
           <header className="mb-8 shrink-0">
-            <h2 className="text-3xl font-black text-text-primary tracking-tight">
+            <h2 className={`${isUrdu ? "text-xl" : "text-3xl"} font-black text-text-primary tracking-tight`}>
               {t("register.structure_title")}
             </h2>
-            <p className="text-sm text-text-muted mt-1.5">
+            <p className={`${isUrdu ? "text-[11px]" : "text-sm"} text-text-muted mt-1.5`}>
               {t("register.structure_desc")}
             </p>
           </header>
 
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-bold flex items-center gap-3 shrink-0 animate-in slide-in-from-top-2 duration-200">
+            <div className={`mb-6 p-4 rounded-xl bg-error/10 border border-error/20 text-error ${isUrdu ? "text-[10px]" : "text-xs"} font-bold flex items-center gap-3 shrink-0 animate-in slide-in-from-top-2 duration-200`}>
               <Info className="h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -685,7 +686,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
               <Button
                 type="submit"
-                className="px-8 py-3 text-xs uppercase tracking-widest"
+                className={`px-8 py-3 ${isUrdu ? "text-[10px]" : "text-xs"} uppercase tracking-widest`}
                 rightIcon={<ForwardIcon className="h-4 w-4" />}
               >
                 {t("register.finish_button")}

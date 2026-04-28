@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
-import { Plus, FileText, Download, Printer, Search, Edit2 } from "lucide-react";
-import { listDeliveryChallans, type DeliveryChallan } from "./api";
+import { FileText, Download, Printer, Search, Edit2, Trash2 } from "lucide-react";
+import { listDeliveryChallans, deleteDeliveryChallan, type DeliveryChallan } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { ChallanCustomField, downloadDeliveryChallanPdf, printDeliveryChallan } from "../reports/pdf";
 import { TablePagination } from "../shared/TablePagination";
 import { useToastStore } from "../../store/toastStore";
-import { SortableHeader } from "../../components/SortableHeader";
-import { TableActions } from "../../components/TableActions";
-import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { ModulePage } from "../../components/ModulePage";
+import { DataTable } from "../../components/DataTable";
+import { Dialog } from "../../components/ui/Dialog";
 
 export function DeliveryChallanModule() {
   const { t } = useTranslation("delivery_chalan");
@@ -20,6 +20,8 @@ export function DeliveryChallanModule() {
   const [loading, setLoading] = useState(true);
   const { addToast } = useToastStore();
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [challanToDelete, setChallanToDelete] = useState<DeliveryChallan | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "last7" | "last30">("all");
   const [sortBy, setSortBy] = useState<"date" | "amount" | "customer" | "dc_number">("date");
@@ -50,7 +52,7 @@ export function DeliveryChallanModule() {
 
 
 
-  const handleSort = (key: "date" | "amount" | "customer" | "dc_number") => {
+  const handleSort = (key: any) => {
     if (sortBy === key) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
@@ -127,6 +129,25 @@ export function DeliveryChallanModule() {
     }
   };
 
+  const handleDelete = (challan: DeliveryChallan) => {
+    setChallanToDelete(challan);
+  };
+
+  const confirmDelete = async () => {
+    if (!challanToDelete) return;
+    try {
+      setIsDeleting(true);
+      await deleteDeliveryChallan(challanToDelete.id);
+      addToast(`${challanToDelete.dc_number} deleted successfully`, "success");
+      await loadData();
+      setChallanToDelete(null);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Failed to delete challan", "error");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -136,202 +157,147 @@ export function DeliveryChallanModule() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-text-primary">{t('title')}</h1>
-            <p className="text-sm text-text-muted mt-1">{t('subtitle')}</p>
-          </div>
-        </div>
-        <Button
-          onClick={() => navigate("/app/delivery-challan/create")}
-          leftIcon={<Plus className="h-4 w-4" />}
-        >
-          {t('common:add', 'Add')}
-        </Button>
-      </div>
-
-
-      {/* List Container */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-surface/30 px-6 py-5">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              {t('history_records')}
-              <span className="ml-1 text-xs font-medium px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border">
-                {filteredChallans.length}
-              </span>
-            </h2>
-
-            {/* Responsive Filter Bar */}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 lg:w-3/4">
-              <Input
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setPage(1);
-                }}
-                placeholder={t('common:search', 'Search...')}
-                leftIcon={<Search className="h-4 w-4" />}
-                className="py-2"
-              />
-
-              <Select
-                value={dateFilter}
-                onChange={(e) => {
-                  setDateFilter(e.target.value as "all" | "today" | "last7" | "last30");
-                  setPage(1);
-                }}
-                options={[
-                  { label: t('common:all_time', 'All Time'), value: "all" },
-                  { label: t('common:today', 'Today'), value: "today" },
-                  { label: t('common:last_7_days', 'Last 7 Days'), value: "last7" },
-                  { label: t('common:last_30_days', 'Last 30 Days'), value: "last30" }
-                ]}
-                className="py-2"
-              />
-
-              <Select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "date" | "amount" | "customer" | "dc_number")}
-                options={[
-                  { label: t('sort_date'), value: "date" },
-                  { label: t('sort_amount'), value: "amount" },
-                  { label: t('sort_customer'), value: "customer" },
-                  { label: t('sort_dc'), value: "dc_number" }
-                ]}
-                className="py-2"
-              />
-
-              <Select
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
-                options={[
-                  { label: t('descending'), value: "desc" },
-                  { label: t('ascending'), value: "asc" }
-                ]}
-                className="py-2"
-              />
-            </div>
-          </div>
-        </div>
-
-        {filteredChallans.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="rounded-full bg-surface p-4 mb-4 border border-border">
-              <FileText className="h-10 w-10 text-text-muted/30" />
-            </div>
-            <p className="text-text-muted font-medium">{t('no_challans')}</p>
-            <p className="text-xs text-text-muted/60 mt-1">{t('try_adjusting')}</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-surface/50 border-b border-border">
-                  <SortableHeader
-                    label={t('dc_number')}
-                    sortKey="dc_number"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label={t('customer')}
-                    sortKey="customer"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label={t('items')}
-                    sortKey="items_count"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label={t('created_at')}
-                    sortKey="date"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <th className="sticky right-0 z-10 bg-surface/90 w-14 px-2 py-4 text-right text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-[-4px_0_10px_rgba(0,0,0,0.1)] backdrop-blur-sm"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paginatedChallans.map((challan) => (
-                  <tr key={challan.id} className="group hover:bg-surface/30 transition-all duration-200">
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-sm font-bold text-primary bg-primary/5 px-2 py-1 rounded border border-primary/10 tracking-tight">
-                        {challan.dc_number}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-text-primary">{challan.customer_name}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-text-muted bg-surface px-2 py-0.5 rounded-full border border-border">
-                        {challan.items.length} unit{challan.items.length !== 1 ? 's' : ''}
-                      </span>
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-text-muted flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-success/60"></span>
-                        {new Date(challan.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </div>
-                    </td>
-                    <td className="sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-4 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm">
-                      <div className="flex items-center justify-end">
-                        <TableActions
-                          actions={[
-                            {
-                              label: t('edit_layout'),
-                              icon: Edit2,
-                              onClick: () => navigate("/app/delivery-challan/edit", { state: { challan } })
-                            },
-                            {
-                              label: t('print_doc'),
-                              icon: Printer,
-                              onClick: () => handlePrint(challan)
-                            },
-                            {
-                              label: downloadingId === challan.id ? t('downloading') : t('save_pdf'),
-                              icon: Download,
-                              onClick: () => handleDownloadPdf(challan)
-                            }
-                          ]}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {filteredChallans.length > 0 && (
-          <div className="border-t border-border bg-surface/20">
-            <TablePagination
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={filteredChallans.length}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
+    <ModulePage
+      title={t('title')}
+      subtitle={t('subtitle')}
+      loading={loading}
+      action={{
+        label: t('common:add', 'Add'),
+        onClick: () => navigate("/app/delivery-challan/create")
+      }}
+      listIcon={<FileText className="h-5 w-5" />}
+      listTitle={t('history_records')}
+      count={filteredChallans.length}
+      filterBar={
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 w-full">
+          <div className="md:col-span-2">
+            <Input
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
                 setPage(1);
               }}
+              placeholder={t('search_placeholder')}
+              leftIcon={<Search className="h-4 w-4" />}
+              className="py-2"
             />
           </div>
-        )}
-      </div>
-    </div>
+
+          <Select
+            value={dateFilter}
+            onChange={(e) => {
+              setDateFilter(e.target.value as any);
+              setPage(1);
+            }}
+            options={[
+              { label: t('all_time'), value: "all" },
+              { label: t('today'), value: "today" },
+              { label: t('last7'), value: "last7" },
+              { label: t('last30'), value: "last30" }
+            ]}
+            className="py-2"
+          />
+        </div>
+      }
+      pagination={
+        filteredChallans.length > 0 && (
+          <TablePagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={filteredChallans.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        )
+      }
+    >
+      <Dialog
+        isOpen={!!challanToDelete}
+        onClose={() => setChallanToDelete(null)}
+        onConfirm={confirmDelete}
+        title={t('confirm_delete_title', 'Delete Delivery Challan?')}
+        description={t('confirm_delete_desc', { 
+          dc_number: challanToDelete?.dc_number,
+          defaultValue: `Are you sure you want to delete ${challanToDelete?.dc_number}? This will permanently remove the record and restore stock levels for all items.`
+        })}
+        confirmText={t('common:delete', 'Delete')}
+        cancelText={t('common:cancel', 'Cancel')}
+        variant="danger"
+        isLoading={isDeleting}
+      />
+
+      <DataTable
+        data={paginatedChallans}
+        keyExtractor={(item) => item.id}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={handleSort}
+        emptyIcon={<FileText className="h-10 w-10 text-text-muted/30" />}
+        emptyMessage={t('no_challans')}
+        columns={[
+          {
+            header: t('dc_number'),
+            sortKey: "dc_number",
+            accessor: (challan) => (
+              <span className="font-mono text-sm font-bold text-primary bg-primary/5 px-2 py-1 rounded border border-primary/10 tracking-tight">
+                {challan.dc_number}
+              </span>
+            )
+          },
+          {
+            header: t('customer'),
+            sortKey: "customer",
+            accessor: (challan) => (
+              <div className="font-semibold text-text-primary">{challan.customer_name}</div>
+            )
+          },
+          {
+            header: t('items'),
+            sortKey: "items_count",
+            accessor: (challan) => (
+              <span className="text-sm text-text-muted bg-surface px-2 py-0.5 rounded-full border border-border">
+                {challan.items.length} unit{challan.items.length !== 1 ? 's' : ''}
+              </span>
+            )
+          },
+          {
+            header: t('created_at'),
+            sortKey: "date",
+            accessor: (challan) => (
+              <div className="text-sm text-text-muted flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-success/60"></span>
+                {new Date(challan.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+              </div>
+            )
+          }
+        ]}
+        actions={(challan) => [
+          {
+            label: t('edit_layout'),
+            icon: Edit2,
+            onClick: () => navigate("/app/delivery-challan/edit", { state: { challan } })
+          },
+          {
+            label: t('print_doc'),
+            icon: Printer,
+            onClick: () => handlePrint(challan)
+          },
+          {
+            label: downloadingId === challan.id ? t('downloading') : t('save_pdf'),
+            icon: Download,
+            onClick: () => handleDownloadPdf(challan)
+          },
+          {
+            label: t('common:delete', 'Delete'),
+            icon: Trash2,
+            onClick: () => handleDelete(challan)
+          }
+        ]}
+      />
+    </ModulePage>
   );
 }

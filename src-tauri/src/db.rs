@@ -167,6 +167,40 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
             value TEXT,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS quotations (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            quote_number TEXT NOT NULL UNIQUE,
+            customer_id  INTEGER NOT NULL,
+            company_id   INTEGER,
+            status       TEXT NOT NULL DEFAULT 'draft',
+            notes        TEXT,
+            external_id  TEXT UNIQUE NOT NULL DEFAULT (lower(hex(randomblob(16)))),
+            sync_status  TEXT NOT NULL DEFAULT 'local_only',
+            sync_version INTEGER NOT NULL DEFAULT 1,
+            last_synced_at TEXT,
+            deleted_at   TEXT,
+            created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(customer_id) REFERENCES customers(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS quotation_items (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            quote_id    INTEGER NOT NULL,
+            product_id  INTEGER,
+            description TEXT NOT NULL,
+            quantity    INTEGER NOT NULL,
+            rate        REAL NOT NULL,
+            amount      REAL NOT NULL,
+            external_id  TEXT UNIQUE NOT NULL DEFAULT (lower(hex(randomblob(16)))),
+            sync_status  TEXT NOT NULL DEFAULT 'local_only',
+            sync_version INTEGER NOT NULL DEFAULT 1,
+            last_synced_at TEXT,
+            deleted_at   TEXT,
+            created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(quote_id) REFERENCES quotations(id) ON DELETE CASCADE,
+            FOREIGN KEY(product_id) REFERENCES products(id)
+        );
         "#,
     )
     .map_err(|e| format!("Failed to initialize database schema: {e}"))?;
@@ -292,6 +326,16 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
         &conn,
         "idx_invoice_items_invoice",
         "CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id)",
+    )?;
+    ensure_index(
+        &conn,
+        "idx_quotations_company_created",
+        "CREATE INDEX IF NOT EXISTS idx_quotations_company_created ON quotations(company_id, created_at)",
+    )?;
+    ensure_index(
+        &conn,
+        "idx_quotation_items_quote",
+        "CREATE INDEX IF NOT EXISTS idx_quotation_items_quote ON quotation_items(quote_id)",
     )?;
     ensure_index(
         &conn,

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Quotation #{{QUOTE_NUMBER}}</title>
+  <style>
+    @page { margin: 0; }
+    body {
+      margin: 0;
+      padding: 40px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1a1a1a;
+      line-height: 1.4;
+      background: #fff;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 40px;
+    }
+    .company-info {
+      max-width: 300px;
+    }
+    .company-name {
+      font-size: 24px;
+      font-weight: 900;
+      color: #0f172a;
+      margin: 0 0 8px 0;
+      letter-spacing: -0.02em;
+    }
+    .company-details {
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+    .document-type {
+      text-align: right;
+    }
+    .document-type h1 {
+      font-size: 32px;
+      font-weight: 900;
+      margin: 0;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .quote-number {
+      font-size: 14px;
+      font-weight: 700;
+      color: #3b82f6;
+      margin-top: 4px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+    .info-box h3 {
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #94a3b8;
+      margin: 0 0 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 6px;
+    }
+    .customer-info {
+      font-size: 13px;
+    }
+    .customer-name {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .customer-details {
+      color: #475569;
+      line-height: 1.5;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    th {
+      background: #f8fafc;
+      text-align: left;
+      padding: 12px 10px;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #64748b;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    td {
+      padding: 12px 10px;
+      font-size: 12px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .col-description { width: 50%; }
+    .col-qty { width: 10%; text-align: center; }
+    .col-rate { width: 20%; text-align: right; }
+    .col-amount { width: 20%; text-align: right; font-weight: 700; }
+    
+    .totals {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .totals-box {
+      width: 250px;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 13px;
+    }
+    .total-row.grand-total {
+      font-size: 18px;
+      font-weight: 900;
+      color: #0f172a;
+      border-top: 2px solid #e2e8f0;
+      margin-top: 8px;
+      padding-top: 12px;
+    }
+    .footer {
+      position: fixed;
+      bottom: 40px;
+      left: 40px;
+      right: 40px;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+    .notes {
+      margin-top: 40px;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .notes h4 {
+      margin: 0 0 8px 0;
+      color: #475569;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="company-info">
+      {{LOGO_HTML}}
+      <h2 class="company-name">{{COMPANY_NAME}}</h2>
+      <div class="company-details">
+        {{COMPANY_ADDRESS}}<br>
+        {{COMPANY_CITY}}, {{COMPANY_STATE}} {{COMPANY_POSTAL}}<br>
+        Phone: {{COMPANY_PHONE}} | Email: {{COMPANY_EMAIL}}<br>
+        {{COMPANY_WEBSITE}}
+      </div>
+    </div>
+    <div class="document-type">
+      <h1>Quotation</h1>
+      <div class="quote-number">#{{QUOTE_NUMBER}}</div>
+      <div style="font-size:11px; color:#64748b; margin-top:8px;">Date: {{DATE}}</div>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-box">
+      <h3>Customer Info</h3>
+      <div class="customer-info">
+        <div class="customer-name">{{CUSTOMER_NAME}}</div>
+        <div class="customer-details">
+          {{CUSTOMER_ADDRESS}}<br>
+          Phone: {{CUSTOMER_PHONE}}
+        </div>
+      </div>
+    </div>
+    <div class="info-box">
+      <h3>Quote Details</h3>
+      <div class="customer-info">
+        <div class="customer-details">
+          Status: <span style="text-transform:uppercase; font-weight:700; color:#3b82f6;">{{STATUS}}</span><br>
+          Valid Until: {{VALID_UNTIL}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="col-description">Description</th>
+        <th class="col-qty">Qty</th>
+        <th class="col-rate">Rate</th>
+        <th class="col-amount">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ITEM_ROWS}}
+      {{EMPTY_ROWS}}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-box">
+      <div class="total-row">
+        <span>Subtotal</span>
+        <span>{{CURRENCY}} {{SUBTOTAL}}</span>
+      </div>
+      <div class="total-row grand-total">
+        <span>Total</span>
+        <span>{{CURRENCY}} {{TOTAL}}</span>
+      </div>
+    </div>
+  </div>
+
+  {{NOTES_HTML}}
+
+  <div class="footer">
+    <div>Generated by Teebot Flow v{{APP_VERSION}}</div>
+    <div>Page 1 of 1</div>
+  </div>
+</body>
+</html>

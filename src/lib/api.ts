@@ -1,4 +1,5 @@
 import { isTauri } from "./platform";
+export { isTauri };
 import { APP_VERSION, PRODUCT_NAME } from "./version";
 
 /**

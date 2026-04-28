@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window",
-  "windows": ["main"],
+  "windows": ["*"],
   "permissions": [
     "core:default",
     "core:webview:allow-print",
@@ -16,6 +16,15 @@
     "fs:allow-home-write-recursive",
     "fs:allow-download-write-recursive",
     "fs:allow-document-write-recursive",
-    "fs:allow-desktop-write-recursive"
+    "fs:allow-desktop-write-recursive",
+    "core:window:allow-create",
+    "core:window:allow-set-title",
+    "core:window:allow-set-size",
+    "core:window:allow-show",
+    "core:window:allow-close",
+    "core:webview:allow-create-webview-window",
+    "core:webview:allow-set-webview-size",
+    "fs:allow-temp-write-recursive",
+    "fs:allow-temp-read-recursive"
   ]
 }

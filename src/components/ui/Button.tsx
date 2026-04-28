@@ -1,4 +1,5 @@
 import React from 'react';
+import { useUiStore } from '../../store/uiStore';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
@@ -16,11 +17,12 @@ export const Button: React.FC<ButtonProps> = ({
   leftIcon,
   rightIcon,
   className = '',
-  disabled,
   ...props
 }) => {
+  const { language } = useUiStore();
+  const isUrdu = language === 'ur';
   const baseStyles = 'inline-flex items-center justify-center rounded-lg font-bold transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100';
-  
+
   const variants = {
     primary: 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90 hover:shadow-primary/30',
     secondary: 'bg-surface border border-border text-text-primary hover:bg-surface/80',
@@ -31,16 +33,16 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const sizes = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-6 py-2.5 text-sm',
-    lg: 'px-8 py-3.5 text-base',
+    sm: `px-3 py-1.5 ${isUrdu ? 'text-[10px]' : 'text-xs'}`,
+    md: `px-6 py-2.5 ${isUrdu ? 'text-xs' : 'text-sm'}`,
+    lg: `px-8 py-3.5 ${isUrdu ? 'text-sm' : 'text-base'}`,
     icon: 'p-2.5',
   };
 
   return (
     <button
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
-      disabled={disabled || isLoading}
+      disabled={props.disabled || isLoading}
       {...props}
     >
       {isLoading ? (

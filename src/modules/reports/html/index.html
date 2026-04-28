@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Delivery Challan — {{DC_NUMBER}}</title>
   <style>
     @page { 
@@ -18,17 +19,21 @@
     }
     body { 
       font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
-      background: white; 
+      background: #f1f5f9; 
       color: #111827; 
       -webkit-font-smoothing: antialiased;
+      padding: 12px;
+      margin: 0;
     }
     #challan { 
-      width: 210mm; 
-      min-height: 297mm; 
+      width: 100%;
       margin: 0 auto; 
       display: flex; 
       flex-direction: column;
       background: white;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     }
     @media print {
       html, body { 
@@ -38,21 +43,12 @@
         padding: 0; 
         background: white;
       }
-      body * {
-        visibility: hidden;
-      }
-      #print-root, #print-root * {
-        visibility: visible;
-      }
-      #print-root {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-      }
       #challan { 
-        page-break-after: always; 
+        width: 210mm;
+        max-width: none;
+        border-radius: 0;
         box-shadow: none;
+        page-break-after: always; 
       }
     }
     

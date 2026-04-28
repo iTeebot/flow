@@ -48,19 +48,22 @@ pub fn run() {
             modules::delivery_challan::list_delivery_challans,
             modules::delivery_challan::get_delivery_challan,
             modules::delivery_challan::save_delivery_challan_pdf,
-            modules::invoices::create_invoice_from_challan,
+            modules::delivery_challan::delete_delivery_challan,
             modules::invoices::list_invoices,
-            modules::dashboard::get_dashboard_summary
+            modules::dashboard::get_dashboard_summary,
+            modules::quotations::create_quotation,
+            modules::quotations::list_quotations,
+            modules::quotations::delete_quotation
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| {
+        .run(|_app, _event| {
             #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Opened { urls } = event {
+            if let tauri::RunEvent::Opened { urls } = _event {
                 use tauri::Emitter;
                 for url in urls {
                     if let Ok(path) = url.to_file_path() {
-                        let _ = app.emit("file-opened", path.to_string_lossy().to_string());
+                        let _ = _app.emit("file-opened", path.to_string_lossy().to_string());
                     }
                 }
             }

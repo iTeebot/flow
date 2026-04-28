@@ -6,8 +6,10 @@ import { TablePagination } from "../shared/TablePagination";
 import { createInvoiceFromChallan, listInvoices, type Invoice } from "./api";
 import { formatCurrency } from "../../lib/utils";
 import { useToastStore } from "../../store/toastStore";
-import { SortableHeader } from "../../components/SortableHeader";
-import { TableActions } from "../../components/TableActions";
+import { ModulePage } from "../../components/ModulePage";
+import { DataTable } from "../../components/DataTable";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 
 export function InvoicesModule() {
   const { companyId, currency } = useAuthStore();
@@ -71,7 +73,7 @@ export function InvoicesModule() {
     }
   };
 
-  const handleSort = (key: "date" | "invoice" | "customer" | "amount") => {
+  const handleSort = (key: any) => {
     if (sortBy === key) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
@@ -121,23 +123,59 @@ export function InvoicesModule() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-text-primary">Financial Invoicing</h1>
-          <p className="text-sm text-text-muted mt-1">Convert delivery challans into professional invoices</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-border text-[10px] font-bold uppercase tracking-widest text-text-muted">
-            <div className="w-1.5 h-1.5 rounded-full bg-success"></div>
-            Live Billing Active
+    <ModulePage
+      title="Financial Invoicing"
+      subtitle="Convert delivery challans into professional invoices"
+      loading={loading}
+      listIcon={<FileText className="h-5 w-5" />}
+      listTitle="Invoice Registry"
+      count={filtered.length}
+      filterBar={
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 w-full">
+          <div className="md:col-span-2">
+            <Input
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search records..."
+              leftIcon={<Search className="h-4 w-4" />}
+              className="h-[46px]"
+            />
           </div>
+          <Select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as "all" | "issued" | "draft");
+              setPage(1);
+            }}
+            options={[
+              { label: "Status: All", value: "all" },
+              { label: "Status: Issued", value: "issued" },
+              { label: "Status: Draft", value: "draft" },
+            ]}
+          />
         </div>
-      </div>
-
-      {/* Invoice Creation Tool */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+      }
+      pagination={
+        filtered.length > 0 && (
+          <TablePagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        )
+      }
+    >
+      {/* Invoice Creation Tool - Nested inside ModulePage children */}
+      <div className="mx-6 mt-6 mb-8 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
         <div className="border-b border-border bg-surface/50 px-6 py-4 flex items-center gap-3">
           <div className="rounded-full bg-primary/10 p-2">
             <PlusCircle className="h-5 w-5 text-primary" />
@@ -193,165 +231,76 @@ export function InvoicesModule() {
         </div>
       </div>
 
-      {/* Invoice Registry */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="border-b border-border bg-surface/30 px-6 py-5">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              Invoice Registry
-              <span className="ml-1 text-xs font-medium px-2 py-0.5 rounded-full bg-surface text-text-muted border border-border">
-                {filtered.length}
+      <DataTable
+        data={paginated}
+        keyExtractor={(item) => item.id}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={handleSort}
+        emptyIcon={<FileText className="h-10 w-10 text-text-muted/30" />}
+        emptyMessage="No invoice records identified"
+        columns={[
+          {
+            header: "Invoice #",
+            sortKey: "invoice",
+            accessor: (invoice) => (
+              <span className="font-mono text-sm font-bold text-primary bg-primary/5 px-2 py-1 rounded border border-primary/10 tracking-tight">
+                {invoice.invoice_number}
               </span>
-            </h2>
-
-            {/* Filter Grid */}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 lg:w-2/3">
-              <div className="relative group lg:col-span-2">
-                <Search className="input-icon-left h-3.5 w-3.5 text-text-muted group-focus-within:text-primary transition-colors" />
-                <input
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder="Search records..."
-                  className="w-full input-with-icon pr-4 py-2 text-xs font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-text-muted/50"
-                />
+            )
+          },
+          {
+            header: "Referenced DC",
+            accessor: (invoice) => (
+              <span className="font-mono text-xs text-text-muted bg-surface px-2 py-0.5 rounded-full border border-border">
+                {invoice.dc_number || "N/A"}
+              </span>
+            )
+          },
+          {
+            header: "Client Name",
+            sortKey: "customer",
+            accessor: (invoice) => (
+              <div className="font-semibold text-text-primary text-sm">{invoice.customer_name}</div>
+            )
+          },
+          {
+            header: "Total Value",
+            sortKey: "amount",
+            accessor: (invoice) => (
+              <div className="font-bold text-text-primary text-sm">{formatCurrency(invoice.total_amount, currency)}</div>
+            )
+          },
+          {
+            header: "Billing Status",
+            accessor: (invoice) => (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight border ${invoice.status === 'issued'
+                ? 'bg-success/10 text-success border-success/20'
+                : 'bg-warning/10 text-warning border-warning/20'
+                }`}>
+                {invoice.status}
+              </span>
+            )
+          },
+          {
+            header: "Created At",
+            sortKey: "date",
+            accessor: (invoice) => (
+              <div className="text-sm text-text-muted flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-success/60"></span>
+                {new Date(invoice.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as "all" | "issued" | "draft");
-                  setPage(1);
-                }}
-                className="text-xs"
-              >
-                <option value="all">Status: All</option>
-                <option value="issued">Status: Issued</option>
-                <option value="draft">Status: Draft</option>
-              </select>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "date" | "invoice" | "customer" | "amount")}
-                className="text-xs"
-              >
-                <option value="date">Sort by Date</option>
-                <option value="invoice">Sort by #</option>
-                <option value="customer">Sort by Client</option>
-                <option value="amount">Sort by Amount</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="rounded-full bg-surface p-4 mb-4 border border-border">
-              <FileText className="h-10 w-10 text-text-muted/30" />
-            </div>
-            <p className="text-text-muted font-medium">No invoice records identified</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-surface/50 border-b border-border">
-                  <SortableHeader
-                    label="Invoice #"
-                    sortKey="invoice"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-text-muted">Referenced DC</th>
-                  <SortableHeader
-                    label="Client Name"
-                    sortKey="customer"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Total Value"
-                    sortKey="amount"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-text-muted">Billing Status</th>
-                  <SortableHeader
-                    label="Created At"
-                    sortKey="date"
-                    currentSortBy={sortBy}
-                    sortOrder={sortOrder}
-                    onSort={handleSort}
-                  />
-                  <th className="sticky right-0 z-10 bg-surface/90 w-14 px-2 py-4 text-right text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-[-4px_0_10px_rgba(0,0,0,0.1)] backdrop-blur-sm"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paginated.map((invoice) => (
-                  <tr key={invoice.id} className="group hover:bg-surface/30 transition-all duration-200">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-text-primary text-sm tracking-tight">{invoice.invoice_number}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-mono text-xs text-text-muted bg-surface/50 px-1.5 py-0.5 rounded border border-border/50">
-                        {invoice.dc_number || "N/A"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-text-primary text-sm">{invoice.customer_name}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-text-primary text-sm">{formatCurrency(invoice.total_amount, currency)}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tighter border ${invoice.status === 'issued' ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'
-                        }`}>
-                        {invoice.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-xs text-text-muted">{new Date(invoice.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                    </td>
-                    <td className="sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-4 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm">
-                      <div className="flex items-center justify-end">
-                        <TableActions
-                          actions={[
-                            {
-                              label: "View Document",
-                              icon: Eye,
-                              onClick: () => { /* View logic if applicable, otherwise keep as is */ }
-                            }
-                          ]}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {filtered.length > 0 && (
-          <div className="border-t border-border bg-surface/20">
-            <TablePagination
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={filtered.length}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
-            />
-          </div>
-        )}
-      </div>
-    </div>
+            )
+          }
+        ]}
+        actions={(_invoice) => [
+          {
+            label: "View Document",
+            icon: Eye,
+            onClick: () => { /* View logic */ }
+          }
+        ]}
+      />
+    </ModulePage>
   );
 }

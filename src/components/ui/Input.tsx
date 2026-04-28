@@ -1,4 +1,5 @@
 import React from 'react';
+import { useUiStore } from '../../store/uiStore';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -19,13 +20,15 @@ export const Input: React.FC<InputProps> = ({
   ...props
 }) => {
   const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
+  const { language } = useUiStore();
+  const isUrdu = language === 'ur';
 
   return (
     <div className="w-full space-y-1.5">
       {label && (
         <label
           htmlFor={inputId}
-          className="block text-[10px] font-black text-text-muted uppercase tracking-widest ps-1"
+          className={`block ${isUrdu ? "text-[9px]" : "text-[10px]"} font-black text-text-muted uppercase tracking-widest ps-1`}
         >
           {label}
         </label>
@@ -40,7 +43,7 @@ export const Input: React.FC<InputProps> = ({
           <input
             id={inputId}
           className={`
-            w-full h-[46px] bg-background border rounded-xl py-3 text-sm transition-all outline-none
+            w-full h-[46px] bg-background border rounded-xl py-3 ${isUrdu ? "text-xs" : "text-sm"} transition-all outline-none
             focus:ring-4
             placeholder:text-text-muted/40
             ${leftIcon ? 'ps-12' : 'ps-4'}
