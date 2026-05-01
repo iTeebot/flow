@@ -14,5 +14,7 @@
   "loading": "لوڈ ہو رہا ہے...",
   "loading_module": "ماڈیول لوڈ ہو رہا ہے...",
   "no_route_matched": "کوئی راستہ نہیں ملا: ",
-  "logout": "لاگ آؤٹ"
+  "logout": "لاگ آؤٹ",
+  "users": "صارفین",
+  "analytics": "تجزیات"
 }

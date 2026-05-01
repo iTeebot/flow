@@ -15,5 +15,9 @@
   "currency": "Currency",
   "table": {
     "no_data": "No data available"
+  },
+  "languages": {
+    "english": "English",
+    "urdu": "اردو"
   }
 }

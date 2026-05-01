@@ -12,6 +12,7 @@ export interface User {
 interface AuthState {
   user: User | null;
   companyId: number | null;
+  sessionId: number | null;
   currency: string;
   companyLogo: string | null;
   isAuthenticated: boolean;
@@ -28,9 +29,10 @@ interface AuthState {
   checkSession: () => Promise<boolean>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   companyId: null,
+  sessionId: null,
   currency: localStorage.getItem("currency") || "USD",
   companyLogo: localStorage.getItem("companyLogo"),
   isAuthenticated: false,
@@ -55,6 +57,7 @@ export const useAuthStore = create<AuthState>((set) => ({
             set({ 
               user: response.user, 
               companyId: response.company_id, 
+              sessionId: response.session_id,
               currency: userCurrency,
               companyLogo: response.logo_base64 || localStorage.getItem("companyLogo"),
               isAuthenticated: true 
@@ -84,6 +87,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ 
         user: response.user, 
         companyId: response.company_id, 
+        sessionId: response.session_id,
         currency: userCurrency,
         companyLogo: response.logo_base64 || localStorage.getItem("companyLogo"),
         isAuthenticated: true 
@@ -105,6 +109,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ 
         user: response.user, 
         companyId: response.company_id, 
+        sessionId: response.session_id,
         currency: userCurrency,
         companyLogo: response.logo_base64 || localStorage.getItem("companyLogo"),
         isAuthenticated: true, 
@@ -134,9 +139,17 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ companyLogo: logo });
   },
 
-  logout: () => {
+  logout: async () => {
+    const { sessionId } = get();
+    if (sessionId) {
+      try {
+        await invoke("logout_session", { sessionId });
+      } catch (err) {
+        console.error("Failed to log out session:", err);
+      }
+    }
     localStorage.removeItem("teebot_user");
-    set({ user: null, companyId: null, currency: "USD", companyLogo: null, isAuthenticated: false });
+    set({ user: null, companyId: null, sessionId: null, currency: "USD", companyLogo: null, isAuthenticated: false });
   },
   resetSystem: async () => {
     try {
@@ -165,6 +178,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ 
         user: response.user, 
         companyId: response.company_id, 
+        sessionId: response.session_id,
         currency: response.user?.currency || "USD",
         isAuthenticated: true 
       });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { Portal } from '../ui/Portal';
 
 interface ModalLayoutProps {
   isOpen: boolean;
@@ -36,7 +37,8 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-sm animate-in fade-in duration-300">
+    <Portal>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className={`w-full ${widthClasses[maxWidth]} bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]`}>
         {/* Header */}
         <div className="px-6 py-4 border-b border-border bg-surface/50 flex items-center justify-between shrink-0">
@@ -67,6 +69,7 @@ export const ModalLayout: React.FC<ModalLayoutProps> = ({
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </Portal>
   );
 };

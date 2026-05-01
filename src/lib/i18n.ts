@@ -22,6 +22,8 @@ import customersEn from '../locales/en/customers.json';
 import customersUr from '../locales/ur/customers.json';
 import deliveryChallanEn from '../locales/en/delivery_chalan.json';
 import deliveryChallanUr from '../locales/ur/delivery_chalan.json';
+import analyticsEn from '../locales/en/analytics.json';
+import analyticsUr from '../locales/ur/analytics.json';
 
 // Translation files would normally be in public/locales or as JSON imports
 const resources = {
@@ -36,6 +38,7 @@ const resources = {
     inventory: inventoryEn,
     customers: customersEn,
     delivery_chalan: deliveryChallanEn,
+    analytics: analyticsEn,
   },
   ur: {
     auth: authUr,
@@ -48,6 +51,7 @@ const resources = {
     inventory: inventoryUr,
     customers: customersUr,
     delivery_chalan: deliveryChallanUr,
+    analytics: analyticsUr,
   }
 };
 

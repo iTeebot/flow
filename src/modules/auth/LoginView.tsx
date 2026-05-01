@@ -83,7 +83,7 @@ export function LoginView() {
 
   return (
     <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
-      <div className="w-full max-w-5xl h-full md:h-[88vh] min-h-[600px] bg-surface border-x md:border border-border md:rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] animate-in fade-in zoom-in-95 duration-500">
+      <div className="w-full h-full bg-surface overflow-hidden grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] animate-in fade-in zoom-in-95 duration-500">
 
         <Sidebar type="login" />
 

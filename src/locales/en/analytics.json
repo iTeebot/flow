@@ -1,0 +1,20 @@
+{
+  "title": "Admin Analytics",
+  "subtitle": "Monitor user activity and system modifications",
+  "invoices_today": "Invoices (Today)",
+  "quotes_today": "Quotations (Today)",
+  "active_users": "Active Users (Today)",
+  "actions_today": "Actions Tracked",
+  "audit_logs": "Audit Logs",
+  "user_sessions": "User Sessions",
+  "no_audit": "No audit logs found",
+  "timestamp": "Timestamp",
+  "user": "User",
+  "action": "Action",
+  "entity": "Entity",
+  "no_sessions": "No user sessions found",
+  "time_in": "Time In",
+  "time_out": "Time Out",
+  "active": "Active",
+  "duration": "Duration"
+}

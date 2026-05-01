@@ -15,5 +15,9 @@
   "currency": "کرنسی",
   "table": {
     "no_data": "کوئی ڈیٹا دستیاب نہیں ہے"
+  },
+  "languages": {
+    "english": "English",
+    "urdu": "اردو"
   }
 }

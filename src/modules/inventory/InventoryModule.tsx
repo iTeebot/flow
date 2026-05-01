@@ -1,20 +1,16 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Plus, Edit, Trash2, Package, TrendingUp, Search, ArrowUpDown } from "lucide-react";
+import { Package, Plus, Trash2, Search, Edit, TrendingUp } from "lucide-react";
 import { listProducts, deleteProduct, adjustStock, type Product } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { formatCurrency } from "../../lib/utils";
-import { TableActions } from "../../components/TableActions";
 import { TablePagination } from "../shared/TablePagination";
 import { useToastStore } from "../../store/toastStore";
-import { Table } from "../../components/ui/Table";
 import { CreateProductModal } from "../../components/modals/CreateProductModal";
 import { Select } from "../../components/ui/Select";
-import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { ModulePage } from "../../components/ModulePage";
 import { DataTable } from "../../components/DataTable";
-import { SortableHeader } from "../../components/SortableHeader";
 
 export function InventoryModule() {
   const { t } = useTranslation("inventory");
@@ -138,7 +134,7 @@ export function InventoryModule() {
         const base = valA.localeCompare(valB);
         return sortOrder === "asc" ? base : -base;
       }
-      
+
       if (typeof valA === "number" && typeof valB === "number") {
         const base = valA - valB;
         return sortOrder === "asc" ? base : -base;

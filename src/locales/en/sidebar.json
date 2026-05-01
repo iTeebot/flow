@@ -14,5 +14,7 @@
   "loading": "Loading...",
   "loading_module": "Loading Module...",
   "no_route_matched": "No route matched: ",
-  "logout": "Logout"
+  "logout": "Logout",
+  "users": "Users",
+  "analytics": "Analytics"
 }

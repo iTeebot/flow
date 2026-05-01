@@ -4,11 +4,14 @@ import i18n from "../lib/i18n";
 type ModuleKey =
   | "dashboard"
   | "delivery-challan"
+  | "quotations"
   | "inventory"
   | "customers"
   | "reports"
   | "invoices"
   | "profile"
+  | "users"
+  | "analytics"
   | "settings"
   | "info";
 

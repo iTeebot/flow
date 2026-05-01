@@ -12,6 +12,7 @@ import { ModulePage } from "../../components/ModulePage";
 import { DataTable } from "../../components/DataTable";
 import { Dialog } from "../../components/ui/Dialog";
 import { formatCurrency } from "../../lib/utils";
+import { downloadQuotationPdf, printQuotation } from "../reports/pdf";
 
 export function QuotationsModule() {
   const { t } = useTranslation("quotations");
@@ -79,14 +80,24 @@ export function QuotationsModule() {
     }
   };
 
-  const handlePrint = (quote: Quotation) => {
-    // Will implement print logic later
-    addToast("Print feature coming soon", "info");
+  const handlePrint = async (quote: Quotation) => {
+    try {
+      await printQuotation(quote);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Failed to print quotation", "error");
+    }
   };
 
-  const handleDownloadPdf = (quote: Quotation) => {
-    // Will implement PDF logic later
-    addToast("PDF download coming soon", "info");
+  const handleDownloadPdf = async (quote: Quotation) => {
+    setDownloadingId(quote.id);
+    try {
+      await downloadQuotationPdf(quote);
+      addToast("PDF saved successfully!", "success");
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Failed to download PDF", "error");
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   return (
@@ -163,36 +174,32 @@ export function QuotationsModule() {
         onSort={() => { }} // Sorting handled by DataTable internal state if needed, or by parent
         columns={[
           {
-            key: "quote_number",
+            accessor: "quote_number",
             header: t('col_number', "Quote #"),
-            sortable: true,
+            sortKey: "quote_number",
             className: "font-mono font-bold text-primary"
           },
           {
-            key: "customer_name",
+            accessor: "customer_name",
             header: t('col_customer', "Customer"),
-            sortable: true,
+            sortKey: "customer_name",
             className: "font-bold"
           },
           {
-            key: "created_at",
+            accessor: (item) => new Date(item.created_at).toLocaleDateString(),
             header: t('col_date', "Date"),
-            sortable: true,
-            accessor: (item) => new Date(item.created_at).toLocaleDateString()
+            sortKey: "created_at",
           },
           {
-            key: "total_amount",
-            header: t('col_amount', "Amount"),
-            sortable: true,
             accessor: (item) => (
               <span className="font-black text-text-primary tabular-nums">
                 {formatCurrency(item.total_amount, currency)}
               </span>
-            )
+            ),
+            header: t('col_amount', "Amount"),
+            sortKey: "total_amount",
           },
           {
-            key: "status",
-            header: t('col_status', "Status"),
             accessor: (item) => (
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight border ${item.status === 'sent'
                   ? 'bg-success/10 text-success border-success/20'
@@ -200,7 +207,8 @@ export function QuotationsModule() {
                 }`}>
                 {item.status}
               </span>
-            )
+            ),
+            header: t('col_status', "Status"),
           }
         ]}
         actions={(item) => [

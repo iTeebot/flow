@@ -22,6 +22,7 @@ pub fn run() {
             modules::auth::is_registered,
             modules::auth::register,
             modules::auth::login,
+            modules::auth::logout_session,
             modules::auth::validate_session,
             modules::auth::update_user_profile,
             modules::auth::reset_database,
@@ -53,7 +54,13 @@ pub fn run() {
             modules::dashboard::get_dashboard_summary,
             modules::quotations::create_quotation,
             modules::quotations::list_quotations,
-            modules::quotations::delete_quotation
+            modules::quotations::delete_quotation,
+            modules::users::list_users,
+            modules::users::create_user,
+            modules::users::delete_user,
+            modules::users::list_user_sessions,
+            modules::audit::list_audit_logs,
+            modules::analytics::get_admin_analytics
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

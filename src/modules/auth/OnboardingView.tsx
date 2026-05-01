@@ -1,25 +1,28 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { UserPlus, Database, Cloud, ArrowRight, ShieldCheck, Zap, Globe2 } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { Button } from "../../components/ui/Button";
-import { invoke } from "../../lib/api";
-import { isTauri } from "../../lib/platform";
+import { checkInternetConnectivity, checkServerHealth, checkFullConnectivity } from "../../utils/connectivity";
 import { useToastStore } from "../../store/toastStore";
 import { useAuthStore } from "../../store/authStore";
+import { isTauri, invoke } from "../../lib/api";
 import { RestoreConfirmModal } from "../../components/modals/RestoreConfirmModal";
 import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
 
 interface OnboardingViewProps {
   onSelectRegister: () => void;
+  onSelectCloudSync: () => void;
 }
 
-export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister }) => {
+export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister, onSelectCloudSync }) => {
   const { t } = useTranslation("auth");
   const { addToast } = useToastStore();
   const { checkRegistration } = useAuthStore();
   const [isRestoring, setIsRestoring] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [isCloudAvailable, setIsCloudAvailable] = useState<boolean | null>(null); // null = checking, true = available, false = unavailable
+  const [hasInternet, setHasInternet] = useState<boolean | null>(null); // null = checking, true = connected, false = disconnected
   const [pendingFile, setPendingFile] = useState<{
     path: string;
     name: string;
@@ -27,8 +30,49 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
     date: string;
   } | null>(null);
 
+  useEffect(() => {
+    checkConnectivity();
+  }, []);
+
+  const checkConnectivity = async () => {
+    console.log('Starting connectivity check...');
+    setHasInternet(null);
+    setIsCloudAvailable(null);
+
+    const result = await checkFullConnectivity();
+    setHasInternet(result.hasInternet);
+    setIsCloudAvailable(result.serverAvailable);
+  };
+
+  const handleCloudSyncClick = async () => {
+    // Security check: Verify cloud is still available before proceeding
+    console.log('Security check: Re-verifying cloud connectivity before proceeding...');
+    
+    setIsCloudAvailable(null); // Show checking state
+    
+    const internetConnected = await checkInternetConnectivity();
+    setHasInternet(internetConnected);
+    
+    if (!internetConnected) {
+      setIsCloudAvailable(false);
+      addToast(t("onboarding.cloud_security_no_internet", "Internet connection lost. Please check your network."), "error");
+      return;
+    }
+    
+    const serverAvailable = await checkServerHealth();
+    setIsCloudAvailable(serverAvailable);
+    
+    if (!serverAvailable) {
+      addToast(t("onboarding.cloud_security_server_unavailable", "Cloud service is no longer available. Please try again later."), "error");
+      return;
+    }
+    
+    // If we get here, cloud is still available - proceed to cloud sync
+    console.log('Security check passed: Proceeding to cloud sync');
+    onSelectCloudSync();
+  };
+
   const handleRestoreBackup = async () => {
-    if (isRestoring) return;
 
     if (isTauri()) {
       try {
@@ -43,7 +87,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
             const { stat } = await import("@tauri-apps/plugin-fs");
             const fileStat = await stat(selected);
             const fileName = selected.split(/[\\\/]/).pop() || selected;
-            
+
             setPendingFile({
               path: selected,
               name: fileName,
@@ -120,7 +164,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
       bg: "bg-primary/10",
       action: onSelectRegister,
       buttonText: t("onboarding.new_btn"),
-      primary: true
+      primary: true,
+      disabled: false
     },
     {
       id: "backup",
@@ -131,25 +176,40 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
       bg: "bg-cyan/10",
       action: handleRestoreBackup,
       buttonText: t("onboarding.backup_btn"),
-      loading: isRestoring
+      loading: isRestoring,
+      disabled: false
     },
     {
       id: "cloud",
       title: t("onboarding.cloud_title"),
-      desc: t("onboarding.cloud_desc"),
-      icon: Cloud,
-      color: "text-purple-500",
-      bg: "bg-purple-500/10",
-      action: () => addToast(t("onboarding.cloud_coming_soon"), "info"),
-      buttonText: t("onboarding.cloud_btn"),
-      disabled: true
+      desc: hasInternet === false 
+        ? t("onboarding.cloud_desc_no_internet", "No internet connection. Please check your network and try again.")
+        : isCloudAvailable === false 
+        ? t("onboarding.cloud_desc_server_unreachable", "Internet connected, but cloud service is unreachable. Server may be down.")
+        : isCloudAvailable === null
+        ? t("onboarding.cloud_desc_checking", "Checking cloud service availability...")
+        : t("onboarding.cloud_desc"),
+      icon: hasInternet === false ? Globe2 : Cloud,
+      color: hasInternet === false ? "text-red-500" : isCloudAvailable === false ? "text-orange-500" : "text-purple-500",
+      bg: hasInternet === false ? "bg-red-500/10" : isCloudAvailable === false ? "bg-orange-500/10" : "bg-purple-500/10",
+      action: hasInternet === false ? checkConnectivity : isCloudAvailable ? handleCloudSyncClick : checkConnectivity,
+      buttonText: hasInternet === false 
+        ? t("onboarding.check_internet_btn", "Check Internet Again")
+        : isCloudAvailable === false 
+        ? t("onboarding.check_server_btn", "Check Server Again")
+        : isCloudAvailable === null
+        ? t("onboarding.checking_btn", "Checking...")
+        : t("onboarding.cloud_btn"),
+      loading: isCloudAvailable === null,
+      disabled: isCloudAvailable === null,
+      visible: true
     }
-  ];
+  ].filter(opt => opt.visible !== false);
 
   return (
     <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
-      <div className="w-full max-w-5xl h-full md:h-[88vh] min-h-[600px] bg-surface border-x md:border border-border md:rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] animate-in fade-in zoom-in-95 duration-500">
-        
+      <div className="w-full h-full bg-surface overflow-hidden grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] animate-in fade-in zoom-in-95 duration-500">
+
         <Sidebar type="register" />
 
         <div className="w-full p-6 lg:p-10 flex flex-col justify-center bg-surface overflow-y-auto">
@@ -164,25 +224,19 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
 
           <div className="grid grid-cols-1 gap-6">
             {options.map((opt) => (
-              <div 
+              <div
                 key={opt.id}
-                className={`group relative p-3 rounded-xl border transition-all duration-300 ${
-                  opt.disabled ? 'opacity-60 grayscale' : 'hover:border-primary/50 hover:bg-primary/5 hover:translate-x-1'
-                } border-border bg-card shadow-sm`}
+                className={`group relative p-3 rounded-xl border transition-all duration-300 ${opt.disabled ? 'opacity-60 grayscale' : 'hover:border-primary/50 hover:bg-primary/5 hover:translate-x-1'
+                  } border-border bg-card shadow-sm`}
               >
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <div className={`p-2 rounded-lg ${opt.bg} ${opt.color} shrink-0 shadow-inner`}>
                     <opt.icon className="h-5 w-5" />
                   </div>
-                  
+
                   <div className="flex-1 space-y-0">
                     <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
                       {opt.title}
-                      {opt.disabled && (
-                        <span className="text-[9px] font-black uppercase tracking-widest bg-surface border border-border px-1.5 py-0.5 rounded text-text-muted">
-                          {t("onboarding.coming_soon")}
-                        </span>
-                      )}
                     </h3>
                     <p className="text-[11px] text-text-muted leading-relaxed max-w-sm">
                       {opt.desc}
@@ -215,7 +269,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
                 {t("onboarding.high_performance")}
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2 text-xs text-text-muted">
               <Globe2 className="h-3.5 w-3.5" />
               <span>{t("onboarding.language_tip")}</span>
@@ -237,8 +291,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
         />
       )}
 
-      <FullscreenLoader 
-        isVisible={isRestoring && !showRestoreConfirm} 
+      <FullscreenLoader
+        isVisible={isRestoring && !showRestoreConfirm}
         message={t("onboarding.restoring_data", "Restoring Data")}
         subMessage={t("onboarding.restore_wait_msg", "Please wait while we decrypt and restore your financial data. Do not close the app.")}
       />

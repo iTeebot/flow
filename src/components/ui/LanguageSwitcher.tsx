@@ -4,9 +4,9 @@ import { Languages } from 'lucide-react';
 import { Select } from './Select';
 
 export const LanguageSwitcher: React.FC = () => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation('common');
 
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleLanguageChange = (e: any) => {
     i18n.changeLanguage(e.target.value);
   };
 
@@ -17,8 +17,8 @@ export const LanguageSwitcher: React.FC = () => {
         value={i18n.language}
         onChange={handleLanguageChange}
         options={[
-          { label: "English", value: "en" },
-          { label: "اردو", value: "ur" }
+          { label: t("languages.english"), value: "en" },
+          { label: t("languages.urdu"), value: "ur" }
         ]}
         className="w-28 py-1.5"
       />

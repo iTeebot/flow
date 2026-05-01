@@ -1,0 +1,20 @@
+{
+  "title": "ایڈمن تجزیات",
+  "subtitle": "صارف کی سرگرمی اور سسٹم کی تبدیلیوں کی نگرانی کریں",
+  "invoices_today": "انوائسز (آج)",
+  "quotes_today": "کوٹیشنز (آج)",
+  "active_users": "فعال صارفین (آج)",
+  "actions_today": "ٹریک کردہ ایکشنز",
+  "audit_logs": "آڈٹ لاگز",
+  "user_sessions": "یوزر سیشنز",
+  "no_audit": "کوئی آڈٹ لاگ نہیں ملا",
+  "timestamp": "وقت",
+  "user": "صارف",
+  "action": "عمل",
+  "entity": "اینٹیٹی",
+  "no_sessions": "کوئی سیشن نہیں ملا",
+  "time_in": "وقت (ان)",
+  "time_out": "وقت (آؤٹ)",
+  "active": "فعال",
+  "duration": "دورانیہ"
+}

@@ -9,3 +9,6 @@ pub mod inventory;
 pub mod dashboard;
 pub mod security;
 pub mod quotations;
+pub mod users;
+pub mod audit;
+pub mod analytics;

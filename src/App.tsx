@@ -12,6 +12,7 @@ import {
   UserCircle2,
   Settings,
   Users,
+  Activity,
   LogOut,
 } from "lucide-react";
 import "./App.css";
@@ -33,8 +34,10 @@ const InvoicesModule = lazy(() => import("./modules/invoices/InvoicesModule").th
 const QuotationsModule = lazy(() => import("./modules/quotations/QuotationsModule").then(m => ({ default: m.QuotationsModule })));
 const CreateQuotationModule = lazy(() => import("./modules/quotations/CreateQuotationModule").then(m => ({ default: m.CreateQuotationModule })));
 const ProfileModule = lazy(() => import("./modules/profile/ProfileModule").then(m => ({ default: m.ProfileModule })));
+const UsersModule = lazy(() => import("./modules/users/UsersModule").then(m => ({ default: m.UsersModule })));
 const SettingsModule = lazy(() => import("./modules/settings/SettingsModule").then(m => ({ default: m.SettingsModule })));
 const InfoModule = lazy(() => import("./modules/info/InfoModule").then(m => ({ default: m.InfoModule })));
+const AnalyticsModule = lazy(() => import("./modules/analytics/AnalyticsModule").then(m => ({ default: m.AnalyticsModule })));
 
 const LoadingFallback = () => {
   const { t } = useTranslation("sidebar");
@@ -48,13 +51,15 @@ const LoadingFallback = () => {
   );
 };
 
-const navItems: {
+interface NavItem {
   id: ModuleKey;
   labelKey: string;
   path: string;
   note?: string;
   icon: ComponentType<{ className?: string }>;
-}[] = [
+}
+
+const navItems: NavItem[] = [
     { id: "dashboard", labelKey: "dashboard", path: "/app/dashboard", icon: LayoutDashboard },
     {
       id: "delivery-challan",
@@ -71,10 +76,16 @@ const navItems: {
     { id: "info", labelKey: "info", path: "/app/info", icon: Info },
   ];
 
+const adminOnlyNavItems: NavItem[] = [
+  { id: "users" as ModuleKey, labelKey: "users", path: "/app/users", icon: Users },
+  { id: "analytics" as ModuleKey, labelKey: "analytics", path: "/app/analytics", icon: Activity },
+];
+
 import { useAuthStore } from "./store/authStore";
 import { LoginView } from "./modules/auth/LoginView";
 import { RegisterView } from "./modules/auth/RegisterView";
 import { OnboardingView } from "./modules/auth/OnboardingView";
+import { CloudSyncView } from "./modules/auth/CloudSyncView";
 import { getCompanyProfile } from "./modules/companyProfile/api";
 import { useState } from "react";
 
@@ -88,7 +99,8 @@ function AppContent() {
     checkRegistration,
     companyId,
     setCurrency,
-    logout
+    logout,
+    user
   } = useAuthStore();
 
   const {
@@ -102,12 +114,17 @@ function AppContent() {
     language
   } = useUiStore();
   const [showRegistration, setShowRegistration] = useState(false);
+  const [showCloudSync, setShowCloudSync] = useState(false);
 
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dir = getLanguageDirection(language);
   }, [language]);
-  const activeNavItem = navItems.find((item) => item.id === activeModule);
+  const effectiveNavItems = user?.role === 'admin'
+    ? [...navItems.slice(0, 7), ...adminOnlyNavItems, ...navItems.slice(7)]
+    : navItems;
+
+  const activeNavItem = effectiveNavItems.find((item) => item.id === activeModule);
   const currentLabel = activeNavItem ? t(activeNavItem.labelKey) : "Teebot Flow";
 
   useEffect(() => {
@@ -139,7 +156,7 @@ function AppContent() {
   }, [syncSystemTheme]);
 
   useEffect(() => {
-    const active = navItems.find((item) => item.path === location.pathname);
+    const active = effectiveNavItems.find((item) => item.path === location.pathname);
     if (active && active.id !== activeModule) {
       setActiveModule(active.id);
     }
@@ -167,14 +184,28 @@ function AppContent() {
         </>
       );
     }
-    return showRegistration ? (
+    if (showRegistration) {
+      return (
+        <>
+          <RegisterView onBack={() => setShowRegistration(false)} />
+          <ToastContainer />
+        </>
+      );
+    }
+    if (showCloudSync) {
+      return (
+        <>
+          <CloudSyncView onBack={() => setShowCloudSync(false)} />
+          <ToastContainer />
+        </>
+      );
+    }
+    return (
       <>
-        <RegisterView onBack={() => setShowRegistration(false)} />
-        <ToastContainer />
-      </>
-    ) : (
-      <>
-        <OnboardingView onSelectRegister={() => setShowRegistration(true)} />
+        <OnboardingView 
+          onSelectRegister={() => setShowRegistration(true)} 
+          onSelectCloudSync={() => setShowCloudSync(true)}
+        />
         <ToastContainer />
       </>
     );
@@ -200,7 +231,7 @@ function AppContent() {
       }
     >
       <div className={`grid h-screen ${sidebarCollapsed ? "grid-cols-[72px_1fr]" : "grid-cols-[220px_1fr]"}`}>
-        <aside 
+        <aside
           onContextMenu={(e) => e.preventDefault()}
           className="h-screen flex flex-col border-r border-border bg-surface"
         >
@@ -224,12 +255,12 @@ function AppContent() {
 
             <button
               type="button"
-               onClick={toggleSidebar}
+              onClick={toggleSidebar}
               title={sidebarCollapsed ? t("expand_sidebar") : t("collapse_sidebar")}
               className={`inline-flex items-center justify-center rounded-lg border border-border bg-card text-xs font-medium text-text-primary transition hover:border-primary hover:bg-primary/10 ${sidebarCollapsed ? "h-9 w-full" : "w-fit gap-1 px-3 py-1.5"
                 }`}
             >
-              {sidebarCollapsed 
+              {sidebarCollapsed
                 ? (direction === 'rtl' ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />)
                 : (direction === 'rtl' ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />)
               }
@@ -239,7 +270,7 @@ function AppContent() {
 
           {/* Navigation Area: (Scrollable) */}
           <nav className="flex-1 overflow-y-auto px-4 py-2 flex flex-col gap-1 custom-scrollbar">
-            {navItems.map((item) => (
+            {effectiveNavItems.map((item) => (
               <NavLink
                 key={item.id}
                 to={item.path}
@@ -305,6 +336,12 @@ function AppContent() {
                 {/* <Route path="/app/reports" element={<ReportsModule />} /> */}
                 <Route path="/app/invoices" element={<InvoicesModule />} />
                 <Route path="/app/profile" element={<ProfileModule />} />
+                {user?.role === 'admin' && (
+                  <>
+                    <Route path="/app/users" element={<UsersModule />} />
+                    <Route path="/app/analytics" element={<AnalyticsModule />} />
+                  </>
+                )}
                 <Route path="/app/settings" element={<SettingsModule />} />
                 <Route path="/app/info" element={<InfoModule />} />
                 <Route path="*" element={<div className="p-10 text-text-muted">{t("no_route_matched")} {location.pathname}</div>} />

@@ -2,19 +2,10 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/authStore";
 import { useUiStore } from "../../store/uiStore";
+import { useToastStore } from "../../store/toastStore";
 import currencies from "../../assets/currencies.json";
 import languagesData from "../../assets/languages.json";
 import pakistanCitiesEn from "../../assets/countries/Pakistan.en.json";
-
-// Dynamic Urdu cities fallback logic
-let pakistanCitiesUr: any[] = pakistanCitiesEn;
-try {
-  // @ts-ignore
-  const urData = await import("../../assets/countries/Pakistan.ur.json");
-  if (urData && urData.default) pakistanCitiesUr = urData.default;
-} catch (e) {
-  // Fallback already set to en
-}
 
 import {
   Eye,
@@ -38,10 +29,15 @@ import { Button } from "../../components/ui/Button";
 import { Sidebar } from "./Sidebar";
 import { getLanguageDirection, getForwardIcon } from "../../utils/layout";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
-import { validatePakistaniPhone, validateUSPhone, validateGenericPhone } from "../../utils/validations/phone";
+import { validatePakistaniPhone, validateUSPhone } from "../../utils/validations/phone";
 import { validateEmail } from "../../utils/validations/email";
 import { validatePakistaniCNIC, validatePakistaniNTN } from "../../utils/validations/identity";
 import { formatPakistaniCNIC, stripNonDigits, stripNonAlphaNumeric } from "../../utils/formatters";
+import { RecoveryKeyModal } from "../../components/modals/RecoveryKeyModal";
+import { sendRecoveryCodeEmail, performInitialBackup } from "../../utils/cloudSync";
+import { invoke } from "../../lib/api";
+import { isTauri } from "../../lib/platform";
+import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
 
 interface Currency {
   symbol: string;
@@ -55,12 +51,13 @@ interface Currency {
 
 export function RegisterView({ onBack }: { onBack: () => void }) {
   const { t } = useTranslation("auth");
-  const { register } = useAuthStore();
+  const { register, checkRegistration } = useAuthStore();
   const { language } = useUiStore();
 
   const direction = getLanguageDirection(language);
   const ForwardIcon = getForwardIcon(direction);
   const isUrdu = language === "ur";
+  const { addToast } = useToastStore();
 
   const [currenciesList, setCurrenciesList] = useState<Currency[]>([]);
 
@@ -81,6 +78,50 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
   const [postalCode, setPostalCode] = useState("");
   const [country, setCountry] = useState("Pakistan");
   const [customCountry, setCustomCountry] = useState("");
+
+  const [isCloudAvailable, setIsCloudAvailable] = useState(false);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [recoveryKey, setRecoveryKey] = useState("");
+  const [isEmailSent, setIsEmailSent] = useState(false);
+  const [cloudBusinessId, setCloudBusinessId] = useState("");
+  const [isSyncingBackup, setIsSyncingBackup] = useState(false);
+  const [pakistanCities, setPakistanCities] = useState<any[]>(pakistanCitiesEn);
+
+  useEffect(() => {
+    const loadUrduCities = async () => {
+      if (language === "ur") {
+        try {
+          const urData = await import("../../assets/countries/Pakistan.ur.json");
+          if (urData && urData.default) {
+            setPakistanCities(urData.default);
+          }
+        } catch (e) {
+          setPakistanCities(pakistanCitiesEn);
+        }
+      } else {
+        setPakistanCities(pakistanCitiesEn);
+      }
+    };
+    loadUrduCities();
+  }, [language]);
+
+  useEffect(() => {
+    const checkCloudHealth = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
+        const response = await fetch(`${apiUrl}/health`);
+        const data = await response.json();
+        if (data.status === "OK") {
+          setIsCloudAvailable(true);
+        }
+      } catch (e) {
+        setIsCloudAvailable(false);
+      }
+    };
+    checkCloudHealth();
+  }, []);
+
+
 
   const countryOptions = languagesData.countries.map(c => ({
     label: language === "ur" ? c.ur : c.en,
@@ -106,6 +147,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
   };
 
   // 3. Security
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -113,6 +155,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const currencyArray = Object.values(currencies) as Currency[];
@@ -121,7 +164,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
   const handleCityChange = (val: string) => {
     setCity(val);
-    const citiesData = language === "ur" ? pakistanCitiesUr : pakistanCitiesEn;
+    const citiesData = language === "ur" ? pakistanCities : pakistanCitiesEn;
     const selected = citiesData.find(c => c.name === val);
     if (selected) {
       setStateRegion(selected.state);
@@ -208,7 +251,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
     if (phone) {
       const isPak = country === "Pakistan";
       const isUS = country === "US";
-      const isValid = isPak ? validatePakistaniPhone(phone) : isUS ? validateUSPhone(phone) : validateGenericPhone(phone);
+      const isValid = isPak ? validatePakistaniPhone(phone) : isUS ? validateUSPhone(phone) : true; // Allow anything for other countries
       if (!isValid) {
         newErrors.phone = " ";
         if (!firstError) firstError = t("register.error_invalid_phone");
@@ -227,6 +270,8 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
     }
 
     // 3. Security
+    checkRequired(username, "username", "register.username_label");
+
     if (checkRequired(password, "password", "register.password_label")) {
       if (password.length < 8) {
         newErrors.password = " ";
@@ -247,9 +292,42 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
       return;
     }
 
+    setIsSubmitting(true);
     try {
+      let businessId = "";
+      if (isCloudAvailable) {
+        const apiUrl = import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
+        const cloudResponse = await fetch(`${apiUrl}/register-business`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fullName,
+            businessName: companyName,
+            email,
+            phone,
+            cnic,
+            ntn: taxId,
+            city,
+            state: stateRegion,
+            country: country === "Others" ? customCountry : country,
+            masterUsername: username,
+            secretKey: password,
+            operatingCurrency: (currencies as any)[currency]
+          })
+        });
+
+        if (!cloudResponse.ok) {
+          const errorData = await cloudResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || "Cloud synchronization failed. Please check your internet or try local-only setup.");
+        }
+
+        const cloudData = await cloudResponse.json();
+        businessId = cloudData.data?._id;
+        setCloudBusinessId(businessId);
+      }
+
       await register({
-        username: email,
+        username,
         email,
         password,
         full_name: fullName,
@@ -257,7 +335,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
         tax_registration_number: taxId,
         sales_tax_number: cnic,
         business_type: "",
-        currency,
+        currency: (currencies as any)[currency]?.code || "PKR",
         phone,
         address,
         city,
@@ -266,14 +344,71 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
         country: country === "Others" ? customCountry : country,
         website: "",
       });
+
+      if (isCloudAvailable && businessId) {
+        // Post-registration cloud tasks
+        const key = await invoke<string>("generate_recovery_key");
+        setRecoveryKey(key);
+
+        try {
+          await sendRecoveryCodeEmail(email, companyName, key);
+          setIsEmailSent(true);
+        } catch (e) {
+          console.error("Failed to send recovery email during registration:", e);
+        }
+
+        setShowRecoveryModal(true);
+      }
     } catch (err: any) {
-      setError(err?.toString() || t("register.error_failed"));
+      setError(err.message || err?.toString() || t("register.error_failed"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveKeyToFile = async () => {
+    if (!isTauri()) return;
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+      
+      const path = await save({
+        defaultPath: "teebot-recovery-key.txt",
+        filters: [{ name: "Text File", extensions: ["txt"] }]
+      });
+
+      if (path) {
+        await writeTextFile(path, `Teebot Flow Recovery Key\nBusiness: ${companyName}\nKey: ${recoveryKey}\n\nKEEP THIS SECURE.`);
+        addToast(t("common:saved"), "success");
+      }
+    } catch (e) {
+      console.error("Save failed:", e);
+    }
+  };
+
+  const handleRecoveryModalClose = async () => {
+    setShowRecoveryModal(false);
+    
+    if (isCloudAvailable && cloudBusinessId) {
+      setIsSyncingBackup(true);
+      try {
+        await performInitialBackup(cloudBusinessId, recoveryKey);
+        addToast("Initial cloud backup completed successfully.", "success");
+      } catch (e) {
+        addToast("Cloud backup failed, but your account is active. You can retry later from settings.", "error");
+      } finally {
+        setIsSyncingBackup(false);
+        // Finally trigger the dashboard navigation via checkRegistration
+        await checkRegistration();
+      }
+    } else {
+      await checkRegistration();
     }
   };
 
   return (
     <div className="h-screen bg-background flex items-center justify-center overflow-hidden">
-      <div className="w-full max-w-5xl h-full md:h-[88vh] min-h-[600px] bg-surface border-x md:border border-border md:rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] animate-in fade-in zoom-in-95 duration-500">
+      <div className="w-full h-full bg-surface overflow-hidden grid grid-cols-1 md:grid-cols-[260px_1fr] lg:grid-cols-[300px_1fr] animate-in fade-in zoom-in-95 duration-500">
 
         <Sidebar type="register" />
 
@@ -463,7 +598,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
                       onChange={handleCityChange}
                       placeholder={t("register.city_placeholder")}
                       openDirection="down"
-                      options={(language === "ur" ? pakistanCitiesUr : pakistanCitiesEn).map(c => ({
+                      options={(language === "ur" ? pakistanCities : pakistanCitiesEn).map((c: any) => ({
                         label: c.name,
                         value: c.name,
                         description: c.state
@@ -587,6 +722,28 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
                   </div>
                 )}
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+                  <Input
+                    label={t("register.username_label")}
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => {
+                      setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''));
+                      if (validationErrors.username) {
+                        setValidationErrors(prev => {
+                          const next = { ...prev };
+                          delete next.username;
+                          return next;
+                        });
+                      }
+                    }}
+                    placeholder={t("register.username_placeholder")}
+                    leftIcon={<UserIcon className="h-4 w-4" />}
+                    error={validationErrors.username}
+                  />
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <Input
                     label={t("register.password_label")}
@@ -688,13 +845,30 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
                 type="submit"
                 className={`px-8 py-3 ${isUrdu ? "text-[10px]" : "text-xs"} uppercase tracking-widest`}
                 rightIcon={<ForwardIcon className="h-4 w-4" />}
+                variant={isCloudAvailable ? "primary" : "secondary"}
+                isLoading={isSubmitting}
               >
-                {t("register.finish_button")}
+                {isCloudAvailable ? t("register.cloud_register_button") : t("register.finish_button")}
               </Button>
             </div>
           </form>
         </div>
       </div>
+
+      <RecoveryKeyModal
+        isOpen={showRecoveryModal}
+        onClose={handleRecoveryModalClose}
+        recoveryKey={recoveryKey}
+        onSaveToFile={handleSaveKeyToFile}
+        isEmailSent={isEmailSent}
+        email={email}
+      />
+
+      <FullscreenLoader
+        isVisible={isSyncingBackup}
+        message="Securing Your System"
+        subMessage="Generating your initial encrypted cloud backup. This may take a moment..."
+      />
     </div>
   );
 }

@@ -6,7 +6,6 @@ import {
   FileText
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/authStore";
 import { useToastStore } from "../../store/toastStore";
 import { listCustomers, type Customer } from "../customers/api";
@@ -30,10 +29,9 @@ interface QuotationItemInput {
 }
 
 export function CreateQuotationModule() {
-  const { t } = useTranslation("quotations");
   const navigate = useNavigate();
   const location = useLocation();
-  const { companyId, currency } = useAuthStore();
+  const { companyId } = useAuthStore();
   const { addToast } = useToastStore();
 
   const isEditMode = !!location.state?.quotation;
@@ -328,8 +326,8 @@ export function CreateQuotationModule() {
         </div>
       </div>
 
-      <CreateCustomerModal isOpen={showCustomerModal} onClose={() => setShowCustomerModal(false)} onSuccess={(c) => { setCustomers([...customers, c]); setSelectedCustomer(c); }} companyId={companyId!} />
-      <CreateProductModal isOpen={showProductModal} onClose={() => setShowProductModal(false)} onSuccess={(p) => { setProducts([...products, p]); handleAddItem(p); }} companyId={companyId!} existingProducts={products} />
+      <CreateCustomerModal isOpen={showCustomerModal} onClose={() => setShowCustomerModal(false)} onSuccess={(c) => { if (c) { setCustomers([...customers, c]); setSelectedCustomer(c); } }} companyId={companyId!} />
+      <CreateProductModal isOpen={showProductModal} onClose={() => setShowProductModal(false)} onSuccess={(p) => { if (p) { setProducts([...products, p]); handleAddItem(p); } }} companyId={companyId!} existingProducts={products} />
     </div>
   );
 }

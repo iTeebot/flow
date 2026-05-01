@@ -36,7 +36,27 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
             password_hash TEXT NOT NULL,
             full_name    TEXT,
             role         TEXT NOT NULL DEFAULT 'admin',
+            permissions  TEXT, -- JSON string of permissions
             created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            time_in TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            time_out TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id INTEGER NOT NULL,
+            changes TEXT, -- JSON snapshot of changes
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
         );
 
         CREATE TABLE IF NOT EXISTS company_profiles (
@@ -206,6 +226,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     .map_err(|e| format!("Failed to initialize database schema: {e}"))?;
 
     ensure_column(&conn, "products", "company_id", "INTEGER")?;
+    ensure_column(&conn, "users", "permissions", "TEXT")?;
     ensure_column(&conn, "products", "description", "TEXT")?;
     ensure_column(&conn, "customers", "company_id", "INTEGER")?;
     ensure_column(&conn, "delivery_challans", "company_id", "INTEGER")?;

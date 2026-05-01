@@ -170,7 +170,7 @@ function buildQuotationHtml(
     .replace("{{STATUS}}", quotation.status)
     .replace("{{ITEM_ROWS}}", itemRows)
     .replace("{{EMPTY_ROWS}}", emptyRows)
-    .replace("{{CURRENCY}}", company.currency || "PKR")
+    .replace(/{{CURRENCY}}/g, company.currency || "PKR")
     .replace("{{SUBTOTAL}}", subtotal.toLocaleString())
     .replace("{{TOTAL}}", total.toLocaleString())
     .replace("{{NOTES_HTML}}", notesHtml)

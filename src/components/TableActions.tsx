@@ -4,7 +4,7 @@ import { MoreVertical } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getLanguageDirection } from "../utils/layout";
 
-export type ActionItem = {
+export type Action = {
   label: string;
   icon: React.ElementType;
   onClick: () => void;
@@ -12,7 +12,7 @@ export type ActionItem = {
 };
 
 interface TableActionsProps {
-  actions: ActionItem[];
+  actions: Action[];
 }
 
 export function TableActions({ actions }: TableActionsProps) {

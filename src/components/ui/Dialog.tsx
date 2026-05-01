@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 import { Button } from './Button';
+import { Portal } from './Portal';
 
 interface DialogProps {
   isOpen: boolean;
@@ -45,7 +46,8 @@ export const Dialog: React.FC<DialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+    <Portal>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-background/80 backdrop-blur-sm animate-in fade-in duration-300"
@@ -97,7 +99,8 @@ export const Dialog: React.FC<DialogProps> = ({
             {confirmText}
           </Button>
         </div>
+        </div>
       </div>
-    </div>
+    </Portal>
   );
 };

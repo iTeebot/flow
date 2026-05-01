@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { Edit, Trash2, Users, Search, ArrowUpDown } from "lucide-react";
+import { Edit, Trash2, Users, Search } from "lucide-react";
 import { listCustomers, deleteCustomer, type Customer } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { TablePagination } from "../shared/TablePagination";
 import { useToastStore } from "../../store/toastStore";
 import { useTranslation } from "react-i18next";
 import { Select } from "../../components/ui/Select";
-import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
 import { ModulePage } from "../../components/ModulePage";

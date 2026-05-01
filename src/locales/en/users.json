@@ -1,0 +1,16 @@
+{
+  "users_management": "Users Management",
+  "users_desc": "Manage team access and permissions",
+  "add_user": "Add User",
+  "username": "Username",
+  "full_name": "Full Name",
+  "role": "Role",
+  "created_at": "Created At",
+  "actions": "Actions",
+  "loading_users": "Loading Users...",
+  "user_deleted": "User deleted successfully",
+  "delete_user": "Delete User",
+  "delete_user_title": "Delete User",
+  "delete_user_desc": "Are you sure you want to delete the user \"{{username}}\"? This action cannot be undone.",
+  "required_fields": "Username and password are required"
+}

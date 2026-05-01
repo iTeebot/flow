@@ -33,10 +33,11 @@ pub struct RegisterInput {
     pub website: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct LoginResponse {
     pub user: User,
     pub company_id: Option<i64>,
+    pub session_id: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -119,6 +120,7 @@ pub fn register(app: AppHandle, input: RegisterInput) -> Result<LoginResponse, S
             currency: Some(currency_val),
         },
         company_id: Some(company_id),
+        session_id: None,
     })
 }
 
@@ -126,32 +128,40 @@ pub fn register(app: AppHandle, input: RegisterInput) -> Result<LoginResponse, S
 pub fn login(app: AppHandle, username: String, password: String) -> Result<LoginResponse, String> {
     let conn = db::open_connection(&app)?;
     
-    // Authenticate via tax_registration_number (NTN/EIN)
+    // Authenticate via username OR tax_registration_number (NTN/EIN) for backward compatibility
     let (id, password_hash, full_name, role, actual_username): (i64, String, Option<String>, String, String) = conn
         .query_row(
             "SELECT u.id, u.password_hash, u.full_name, u.role, u.username 
              FROM users u
-             JOIN company_profiles cp ON cp.user_id = u.id
-             WHERE cp.tax_registration_number = ?1",
+             LEFT JOIN company_profiles cp ON cp.user_id = u.id
+             WHERE u.username = ?1 OR cp.tax_registration_number = ?1",
             [&username],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
         )
-        .map_err(|_| "Invalid Business ID or password".to_string())?;
+        .map_err(|_| "Invalid credentials".to_string())?;
 
     let valid = verify(password, &password_hash).map_err(|e| format!("Error verifying password: {e}"))?;
 
     if !valid {
-        return Err("Invalid Business ID or password".to_string());
+        return Err("Invalid credentials".to_string());
     }
 
-    // Get company ID and currency for this user
+    // Since Teebot Flow local DB is generally single-company, grab the first active company
     let (company_id, currency): (i64, String) = conn
         .query_row(
-            "SELECT id, currency FROM company_profiles WHERE user_id = ?1",
-            [&id],
+            "SELECT id, currency FROM company_profiles WHERE deleted_at IS NULL LIMIT 1",
+            [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|e| format!("Failed to fetch company: {e}"))?;
+
+    // Log the session
+    conn.execute(
+        "INSERT INTO user_sessions (user_id) VALUES (?1)",
+        [id],
+    ).map_err(|e| format!("Failed to log session: {e}"))?;
+    
+    let session_id = conn.last_insert_rowid();
 
     Ok(LoginResponse {
         user: User {
@@ -162,7 +172,18 @@ pub fn login(app: AppHandle, username: String, password: String) -> Result<Login
             currency: Some(currency),
         },
         company_id: Some(company_id),
+        session_id: Some(session_id),
     })
+}
+
+#[tauri::command]
+pub fn logout_session(app: AppHandle, session_id: i64) -> Result<(), String> {
+    let conn = db::open_connection(&app)?;
+    conn.execute(
+        "UPDATE user_sessions SET time_out = CURRENT_TIMESTAMP WHERE id = ?1",
+        [session_id],
+    ).map_err(|e| format!("Failed to end session: {e}"))?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -194,6 +215,7 @@ pub fn validate_session(app: AppHandle, user_id: i64) -> Result<LoginResponse, S
             currency: Some(currency),
         },
         company_id: Some(company_id),
+        session_id: None,
     })
 }
 
