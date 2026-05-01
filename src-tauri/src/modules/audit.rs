@@ -3,6 +3,7 @@ use rusqlite::params;
 use serde_json::Value;
 use tauri::AppHandle;
 
+#[allow(dead_code)]
 pub fn log_audit(
     app: &AppHandle,
     user_id: i64,

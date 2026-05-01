@@ -15,6 +15,19 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
             db::init_db(&app.handle())?;
+            
+            // On Linux, the window icon often needs to be set explicitly
+            #[cfg(target_os = "linux")]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    let icon_bytes = include_bytes!("../icons/128x128.png");
+                    if let Ok(icon) = tauri::image::Image::from_bytes(icon_bytes) {
+                        let _ = window.set_icon(icon);
+                    }
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -50,6 +63,7 @@ pub fn run() {
             modules::delivery_challan::get_delivery_challan,
             modules::delivery_challan::save_delivery_challan_pdf,
             modules::delivery_challan::delete_delivery_challan,
+            modules::invoices::create_invoice_from_challan,
             modules::invoices::list_invoices,
             modules::dashboard::get_dashboard_summary,
             modules::quotations::create_quotation,

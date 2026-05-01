@@ -413,11 +413,11 @@ export function SettingsModule() {
             <div className="border-b border-border bg-surface/30 px-6 py-5">
               <h2 className="text-lg font-bold text-error flex items-center gap-2">
                 <ShieldAlert className="h-5 w-5" />
-                {t("encryption", "Military-Grade Encryption")}
+                {t("encryption")}
               </h2>
-              <p className="text-xs text-text-muted mt-1">{t("encryption_desc", "Secure your local and cloud backups")}</p>
+              <p className="text-xs text-text-muted mt-1">{t("encryption_desc")}</p>
             </div>
-
+ 
             <div className="p-6 space-y-6">
               {encryptionKey ? (
                 <div className="p-4 rounded-xl border border-success/30 bg-success/5 flex items-center gap-4">
@@ -425,8 +425,8 @@ export function SettingsModule() {
                     <Lock className="h-6 w-6 text-success" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-sm font-bold text-text-primary">{t("encryption_active", "Encryption is Active")}</h3>
-                    <p className="text-xs text-text-muted mt-1">{t("encryption_active_desc", "All new backups are encrypted with AES-256-GCM.")}</p>
+                    <h3 className="text-sm font-bold text-text-primary">{t("encryption_active")}</h3>
+                    <p className="text-xs text-text-muted mt-1">{t("encryption_active_desc")}</p>
                   </div>
                 </div>
               ) : (
@@ -434,8 +434,8 @@ export function SettingsModule() {
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-error/5 border border-error/20">
                     <ShieldAlert className="h-5 w-5 text-error shrink-0 mt-0.5" />
                     <p className="text-xs leading-relaxed text-text-primary/80">
-                      <span className="font-bold text-error mr-1">{t("warning", "WARNING:")}</span>
-                      {t("encryption_warning", "Your backups are currently unencrypted. Anyone with access to the file can read your financial data.")}
+                      <span className="font-bold text-error mr-1">{t("warning")}</span>
+                      {t("encryption_warning")}
                     </p>
                   </div>
                   <button
@@ -445,7 +445,7 @@ export function SettingsModule() {
                     className="w-full flex items-center justify-center gap-2 rounded-xl bg-error px-6 py-3.5 text-xs font-black uppercase tracking-widest text-error-foreground shadow-lg shadow-error/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
                   >
                     <Key className="h-4 w-4" />
-                    {t("generate_key", "Generate Recovery Key")}
+                    {t("generate_key")}
                   </button>
                 </div>
               )}

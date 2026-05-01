@@ -4,9 +4,9 @@ const RECOVERY_KEY_FILE = "teebot-flow-recovery-key.txt";
 const RECOVERY_KEY_STORAGE_KEY = "teebot_recovery_key";
 
 async function getDesktopRecoveryKeyPath(): Promise<string> {
-  const { appConfigDir } = await import("@tauri-apps/api/path");
+  const { appConfigDir, join } = await import("@tauri-apps/api/path");
   const configDir = await appConfigDir();
-  return `${configDir}${RECOVERY_KEY_FILE}`;
+  return await join(configDir, RECOVERY_KEY_FILE);
 }
 
 async function readDesktopRecoveryKey(): Promise<string | null> {
@@ -46,7 +46,13 @@ export async function saveRecoveryKey(key: string): Promise<void> {
     return;
   }
 
-  const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+  const { writeTextFile, mkdir } = await import("@tauri-apps/plugin-fs");
+  const { appConfigDir } = await import("@tauri-apps/api/path");
+
+  // Ensure config directory exists
+  const configDir = await appConfigDir();
+  await mkdir(configDir, { recursive: true });
+
   const filePath = await getDesktopRecoveryKeyPath();
   await writeTextFile(filePath, key);
 }

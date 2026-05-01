@@ -61,7 +61,7 @@ pub fn list_users(app: AppHandle) -> Result<Vec<User>, String> {
 
 #[tauri::command]
 pub fn create_user(app: AppHandle, input: CreateUserInput) -> Result<User, String> {
-    let mut conn = db::open_connection(&app)?;
+    let conn = db::open_connection(&app)?;
     let hashed = hash(input.password, DEFAULT_COST).map_err(|e| e.to_string())?;
 
     conn.execute(

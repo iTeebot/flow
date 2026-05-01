@@ -27,5 +27,12 @@
   "reveal_in_finder": "Reveal in Finder/Explorer",
   "backup_desc": "Protect your catalog, customer directory, and financial records by creating regular offline security copies. These can be used to restore your data in case of hardware failure.",
   "securing_data": "Securing Data...",
-  "generate_backup": "Generate Backup Now"
+  "generate_backup": "Generate Backup Now",
+  "encryption": "Data Encryption",
+  "encryption_desc": "Secure your local and cloud backups",
+  "encryption_active": "Encryption is Active",
+  "encryption_active_desc": "All new backups are encrypted with AES-256-GCM.",
+  "encryption_warning": "Your backups are currently unencrypted. Anyone with access to the file can read your financial data.",
+  "warning": "WARNING:",
+  "generate_key": "Generate Recovery Key"
 }

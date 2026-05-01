@@ -1,0 +1,286 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans); }
+  .lp { color: var(--color-text-primary); }
+
+  .nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 32px; border-bottom: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); position: sticky; top: 0; z-index: 99; }
+  .nav-logo { display: flex; align-items: center; gap: 10px; }
+  .nav-logo-mark { width: 32px; height: 32px; background: #3C34B0; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .nav-logo-mark svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2; }
+  .nav-title { font-size: 15px; font-weight: 500; color: var(--color-text-primary); }
+  .nav-actions { display: flex; align-items: center; gap: 10px; }
+  .btn-ghost { font-size: 13px; padding: 7px 14px; border-radius: 8px; border: 0.5px solid var(--color-border-secondary); background: transparent; color: var(--color-text-primary); cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: var(--font-sans); }
+  .btn-ghost:hover { background: var(--color-background-secondary); }
+  .btn-primary { font-size: 13px; padding: 7px 16px; border-radius: 8px; border: none; background: #3C34B0; color: #fff; cursor: pointer; font-weight: 500; font-family: var(--font-sans); }
+  .btn-primary:hover { background: #4A41C8; }
+
+  .hero { padding: 80px 32px 64px; text-align: center; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #534AB7; background: #EEEDFE; padding: 4px 12px; border-radius: 20px; margin-bottom: 24px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .hero-title { font-size: 42px; font-weight: 500; line-height: 1.15; letter-spacing: -0.02em; color: var(--color-text-primary); margin-bottom: 18px; max-width: 560px; margin-left: auto; margin-right: auto; }
+  .hero-sub { font-size: 16px; color: var(--color-text-secondary); line-height: 1.7; max-width: 440px; margin: 0 auto 36px; }
+  .hero-ctas { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  .cta-main { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: #3C34B0; color: #fff; border-radius: 10px; font-size: 15px; font-weight: 500; text-decoration: none; cursor: pointer; border: none; font-family: var(--font-sans); }
+  .cta-main:hover { background: #4A41C8; }
+  .cta-sec { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: transparent; color: var(--color-text-primary); border-radius: 10px; font-size: 15px; border: 0.5px solid var(--color-border-secondary); cursor: pointer; text-decoration: none; font-family: var(--font-sans); }
+  .cta-sec:hover { background: var(--color-background-secondary); }
+  .beta-tag { font-size: 10px; font-weight: 500; color: #BA7517; background: #FAEEDA; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.04em; }
+  .hero-note { font-size: 12px; color: var(--color-text-secondary); margin-top: 16px; }
+
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .stat-cell { padding: 28px 24px; border-right: 0.5px solid var(--color-border-tertiary); text-align: center; }
+  .stat-cell:last-child { border-right: none; }
+  .stat-num { font-size: 28px; font-weight: 500; color: var(--color-text-primary); line-height: 1; margin-bottom: 6px; }
+  .stat-label { font-size: 12px; color: var(--color-text-secondary); }
+
+  .section { padding: 64px 32px; }
+  .section-label { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+  .section-title { font-size: 28px; font-weight: 500; color: var(--color-text-primary); letter-spacing: -0.015em; margin-bottom: 10px; }
+  .section-sub { font-size: 15px; color: var(--color-text-secondary); line-height: 1.65; max-width: 480px; }
+
+  .features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--color-border-tertiary); border: 0.5px solid var(--color-border-tertiary); border-radius: 14px; overflow: hidden; margin-top: 40px; }
+  .feat-card { background: var(--color-background-primary); padding: 28px 24px; }
+  .feat-icon { width: 36px; height: 36px; border-radius: 8px; background: #EEEDFE; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+  .feat-icon svg { width: 18px; height: 18px; stroke: #534AB7; fill: none; stroke-width: 1.8; }
+  .feat-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 6px; }
+  .feat-desc { font-size: 13px; color: var(--color-text-secondary); line-height: 1.55; }
+
+  .dl-section { background: var(--color-background-secondary); border-top: 0.5px solid var(--color-border-tertiary); border-bottom: 0.5px solid var(--color-border-tertiary); padding: 64px 32px; }
+  .platforms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+  .platform-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 14px; padding: 28px; }
+  .platform-card.featured { border-color: #3C34B0; border-width: 1.5px; }
+  .platform-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .platform-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .platform-icon svg { width: 22px; height: 22px; fill: none; stroke-width: 1.6; }
+  .platform-name { font-size: 16px; font-weight: 500; color: var(--color-text-primary); }
+  .dl-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 8px; border: 0.5px solid var(--color-border-tertiary); margin-bottom: 8px; cursor: pointer; text-decoration: none; }
+  .dl-item:hover { border-color: #3C34B0; background: #EEEDFE; }
+  .dl-name { font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
+  .dl-size { font-size: 11px; color: var(--color-text-secondary); }
+  .dl-arrow { width: 16px; height: 16px; stroke: var(--color-text-secondary); fill: none; stroke-width: 1.8; flex-shrink: 0; }
+  .dl-item:hover .dl-arrow { stroke: #534AB7; }
+
+  .about-section { padding: 64px 32px; border-bottom: 0.5px solid var(--color-border-tertiary); display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+  .about-text { }
+  .about-body { font-size: 15px; color: var(--color-text-secondary); line-height: 1.75; margin-top: 16px; }
+  .about-visual { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .about-chip { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: 10px; padding: 18px; }
+  .about-chip-icon { width: 28px; height: 28px; margin-bottom: 10px; stroke: #534AB7; fill: none; stroke-width: 1.6; }
+  .about-chip-title { font-size: 13px; font-weight: 500; color: var(--color-text-primary); margin-bottom: 4px; }
+  .about-chip-desc { font-size: 12px; color: var(--color-text-secondary); }
+
+  .links-section { padding: 64px 32px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .links-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 32px; }
+  .link-card { display: flex; align-items: center; gap: 14px; padding: 20px 22px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: 12px; text-decoration: none; }
+  .link-card:hover { border-color: #3C34B0; }
+  .link-icon { width: 36px; height: 36px; border-radius: 8px; background: #EEEDFE; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .link-icon svg { width: 16px; height: 16px; stroke: #534AB7; fill: none; stroke-width: 1.8; }
+  .link-title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); }
+  .link-desc { font-size: 12px; color: var(--color-text-secondary); }
+
+  .footer { padding: 28px 32px; display: flex; align-items: center; justify-content: space-between; border-top: 0.5px solid var(--color-border-tertiary); }
+  .footer-left { font-size: 12px; color: var(--color-text-secondary); }
+  .footer-v { font-size: 11px; font-weight: 500; color: #534AB7; background: #EEEDFE; padding: 3px 9px; border-radius: 5px; }
+</style>
+
+<div class="lp">
+
+  <nav class="nav">
+    <div class="nav-logo">
+      <div class="nav-logo-mark">
+        <svg viewBox="0 0 20 20"><path d="M3 14l4-8 4 5 3-4 3 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="nav-title">Teebot Flow</span>
+    </div>
+    <div class="nav-actions">
+      <button class="btn-ghost">
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l4-4m0 0a5 5 0 1 0-7-7 5 5 0 0 0 7 7z"/></svg>
+        Download
+      </button>
+      <button class="btn-primary">Open App</button>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="eyebrow">
+      <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="#534AB7" stroke-width="2.5"><path d="M13 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path d="M3 10a7 7 0 1 0 14 0A7 7 0 0 0 3 10z"/></svg>
+      Local-first ERP
+    </div>
+    <h1 class="hero-title">Business management, built for speed</h1>
+    <p class="hero-sub">Inventory, invoices, delivery challans, and customer records — all offline-ready, all in one place.</p>
+    <div class="hero-ctas">
+      <button class="cta-main">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="2"><path d="M10 3v10M6 9l4 4 4-4" stroke-linecap="round"/><path d="M4 17h12"/></svg>
+        Download for Windows
+      </button>
+      <button class="cta-sec">
+        Try Web Version
+        <span class="beta-tag">Beta</span>
+      </button>
+    </div>
+    <p class="hero-note">Free to use · Available on Windows, macOS &amp; Linux</p>
+  </section>
+
+  <div class="stats-row">
+    <div class="stat-cell"><div class="stat-num">3</div><div class="stat-label">Platforms</div></div>
+    <div class="stat-cell"><div class="stat-num">100%</div><div class="stat-label">Offline capable</div></div>
+    <div class="stat-cell"><div class="stat-num">v0.0.5</div><div class="stat-label">Latest release</div></div>
+    <div class="stat-cell"><div class="stat-num">0</div><div class="stat-label">Cloud dependency</div></div>
+  </div>
+
+  <section class="section">
+    <div class="section-label">Features</div>
+    <div class="section-title">Everything your operations need</div>
+    <p class="section-sub">Purpose-built modules that work together so you can focus on running the business.</p>
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-icon">
+          <svg viewBox="0 0 20 20"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/></svg>
+        </div>
+        <div class="feat-title">Dashboard</div>
+        <div class="feat-desc">Live overview of sales, inventory levels, and pending deliveries at a glance.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">
+          <svg viewBox="0 0 20 20"><path d="M4 6h12M4 10h8M4 14h6" stroke-linecap="round"/><rect x="2" y="2" width="16" height="16" rx="2"/></svg>
+        </div>
+        <div class="feat-title">Invoicing</div>
+        <div class="feat-desc">Generate and print professional invoices and delivery challans in seconds.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">
+          <svg viewBox="0 0 20 20"><path d="M8 4h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8l4-4z"/><path d="M8 4v4H4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="feat-title">Inventory</div>
+        <div class="feat-desc">Track stock in real time with low-stock alerts and batch management.</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">
+          <svg viewBox="0 0 20 20"><circle cx="10" cy="8" r="3"/><path d="M4 17c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke-linecap="round"/></svg>
+        </div>
+        <div class="feat-title">Customers</div>
+        <div class="feat-desc">Full customer history, contact records, and outstanding balance summaries.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="dl-section">
+    <div class="section-label">Downloads</div>
+    <div class="section-title">Choose your platform</div>
+    <p class="section-sub">Native desktop app for all major operating systems. Fast install, no cloud account needed.</p>
+    <div class="platforms">
+      <div class="platform-card featured">
+        <div class="platform-header">
+          <div class="platform-icon" style="background:#EEEDFE;">
+            <svg viewBox="0 0 20 20" stroke="#534AB7"><path d="M3 4h6v6H3zM11 4h6v6h-6zM3 12h6v6H3zM11 12h6v6h-6z"/></svg>
+          </div>
+          <div>
+            <div class="platform-name">Windows</div>
+            <div style="font-size:11px;color:var(--color-text-secondary);">Recommended</div>
+          </div>
+        </div>
+        <a class="dl-item" href="/releases/win/teebot-flow_0.0.5_x64-setup.exe" download>
+          <div><div class="dl-name">Installer (EXE)</div><div class="dl-size">~4.1 MB</div></div>
+          <svg class="dl-arrow" viewBox="0 0 20 20"><path d="M10 3v10M6 9l4 4 4-4" stroke-linecap="round"/></svg>
+        </a>
+        <a class="dl-item" href="/releases/win/teebot-flow_0.0.5_x64_en-US.msi" download>
+          <div><div class="dl-name">MSI Package</div><div class="dl-size">~5.3 MB</div></div>
+          <svg class="dl-arrow" viewBox="0 0 20 20"><path d="M10 3v10M6 9l4 4 4-4" stroke-linecap="round"/></svg>
+        </a>
+      </div>
+      <div class="platform-card">
+        <div class="platform-header">
+          <div class="platform-icon" style="background:#E1F5EE;">
+            <svg viewBox="0 0 20 20" stroke="#0F6E56"><circle cx="10" cy="10" r="7"/><path d="M10 3v14M3 10h14" stroke-linecap="round"/></svg>
+          </div>
+          <span class="platform-name">Linux</span>
+        </div>
+        <a class="dl-item" href="/releases/linux/teebot-flow_0.0.5_amd64.AppImage" download>
+          <div><div class="dl-name">AppImage</div><div class="dl-size">~76.6 MB</div></div>
+          <svg class="dl-arrow" viewBox="0 0 20 20"><path d="M10 3v10M6 9l4 4 4-4" stroke-linecap="round"/></svg>
+        </a>
+        <a class="dl-item" href="/releases/linux/teebot-flow_0.0.5_amd64.deb" download>
+          <div><div class="dl-name">Debian Package</div><div class="dl-size">~6.5 MB</div></div>
+          <svg class="dl-arrow" viewBox="0 0 20 20"><path d="M10 3v10M6 9l4 4 4-4" stroke-linecap="round"/></svg>
+        </a>
+        <a class="dl-item" href="/releases/linux/teebot-flow_0.0.5_x86_64.rpm" download>
+          <div><div class="dl-name">RPM Package</div><div class="dl-size">~6.5 MB</div></div>
+          <svg class="dl-arrow" viewBox="0 0 20 20"><path d="M10 3v10M6 9l4 4 4-4" stroke-linecap="round"/></svg>
+        </a>
+      </div>
+      <div class="platform-card">
+        <div class="platform-header">
+          <div class="platform-icon" style="background:#F1EFE8;">
+            <svg viewBox="0 0 20 20" stroke="#444441"><path d="M12 4c0 1.333-.667 2.333-2 3-1.333.667-2.667.667-4 0 0 2.667 1 4.667 3 6 1.333-1.333 2-3.333 2-6l1-3z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <span class="platform-name">macOS</span>
+        </div>
+        <a class="dl-item" href="/releases/mac/teebot-flow_0.0.5_arm64.dmg" download>
+          <div><div class="dl-name">DMG (ARM64)</div><div class="dl-size">~5.8 MB</div></div>
+          <svg class="dl-arrow" viewBox="0 0 20 20"><path d="M10 3v10M6 9l4 4 4-4" stroke-linecap="round"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="about-section">
+    <div class="about-text">
+      <div class="section-label">About</div>
+      <div class="section-title">Local-first, built to last</div>
+      <p class="about-body">Teebot Flow is a local-first ERP desktop app designed for operational workflows. Your data lives on your machine — no subscriptions, no cloud lock-in, no internet required to run your business.</p>
+    </div>
+    <div class="about-visual">
+      <div class="about-chip">
+        <svg class="about-chip-icon" viewBox="0 0 20 20"><path d="M4 10h12M4 14h8M4 6h8" stroke-linecap="round"/></svg>
+        <div class="about-chip-title">Offline first</div>
+        <div class="about-chip-desc">Works without internet</div>
+      </div>
+      <div class="about-chip">
+        <svg class="about-chip-icon" viewBox="0 0 20 20"><rect x="3" y="5" width="14" height="10" rx="2"/><path d="M7 5V3h6v2" stroke-linecap="round"/></svg>
+        <div class="about-chip-title">Desktop native</div>
+        <div class="about-chip-desc">Built with Tauri</div>
+      </div>
+      <div class="about-chip">
+        <svg class="about-chip-icon" viewBox="0 0 20 20"><path d="M10 3l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4z"/></svg>
+        <div class="about-chip-title">Free to use</div>
+        <div class="about-chip-desc">No paid tiers</div>
+      </div>
+      <div class="about-chip">
+        <svg class="about-chip-icon" viewBox="0 0 20 20"><path d="M5 10l4 4 6-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="about-chip-title">Privacy</div>
+        <div class="about-chip-desc">Data stays on-device</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="links-section">
+    <div class="section-label">Resources</div>
+    <div class="section-title">Learn more</div>
+    <div class="links-grid">
+      <a class="link-card" href="https://www.iteebot.com" target="_blank" rel="noreferrer">
+        <div class="link-icon">
+          <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 3c-2 2-3 4-3 7s1 5 3 7M10 3c2 2 3 4 3 7s-1 5-3 7M3 10h14" stroke-linecap="round"/></svg>
+        </div>
+        <div>
+          <div class="link-title">Teebot Labs</div>
+          <div class="link-desc">Company website and developer portal</div>
+        </div>
+      </a>
+      <a class="link-card" href="https://teebot-flow.iteebot.com" target="_blank" rel="noreferrer">
+        <div class="link-icon">
+          <svg viewBox="0 0 20 20"><rect x="2" y="4" width="16" height="12" rx="2"/><path d="M8 8l2 2 2-2M10 10v4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div>
+          <div class="link-title">Product Page</div>
+          <div class="link-desc">Official Teebot Flow landing page</div>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-left">© 2024 Teebot Flow · Teebot Labs</div>
+    <span class="footer-v">v0.0.5</span>
+  </footer>
+
+</div>

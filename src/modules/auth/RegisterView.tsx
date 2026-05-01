@@ -335,6 +335,12 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
         const cloudData = await cloudResponse.json();
         businessId = cloudData.data?._id;
+
+        if (cloudData.businessJwt) {
+          const { saveBusinessJwt } = await import("../../utils/businessJwtStore");
+          await saveBusinessJwt(cloudData.businessJwt);
+        }
+
         setCloudBusinessId(businessId);
       }
 

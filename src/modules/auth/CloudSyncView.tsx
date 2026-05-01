@@ -220,6 +220,12 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       }
 
       const responseData = await response.json();
+      
+      if (responseData.businessJwt) {
+        const { saveBusinessJwt } = await import("../../utils/businessJwtStore");
+        await saveBusinessJwt(responseData.businessJwt);
+      }
+
       const businessData = responseData.data || responseData;
       console.log("Cloud Sync Data Received:", businessData);
 

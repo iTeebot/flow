@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
-import { Download, Zap, BarChart3, Package, Info, ExternalLink, Globe, Shield, Heart, Cpu, Server, HardDrive } from "lucide-react";
+import { Download, Zap, BarChart3, Package, Info, ExternalLink, Globe, Shield, Heart, Cpu, Server, HardDrive, Monitor } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { getAppInfo, type AppInfo } from "../modules/info/api";
-import { APP_VERSION, PRODUCT_NAME } from "../lib/version";
+import { APP_VERSION } from "../lib/version";
+import { detectOS, getBestDownloadForOS } from "../lib/platform";
 
 export function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const [info, setInfo] = useState<AppInfo | null>(null);
+
+  const userOS = detectOS();
+  const smartDownload = getBestDownloadForOS(userOS);
 
   useEffect(() => {
     // Try to fetch app info (may fail on web, which is fine)
@@ -26,7 +30,7 @@ export function LandingPage() {
   const releases = [
     {
       os: "Windows",
-      icon: "🪟",
+      icon: <img src="/windows_logo.png" alt="Windows" className="w-12 h-12 object-contain" />,
       downloads: [
         {
           name: "Installer (EXE)",
@@ -42,7 +46,7 @@ export function LandingPage() {
     },
     {
       os: "Linux",
-      icon: "🐧",
+      icon: <img src="/linux_logo.png" alt="Linux" className="w-12 h-12 object-contain" />,
       downloads: [
         {
           name: "AppImage",
@@ -63,7 +67,7 @@ export function LandingPage() {
     },
     {
       os: "macOS",
-      icon: "🍎",
+      icon: <img src="/apple_logo.png" alt="macOS" className="w-12 h-12 object-contain" />,
       downloads: [
         {
           name: "DMG (ARM64)",
@@ -77,50 +81,90 @@ export function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-surface to-background text-text-primary">
       {/* Header */}
-      <header className="border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 py-6 flex items-center justify-between">
+      <header className="border-b border-border sticky top-0 z-50 bg-background/80 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img
               src="/logo.png"
               alt="Teebot Flow"
               className="h-10 w-auto"
             />
-            <h1 className="text-2xl font-bold">Teebot Flow</h1>
+            <h1 className="text-xl font-bold hidden sm:block">Teebot Flow</h1>
           </div>
-          {isAuthenticated && (
-            <button
-              onClick={() => navigate("/app")}
-              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition font-semibold"
+          <div className="flex items-center gap-3">
+            <a
+              href={smartDownload.url}
+              download
+              className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:border-primary/50 transition font-medium text-sm"
             >
-              Open App
-            </button>
-          )}
+              <Download className="w-4 h-4 text-primary" />
+              <span className="hidden md:inline">{smartDownload.label}</span>
+              <span className="md:hidden">Download</span>
+            </a>
+            {isAuthenticated && (
+              <button
+                onClick={() => navigate("/app")}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition font-semibold text-sm"
+              >
+                Open App
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
-        <div className="text-center space-y-6 mb-16">
-          <h2 className="text-5xl font-bold leading-tight">
-            Business Management Made Simple
-          </h2>
-          <p className="text-xl text-text-muted max-w-2xl mx-auto">
-            Streamline your inventory, invoices, customers, and delivery operations with Teebot Flow.
-            Available on Windows, macOS, and Linux.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <button
-              onClick={() => navigate("/app")}
-              className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition font-semibold text-lg"
-            >
-              {isAuthenticated ? "Launch App" : "Try Web Version"}
-            </button>
-            <p className="text-sm text-text-muted">or download the desktop app below</p>
-          </div>
+      <section className="max-w-5xl mx-auto px-4 py-20 text-center border-b border-border/50">
+        <div className="inline-flex items-center gap-2 text-xs font-semibold text-primary bg-primary/10 px-3 py-1.5 rounded-full mb-6 tracking-wide uppercase">
+          <Zap className="w-4 h-4" />
+          Local-first ERP
         </div>
+        <h2 className="text-4xl sm:text-5xl md:text-6xl font-bold leading-tight mb-6 text-text-primary tracking-tight">
+          Business management, built for speed
+        </h2>
+        <p className="text-lg sm:text-xl text-text-muted max-w-2xl mx-auto mb-10 leading-relaxed">
+          Inventory, invoices, delivery challans, and customer records — all offline-ready, all in one place.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 pt-2">
+          <a
+            href={smartDownload.url}
+            download
+            className="w-full sm:w-auto px-8 py-3.5 bg-primary text-primary-foreground rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all font-semibold text-base flex items-center justify-center gap-3 shadow-lg shadow-primary/20"
+          >
+            <Download className="w-5 h-5" />
+            Download for {userOS}
+          </a>
+          <button
+            onClick={() => navigate("/app")}
+            className="w-full sm:w-auto px-8 py-3.5 bg-transparent border border-border text-text-primary rounded-xl hover:bg-surface hover:border-primary/30 transition-all font-medium text-base flex items-center justify-center gap-2"
+          >
+            {isAuthenticated ? "Launch App" : "Try Web Version"}
+            <span className="px-1.5 py-0.5 bg-orange-500/10 text-orange-500 text-[10px] font-bold uppercase tracking-widest rounded border border-orange-500/20">Beta</span>
+          </button>
+        </div>
+        <p className="text-sm text-text-muted mt-6">Free to use · Available on Windows, macOS & Linux</p>
+      </section>
 
-        {/* Features */}
-        <div className="grid md:grid-cols-4 gap-6 mb-20">
+      {/* Stats Row */}
+      <div className="max-w-6xl mx-auto px-4 border-b border-border/50">
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-y md:divide-y-0 divide-border/50">
+          {[
+            { num: "3", label: "Platforms" },
+            { num: "100%", label: "Offline capable" },
+            { num: APP_VERSION, label: "Latest release" },
+            { num: "0", label: "Cloud dependency" },
+          ].map((stat, i) => (
+            <div key={i} className="py-8 text-center">
+              <div className="text-3xl font-bold text-text-primary mb-1">{stat.num}</div>
+              <div className="text-sm text-text-muted font-medium">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Features */}
+      <section className="max-w-6xl mx-auto px-4 py-16">
+        <div className="grid md:grid-cols-4 gap-6">
           {[
             { icon: BarChart3, label: "Dashboard", desc: "Real-time insights" },
             { icon: Package, label: "Inventory", desc: "Stock management" },
@@ -145,11 +189,11 @@ export function LandingPage() {
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {releases.map((platform) => (
-              <div 
-                key={platform.os} 
+              <div
+                key={platform.os}
                 className="rounded-lg border bg-background border-border hover:border-primary/30 p-8 transition-all"
               >
-                <div className="text-5xl mb-3">{platform.icon}</div>
+                <div className="mb-4">{platform.icon}</div>
                 <h4 className="text-2xl font-bold mb-4">{platform.os}</h4>
                 <div className="space-y-2">
                   {platform.downloads.map((dl) => (
@@ -174,15 +218,29 @@ export function LandingPage() {
       </section>
 
       {/* About Section */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
-        <div className="rounded-lg border border-border bg-card p-8">
-          <h2 className="mb-4 flex items-center gap-2 text-2xl font-bold text-text-primary">
-            <Heart className="h-5 w-5 text-pink-500" />
-            About {PRODUCT_NAME}
-          </h2>
-          <p className="text-base leading-relaxed text-text-muted max-w-3xl">
-            {PRODUCT_NAME} is a local-first ERP desktop app designed for operational workflows such as delivery challans, invoices, inventory, customer records, reporting, and business controls. Built for businesses that need fast, reliable, and offline-capable management tools.
-          </p>
+      <section className="max-w-6xl mx-auto px-4 py-20 border-b border-border/50">
+        <div className="grid md:grid-cols-2 gap-16 items-center">
+          <div>
+            <div className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-3">About</div>
+            <h2 className="text-3xl font-bold text-text-primary mb-4 tracking-tight">Local-first, built to last</h2>
+            <p className="text-base text-text-muted leading-relaxed">
+              Teebot Flow is a local-first ERP desktop app designed for operational workflows. Your data lives on your machine — no subscriptions, no cloud lock-in, no internet required to run your business. Optional cloud sync ensures you stay connected only when you choose to.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { icon: Zap, title: "Offline first", desc: "Works without internet" },
+              { icon: Monitor, title: "Desktop native", desc: "Built with Tauri" },
+              { icon: Heart, title: "Free to use", desc: "No paid tiers" },
+              { icon: Shield, title: "Zero Knowledge", desc: "E2E Encryption for Sync" }
+            ].map((chip, i) => (
+              <div key={i} className="bg-surface border border-border rounded-2xl p-5 hover:border-primary/30 transition-colors">
+                <chip.icon className="w-7 h-7 text-primary mb-3" />
+                <h3 className="font-semibold text-text-primary text-sm mb-1">{chip.title}</h3>
+                <p className="text-xs text-text-muted">{chip.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -224,7 +282,7 @@ export function LandingPage() {
         </section>
       )}
 
-      {/* Links Section */}
+      {/* Learn More Section */}
       <section className="max-w-6xl mx-auto px-4 py-16">
         <h3 className="text-2xl font-bold mb-8 flex items-center gap-2 text-text-primary">
           <Globe className="h-5 w-5 text-primary" />

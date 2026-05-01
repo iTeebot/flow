@@ -156,7 +156,7 @@ pub fn list_quotations(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Quo
 
 #[tauri::command]
 pub fn delete_quotation(app: tauri::AppHandle, quote_id: i64) -> Result<(), String> {
-    let mut conn = db::open_connection(&app)?;
+    let conn = db::open_connection(&app)?;
     conn.execute(
         "UPDATE quotations SET deleted_at = datetime('now') WHERE id = ?1",
         [quote_id],

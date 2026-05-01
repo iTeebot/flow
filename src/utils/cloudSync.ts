@@ -5,7 +5,7 @@ import { checkFullConnectivity } from './connectivity';
 import { loadBusinessJwt, clearBusinessJwt } from './businessJwtStore';
 import { gunzipSync, gzipSync } from 'fflate';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.afmsolution.tech/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.afmsolution.tech/api/teebot-flow';
 
 /**
  * Sends the recovery code to the user's email.
@@ -25,7 +25,7 @@ export const sendRecoveryCodeEmail = async (email: string, businessName: string,
       throw new Error("Server is not available");
     }
 
-    const endpoint = `${API_BASE_URL}/teebot-flow/send-recovery-code-email`;
+    const endpoint = `${API_BASE_URL}/send-recovery-code-email`;
     console.log(`📍 Calling endpoint: ${endpoint}`);
     
     const response = await axios.post(endpoint, {
@@ -76,7 +76,7 @@ export const uploadBackup = async (backupBlob: Blob) => {
     const formData = new FormData();
     formData.append('backup', new Blob([gzippedBuffer], { type: 'application/gzip' }), 'teebot-backup.tbf.gz');
 
-    const response = await axios.post(`${API_BASE_URL}/teebot-flow/upload-backup`, formData, {
+    const response = await axios.post(`${API_BASE_URL}/upload-backup`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
         Authorization: `Bearer ${businessJwt}`,
@@ -107,7 +107,7 @@ export const uploadBackup = async (backupBlob: Blob) => {
  */
 export const downloadLatestBackup = async (businessId: string) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/teebot-flow/download-backup/${businessId}`, {
+    const response = await axios.get(`${API_BASE_URL}/download-backup/${businessId}`, {
       responseType: 'blob'
     });
     const gzippedBytes = new Uint8Array(await response.data.arrayBuffer());
