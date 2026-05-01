@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import { invoke } from "../lib/api";
+import { loadRecoveryKey } from "../utils/recoveryKeyStore";
+import { saveBusinessJwt, clearBusinessJwt } from "../utils/businessJwtStore";
+import { checkFullConnectivity } from "../utils/connectivity";
 
 export interface User {
   id: number;
@@ -7,6 +10,9 @@ export interface User {
   full_name: string | null;
   role: string;
   currency: string | null;
+  email?: string;
+  company_name?: string;
+  cloud_business_id?: string;
 }
 
 interface AuthState {
@@ -29,6 +35,38 @@ interface AuthState {
   checkSession: () => Promise<boolean>;
 }
 
+async function ensureBusinessJwtFromServer(userId?: number): Promise<string | null> {
+  const { loadBusinessJwt } = await import("../utils/businessJwtStore");
+  const existingToken = await loadBusinessJwt();
+  if (existingToken) {
+    return existingToken;
+  }
+
+  const connectivity = await checkFullConnectivity();
+  if (!connectivity.hasInternet || !connectivity.serverAvailable) {
+    console.debug("ensureBusinessJwtFromServer: connectivity unavailable");
+    return null;
+  }
+
+  if (!userId) {
+    console.debug("ensureBusinessJwtFromServer: missing userId");
+    return null;
+  }
+
+  try {
+    const sessionResponse = await invoke<any>("validate_session", { userId });
+    if (sessionResponse.businessJwt) {
+      console.debug("ensureBusinessJwtFromServer: fetched businessJwt ->", !!sessionResponse.businessJwt);
+      await saveBusinessJwt(sessionResponse.businessJwt);
+      return sessionResponse.businessJwt;
+    }
+  } catch (error) {
+    console.error("ensureBusinessJwtFromServer: failed to fetch businessJwt:", error);
+  }
+
+  return null;
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   companyId: null,
@@ -38,6 +76,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isRegistered: false,
   isLoading: true,
+
+  
+  
+  // Merge backend user data with any locally saved fields we already know.
+  // This preserves email/company/cloud identifiers that some backend session
+  // responses do not include.
+  
 
   checkRegistration: async () => {
     try {
@@ -50,12 +95,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const user = JSON.parse(savedUser);
             const response = await invoke<any>("validate_session", { userId: user.id });
             const userCurrency = response.user?.currency || "USD";
+            const mergedUser = {
+              ...response.user,
+              email: response.user?.email || user.email,
+              company_name: response.user?.company_name || user.company_name,
+              cloud_business_id: response.user?.cloud_business_id || user.cloud_business_id,
+            };
             localStorage.setItem("currency", userCurrency);
             if (response.logo_base64) {
               localStorage.setItem("companyLogo", response.logo_base64);
             }
+            if (response.businessJwt) {
+              console.debug('checkRegistration: received businessJwt ->', !!response.businessJwt);
+              await saveBusinessJwt(response.businessJwt);
+            } else {
+              await ensureBusinessJwtFromServer(user.id);
+            }
+            localStorage.setItem("teebot_user", JSON.stringify(mergedUser));
             set({ 
-              user: response.user, 
+              user: mergedUser, 
               companyId: response.company_id, 
               sessionId: response.session_id,
               currency: userCurrency,
@@ -79,13 +137,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const response = await invoke<any>("login", { username, password });
       const userCurrency = response.user?.currency || "USD";
+      const mergedUser = {
+        ...response.user,
+        email: response.user?.email || response.user?.username || undefined,
+      };
       localStorage.setItem("currency", userCurrency);
-      localStorage.setItem("teebot_user", JSON.stringify(response.user));
+      localStorage.setItem("teebot_user", JSON.stringify(mergedUser));
       if (response.logo_base64) {
         localStorage.setItem("companyLogo", response.logo_base64);
       }
+      if (response.businessJwt) {
+        console.debug('login: received businessJwt ->', !!response.businessJwt);
+        await saveBusinessJwt(response.businessJwt);
+      } else {
+        await ensureBusinessJwtFromServer(response.user?.id);
+      }
       set({ 
-        user: response.user, 
+        user: mergedUser, 
         companyId: response.company_id, 
         sessionId: response.session_id,
         currency: userCurrency,
@@ -102,12 +170,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const response = await invoke<any>("register", { input: data });
       const userCurrency = response.user?.currency || "USD";
+      const mergedUser = {
+        ...response.user,
+        email: response.user?.email || data?.email,
+        company_name: response.user?.company_name || data?.company_name,
+      };
       localStorage.setItem("currency", userCurrency);
       if (response.logo_base64) {
         localStorage.setItem("companyLogo", response.logo_base64);
       }
+      if (response.businessJwt) {
+        console.debug('register: received businessJwt ->', !!response.businessJwt);
+        await saveBusinessJwt(response.businessJwt);
+      } else {
+        await ensureBusinessJwtFromServer(response.user?.id);
+      }
+      localStorage.setItem("teebot_user", JSON.stringify(mergedUser));
       set({ 
-        user: response.user, 
+        user: mergedUser, 
         companyId: response.company_id, 
         sessionId: response.session_id,
         currency: userCurrency,
@@ -122,6 +202,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setUser: (user) => {
+    localStorage.setItem("teebot_user", JSON.stringify(user));
     set({ user });
   },
 
@@ -140,7 +221,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    const { sessionId } = get();
+    const { sessionId, user } = get();
+    
+    // Trigger cloud backup before logout if user has cloud account and recovery key
+    if (user?.cloud_business_id) {
+      try {
+        const recoveryKey = await loadRecoveryKey();
+
+        if (recoveryKey) {
+          console.log("📤 Triggering cloud backup on logout...");
+          const backupInfo = await invoke<any>("create_backup", { encryptionKey: recoveryKey });
+          
+          // Try to upload backup to cloud
+          try {
+            const { readFile } = await import("@tauri-apps/plugin-fs");
+            const fileData = await readFile(backupInfo.backup_path || "");
+            const backupBlob = new Blob([fileData], { type: "application/octet-stream" });
+            
+            // Import uploadBackup dynamically to avoid circular dependencies
+            const { uploadBackup } = await import("../utils/cloudSync");
+            await uploadBackup(backupBlob);
+            console.log("✅ Cloud backup completed on logout");
+          } catch (uploadErr) {
+            console.error("⚠️ Failed to upload backup to cloud on logout:", uploadErr);
+          }
+        }
+      } catch (backupErr) {
+        console.error("⚠️ Failed to create backup on logout:", backupErr);
+      }
+    }
+    
     if (sessionId) {
       try {
         await invoke("logout_session", { sessionId });
@@ -155,6 +265,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       await invoke("reset_database");
       localStorage.clear();
+      await clearBusinessJwt();
       set({ 
         user: null, 
         companyId: null, 
@@ -175,11 +286,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const user = JSON.parse(savedUser);
       const response = await invoke<any>("validate_session", { userId: user.id });
+      const mergedUser = {
+        ...response.user,
+        email: response.user?.email || user.email,
+        company_name: response.user?.company_name || user.company_name,
+        cloud_business_id: response.user?.cloud_business_id || user.cloud_business_id,
+      };
+      localStorage.setItem("teebot_user", JSON.stringify(mergedUser));
+      if (response.businessJwt) {
+        console.debug('checkSession: received businessJwt ->', !!response.businessJwt);
+        await saveBusinessJwt(response.businessJwt);
+      } else {
+        await ensureBusinessJwtFromServer(user.id);
+      }
       set({ 
-        user: response.user, 
+        user: mergedUser, 
         companyId: response.company_id, 
         sessionId: response.session_id,
-        currency: response.user?.currency || "USD",
+        currency: mergedUser.currency || "USD",
         isAuthenticated: true 
       });
       return true;

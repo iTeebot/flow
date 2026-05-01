@@ -19,6 +19,7 @@
     "@tauri-apps/plugin-fs": "^2.5.0",
     "@tauri-apps/plugin-opener": "^2",
     "axios": "^1.15.2",
+    "fflate": "^0.8.2",
     "i18next": "^26.0.8",
     "i18next-browser-languagedetector": "^8.2.1",
     "jspdf": "^4.2.1",

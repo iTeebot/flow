@@ -24,6 +24,7 @@ import { validatePakistaniCNIC, validatePakistaniNTN } from "../../utils/validat
 import { getLanguageDirection, getForwardIcon } from "../../utils/layout";
 import { stripNonAlphaNumeric, stripNonDigits } from "../../utils/formatters";
 import { downloadLatestBackup } from "../../utils/cloudSync";
+import { saveRecoveryKey } from "../../utils/recoveryKeyStore";
 import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
 import { invoke } from "../../lib/api";
 import { isTauri } from "../../lib/platform";
@@ -132,21 +133,26 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         let errorMessage = t("register_errors.sync_failed");
-        if (response.status === 409 && errorData.error) {
-          if (errorData.error.includes('email')) {
-            errorMessage = t("register_errors.email_already_exists");
-          } else if (errorData.error.includes('phone')) {
-            errorMessage = t("register_errors.phone_already_exists");
-          } else if (errorData.error.includes('cnic')) {
-            errorMessage = t("register_errors.cnic_already_exists");
-          } else if (errorData.error.includes('ntn')) {
-            errorMessage = t("register_errors.ntn_already_exists");
-          } else {
-            errorMessage = errorData.error;
+        
+        // Priority: custom error from server > message > generic fallback
+        if (errorData.error) {
+          errorMessage = errorData.error;
+          // Handle specific 409 conflicts
+          if (response.status === 409) {
+            if (errorData.error.includes('email')) {
+              errorMessage = t("register_errors.email_already_exists");
+            } else if (errorData.error.includes('phone')) {
+              errorMessage = t("register_errors.phone_already_exists");
+            } else if (errorData.error.includes('cnic')) {
+              errorMessage = t("register_errors.cnic_already_exists");
+            } else if (errorData.error.includes('ntn')) {
+              errorMessage = t("register_errors.ntn_already_exists");
+            }
           }
         } else if (errorData.message) {
           errorMessage = errorData.message;
         }
+        
         throw new Error(errorMessage);
       }
 
@@ -155,7 +161,8 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       setVerificationField(data.verificationField);
       setStep("verify");
     } catch (err: any) {
-      addToast(err.message || t("cloud_sync.error_sync_failed"), "error");
+      const errorMsg = err.message || t("cloud_sync.error_sync_failed");
+      addToast(errorMsg, "error");
     } finally {
       setIsLoading(false);
     }
@@ -178,7 +185,8 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Verification failed");
+        const errorMessage = errorData.error || errorData.message || "Verification failed";
+        throw new Error(errorMessage);
       }
 
       setStep("otp");
@@ -207,48 +215,86 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || t("cloud_sync.error_otp_invalid"));
+        const errorMessage = errorData.error || errorData.message || t("cloud_sync.error_otp_invalid");
+        throw new Error(errorMessage);
       }
 
-      const businessData = await response.json();
+      const responseData = await response.json();
+      const businessData = responseData.data || responseData;
       console.log("Cloud Sync Data Received:", businessData);
 
-      await register({
+      // Map server response to registration format
+      const registrationData = {
         username: businessData.username || businessData.masterUsername || "admin",
         email: businessData.email,
         password: password, // Use the password provided by user in step 1
         full_name: businessData.fullName,
-        company_name: businessData.businessName,
+        company_name: businessData.businessName || businessData.companyName || businessData.company_name,
         tax_registration_number: businessData.ntn,
         sales_tax_number: businessData.cnic,
         business_type: businessData.businessType || "",
-        currency: businessData.operatingCurrency?.code || "PKR",
+        currency: businessData.operatingCurrency?.code || businessData.currency || "PKR",
         phone: businessData.phone,
-        address: businessData.streetAddress,
+        address: businessData.streetAddress || businessData.address,
         city: businessData.city,
         state: businessData.state,
         postal_code: businessData.postalCode || "",
         country: businessData.country,
         website: businessData.website || "",
-      });
+      };
 
+      console.log("Registration Data to Send:", registrationData);
+
+      // Validate required fields
+      if (!registrationData.company_name) {
+        console.error("❌ Company name missing from cloud data!");
+        console.error("Raw server response:", JSON.stringify(businessData, null, 2));
+        console.error("All available fields:", Object.keys(businessData));
+        throw new Error(`Company name missing from cloud data. Raw response: ${JSON.stringify(businessData)}`);
+      }
+
+      // Register locally with cloud data
+      await register(registrationData);
+      
+      // Explicitly store email and cloud_business_id in auth store
+      const { setUser, user } = useAuthStore.getState();
+      if (user) {
+        setUser({
+          ...user,
+          email: registrationData.email,
+          company_name: registrationData.company_name,
+          cloud_business_id: businessData._id,
+        });
+      }
+      
       addToast(t("cloud_sync.sync_success"), "success");
       
-      // Move to restore step
+      // Store cloud ID for potential backup restoration
       setCloudId(businessData._id);
-      setStep("restore");
-    } catch (err: any) {
-      console.error("Cloud Sync Verification/Registration Error:", err);
-      let errorMessage = typeof err === 'string' ? err : (err?.message || t("cloud_sync.error_otp_invalid"));
-      if (errorMessage.includes('email')) {
-        errorMessage = t("register_errors.email_already_exists");
-      } else if (errorMessage.includes('phone')) {
-        errorMessage = t("register_errors.phone_already_exists");
-      } else if (errorMessage.includes('cnic')) {
-        errorMessage = t("register_errors.cnic_already_exists");
-      } else if (errorMessage.includes('ntn')) {
-        errorMessage = t("register_errors.ntn_already_exists");
+      
+      // Check if a backup exists on the server
+      try {
+        const backupBlob = await downloadLatestBackup(businessData._id);
+        if (backupBlob && backupBlob.size > 0) {
+          setStep("restore");
+        } else {
+          // No backup found, proceed directly to dashboard
+          console.log("No backup file found on server. Proceeding with synced business data.");
+          addToast("No backup found. Your synced business data is ready to use.", "info");
+          await checkRegistration();
+        }
+      } catch (err: any) {
+        console.log("Backup check failed, proceeding with synced data:", err);
+        if (err instanceof Error && err.message === 'Session Expired') {
+          addToast('Session Expired. Please perform a Cloud Sync to refresh your access.', 'error');
+          return;
+        }
+        addToast("Your synced business data is ready to use.", "success");
+        await checkRegistration();
       }
+    } catch (err: any) {
+      console.error("Cloud Sync Verification Error:", err);
+      let errorMessage = typeof err === 'string' ? err : (err?.message || t("cloud_sync.error_otp_invalid"));
       addToast(errorMessage, "error");
     } finally {
       setIsLoading(false);
@@ -269,11 +315,17 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        
+        // Handle 429 rate limit with cooldown
         if (response.status === 429 && errorData.cooldownSeconds) {
           setResendCooldown(errorData.cooldownSeconds);
-          throw new Error(errorData.error || errorData.message || "Please wait before resending");
+          const errorMsg = errorData.error || errorData.message || "Please wait before resending";
+          throw new Error(errorMsg);
         }
-        throw new Error(errorData.message || "Failed to resend OTP");
+        
+        // Handle other errors
+        const errorMsg = errorData.error || errorData.message || "Failed to resend OTP";
+        throw new Error(errorMsg);
       }
 
       const nextCount = resendCount + 1;
@@ -298,6 +350,13 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       // 1. Download blob from cloud
       const backupBlob = await downloadLatestBackup(cloudId);
       
+      if (!backupBlob || backupBlob.size === 0) {
+        console.log("No backup file found on server. Proceeding with local registration.");
+        addToast("No backup file found. Proceeding with your synced business data.", "info");
+        await checkRegistration();
+        return;
+      }
+
       if (isTauri()) {
         const { tempDir, join } = await import("@tauri-apps/api/path");
         const { writeFile, remove } = await import("@tauri-apps/plugin-fs");
@@ -313,12 +372,17 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
         try { await remove(tempPath); } catch (e) {}
       }
 
+      // 4. Save recovery key to desktop app config after successful restore
+      await saveRecoveryKey(recoveryKey);
+      console.log("✅ Recovery key saved to desktop storage");
+
       addToast(t("cloud_sync_messages.restore_success"), "success");
       await checkRegistration();
     } catch (err: any) {
       console.error("Cloud restoration failed:", err);
-      addToast(err.message || t("cloud_sync_messages.restore_failed"), "error");
-      // Allow user to continue even if restore fails
+      // If backup restore fails, still allow user to proceed with local registration
+      console.log("Backup restoration failed, but local registration is complete. Proceeding...");
+      addToast("Backup restoration skipped. Your business data is ready to use.", "info");
       await checkRegistration();
     } finally {
       setIsRestoringBackup(false);
@@ -469,7 +533,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
                   <div className="p-4 rounded-xl border border-success/20 bg-success/5 flex items-start gap-3">
                     <Mail className="h-5 w-5 text-success shrink-0 mt-0.5" />
                     <p className="text-sm text-text-primary leading-relaxed">
-                      {t("cloud_sync_messages.check_inbox", { email })}
+                      {t("cloud_sync_messages.check_inbox")} <strong>{email}</strong>.
                     </p>
                   </div>
                   <Input
@@ -511,7 +575,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
                   <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-start gap-3">
                     <ShieldCheck className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
                     <p className="text-sm text-text-primary leading-relaxed">
-                      {t("cloud_sync_messages.backup_found")}
+                      {t("cloud_sync_messages.backup_found")} <strong>{t("cloud_sync_messages.backup_found_key_label")}</strong>.
                     </p>
                   </div>
                   <Input
@@ -528,7 +592,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
                       onClick={() => checkRegistration()}
                       className="text-xs text-text-muted hover:text-primary transition-colors font-medium underline underline-offset-4"
                     >
-                      Skip restoration and start fresh
+                      Skip backup restoration and use synced data
                     </button>
                   </div>
                 </div>

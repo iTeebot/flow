@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { UserPlus, Database, Cloud, ArrowRight, ShieldCheck, Zap, Globe2 } from "lucide-react";
 import { Sidebar } from "./Sidebar";
 import { Button } from "../../components/ui/Button";
-import { checkInternetConnectivity, checkServerHealth, checkFullConnectivity } from "../../utils/connectivity";
+import { checkFullConnectivity } from "../../utils/connectivity";
 import { useToastStore } from "../../store/toastStore";
 import { useAuthStore } from "../../store/authStore";
 import { isTauri, invoke } from "../../lib/api";
@@ -50,19 +50,16 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
     
     setIsCloudAvailable(null); // Show checking state
     
-    const internetConnected = await checkInternetConnectivity();
-    setHasInternet(internetConnected);
+    const result = await checkFullConnectivity();
+    setHasInternet(result.hasInternet);
+    setIsCloudAvailable(result.serverAvailable);
     
-    if (!internetConnected) {
-      setIsCloudAvailable(false);
+    if (!result.hasInternet) {
       addToast(t("onboarding.cloud_security_no_internet", "Internet connection lost. Please check your network."), "error");
       return;
     }
     
-    const serverAvailable = await checkServerHealth();
-    setIsCloudAvailable(serverAvailable);
-    
-    if (!serverAvailable) {
+    if (!result.serverAvailable) {
       addToast(t("onboarding.cloud_security_server_unavailable", "Cloud service is no longer available. Please try again later."), "error");
       return;
     }

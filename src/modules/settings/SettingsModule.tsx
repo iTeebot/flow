@@ -10,6 +10,10 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import languagesData from "../../assets/languages.json";
 import { RestoreConfirmModal } from "../../components/modals/RestoreConfirmModal";
 import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
+import { sendRecoveryCodeEmail, uploadBackup } from "../../utils/cloudSync";
+import { checkFullConnectivity } from "../../utils/connectivity";
+import { loadRecoveryKey, saveRecoveryKey } from "../../utils/recoveryKeyStore";
+import { loadBusinessJwt } from "../../utils/businessJwtStore";
 
 export function SettingsModule() {
   const { t } = useTranslation("settings");
@@ -18,7 +22,9 @@ export function SettingsModule() {
   const [backupAt, setBackupAt] = useState<string | null>(null);
   const [backupPath, setBackupPath] = useState<string | null>(null);
   const [backupBusy, setBackupBusy] = useState(false);
-  const [encryptionKey, setEncryptionKey] = useState<string | null>(localStorage.getItem("teebot_recovery_key"));
+  const [encryptionKey, setEncryptionKey] = useState<string | null>(null);
+  const [connectivity, setConnectivity] = useState<{ hasInternet: boolean; serverAvailable: boolean } | null>(null);
+  const [businessJwtPresent, setBusinessJwtPresent] = useState<boolean | null>(null);
   const { addToast } = useToastStore();
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [pendingFile, setPendingFile] = useState<{
@@ -34,6 +40,25 @@ export function SettingsModule() {
   }));
 
   useEffect(() => {
+    const loadRecoveryKeyState = async () => {
+      try {
+        const key = await loadRecoveryKey();
+        setEncryptionKey(key);
+      } catch (error) {
+        console.error("Failed to load recovery key:", error);
+      }
+    };
+
+    const loadBusinessTokenState = async () => {
+      try {
+        const t = await loadBusinessJwt();
+        setBusinessJwtPresent(!!t);
+      } catch (e) {
+        console.error('Failed to load business JWT:', e);
+        setBusinessJwtPresent(false);
+      }
+    };
+
     const loadBackupInfo = async () => {
       try {
         const info = await getBackupInfo();
@@ -43,7 +68,25 @@ export function SettingsModule() {
         // Keep settings usable if backup metadata is unavailable.
       }
     };
+    
+    const checkConnectivity = async () => {
+      try {
+        const result = await checkFullConnectivity();
+        setConnectivity(result);
+      } catch (err) {
+        console.error("Failed to check connectivity:", err);
+        setConnectivity({ hasInternet: false, serverAvailable: false });
+      }
+    };
+    
     loadBackupInfo();
+    loadRecoveryKeyState();
+    loadBusinessTokenState();
+    checkConnectivity();
+    
+    // Check connectivity every 10 seconds
+    const interval = setInterval(checkConnectivity, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleRevealFolder = async () => {
@@ -56,20 +99,138 @@ export function SettingsModule() {
     }
   };
 
+  // (debug helper removed — use console logs and indicator)
+
   const handleThemeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
     addToast(t("theme_set", { mode }), "info");
   };
 
+  const ensureRecoveryKeyExists = async (): Promise<string | null> => {
+    // If recovery key already exists, return it
+    if (encryptionKey) {
+      return encryptionKey;
+    }
+
+    // Generate and save recovery key before allowing backup
+    try {
+      const newKey = await generateRecoveryKey();
+
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const path = await save({
+        title: "Save Master Recovery Key",
+        defaultPath: "teebot-recovery-key.txt",
+        filters: [{ name: "Text Document", extensions: ["txt"] }]
+      });
+
+      // User cancelled the save dialog
+      if (!path) {
+        addToast(t("key_cancelled", "You must save the recovery key to enable encrypted backups."), "error");
+        return null;
+      }
+
+      // Save the file
+      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+      await writeTextFile(path, `TEEBOT FLOW MASTER RECOVERY KEY\n\nKEEP THIS SAFE. IF LOST, YOUR ENCRYPTED BACKUPS CANNOT BE RESTORED.\n\nKEY: ${newKey}\n\nGenerated: ${new Date().toLocaleString()}`);
+
+      // Store in desktop app config only after successful save
+      await saveRecoveryKey(newKey);
+      setEncryptionKey(newKey);
+      addToast(t("key_generated", "Military-grade encryption enabled! Key saved."), "success");
+
+      // Try to send recovery email if connectivity available
+      try {
+        console.log("📧 Attempting to send recovery email...");
+        console.log("User data:", { email: user?.email, company_name: user?.company_name, id: user?.id });
+        
+        const connectivity = await checkFullConnectivity();
+        console.log("Connectivity check result:", { hasInternet: connectivity.hasInternet, serverAvailable: connectivity.serverAvailable });
+        
+        if (!connectivity.hasInternet) {
+          addToast("Internet connection unavailable. Email will be sent when connected.", "info");
+          return newKey;
+        }
+        
+        if (!connectivity.serverAvailable) {
+          addToast("Cloud server unavailable. Email will be sent when available.", "info");
+          return newKey;
+        }
+        
+        if (!user?.email) {
+          console.error("❌ User email is missing from auth store");
+          addToast("Email address not found. Cannot send recovery code.", "error");
+          return newKey;
+        }
+        
+        if (!user?.company_name) {
+          console.error("❌ Company name is missing from auth store");
+          addToast("Company name not found. Cannot send recovery code.", "error");
+          return newKey;
+        }
+        
+        console.log(`📧 Sending recovery email to ${user.email}...`);
+        await sendRecoveryCodeEmail(user.email, user.company_name, newKey);
+        addToast("Recovery code sent to your email.", "success");
+      } catch (e) {
+        console.error("❌ Failed to send recovery email:", e);
+        addToast("Failed to send recovery email. You can retry from settings.", "info");
+      }
+
+      return newKey;
+    } catch (err) {
+      console.error("Failed to ensure recovery key:", err);
+      const msg = typeof err === 'string' ? err : (err instanceof Error ? err.message : "Unknown error");
+      addToast(`Failed to setup encryption: ${msg}`, "error");
+      return null;
+    }
+  };
+
   const handleCreateBackup = async () => {
     try {
       setBackupBusy(true);
-      const info = await createBackup(encryptionKey || undefined);
+
+      // Ensure recovery key exists before creating backup
+      const key = await ensureRecoveryKeyExists();
+      if (!key) {
+        return;
+      }
+
+      const businessJwt = await loadBusinessJwt();
+
+      // Check connectivity for cloud upload
+      const connResult = await checkFullConnectivity();
+      setConnectivity(connResult);
+      
+      if (!connResult.hasInternet) {
+        addToast("No internet connection. Cannot upload backup to cloud.", "error");
+        return;
+      }
+      
+      if (!connResult.serverAvailable) {
+        addToast("Cloud server not available. Cannot upload backup to cloud.", "error");
+        return;
+      }
+
+      const info = await createBackup(key);
+      const { readFile } = await import("@tauri-apps/plugin-fs");
+      const fileData = await readFile(info.backup_path || "");
+      const backupBlob = new Blob([fileData], { type: "application/octet-stream" });
+
+      if (businessJwt) {
+        await uploadBackup(backupBlob);
+        addToast("Backup generated and uploaded to cloud successfully!", "success");
+      } else {
+        addToast("Backup generated locally. Cloud upload requires a business token.", "info");
+      }
+
       setBackupAt(info.last_backup_at ?? null);
       setBackupPath(info.backup_path ?? null);
-      addToast(t("backup_success", "Backup generated successfully"), "success");
     } catch (err) {
-      addToast(err instanceof Error ? err.message : t("backup_error"), "error");
+      const msg = err instanceof Error ? err.message : t("backup_error");
+      addToast(msg, "error");
+      if (msg === 'Session Expired') {
+        addToast('Your cloud session expired. Please perform a Cloud Sync to refresh your access.', 'info');
+      }
     } finally {
       setBackupBusy(false);
     }
@@ -77,6 +238,14 @@ export function SettingsModule() {
 
   const handleExportBackup = async () => {
     try {
+      setBackupBusy(true);
+
+      // Ensure recovery key exists before exporting backup
+      const key = await ensureRecoveryKeyExists();
+      if (!key) {
+        return;
+      }
+
       const { save } = await import("@tauri-apps/plugin-dialog");
       const path = await save({
         title: t("export_backup_title", "Export Teebot Backup"),
@@ -85,8 +254,7 @@ export function SettingsModule() {
       });
 
       if (path) {
-        setBackupBusy(true);
-        await exportBackup(path, encryptionKey || undefined);
+        await exportBackup(path, key);
         addToast(t("export_success", "Backup exported successfully!"), "success");
       }
     } catch (err) {
@@ -143,25 +311,7 @@ export function SettingsModule() {
   const handleGenerateKey = async () => {
     try {
       setBackupBusy(true);
-      const newKey = await generateRecoveryKey();
-
-      const { save } = await import("@tauri-apps/plugin-dialog");
-      const path = await save({
-        title: "Save Master Recovery Key",
-        defaultPath: "teebot-recovery-key.txt",
-        filters: [{ name: "Text Document", extensions: ["txt"] }]
-      });
-
-      if (path) {
-        const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-        await writeTextFile(path, `TEEBOT FLOW MASTER RECOVERY KEY\n\nKEEP THIS SAFE. IF LOST, YOUR ENCRYPTED BACKUPS CANNOT BE RESTORED.\n\nKEY: ${newKey}`);
-
-        localStorage.setItem("teebot_recovery_key", newKey);
-        setEncryptionKey(newKey);
-        addToast(t("key_generated", "Military-grade encryption enabled! Key saved to device."), "success");
-      } else {
-        addToast(t("key_cancelled", "You must save the file to enable encryption."), "error");
-      }
+      await ensureRecoveryKeyExists();
     } catch (err) {
       console.error("Generate key error:", err);
       const msg = typeof err === 'string' ? err : (err instanceof Error ? err.message : "Unknown error");
@@ -177,6 +327,10 @@ export function SettingsModule() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-text-primary">{t("title")}</h1>
         <p className="text-sm text-text-muted mt-1">{t("subtitle")}</p>
+        <div className="mt-2 text-xs">
+          <span className="font-medium">Cloud token:</span>{' '}
+          {businessJwtPresent === null ? <span className="text-text-muted">checking…</span> : businessJwtPresent ? <span className="text-success">present</span> : <span className="text-error">missing</span>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -364,13 +518,16 @@ export function SettingsModule() {
               <button
                 type="button"
                 onClick={handleCreateBackup}
-                disabled={backupBusy}
-                className="w-full sm:w-auto flex items-center justify-center gap-3 rounded-xl bg-primary px-10 py-5 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-2xl shadow-primary/40 transition-all hover:scale-[1.05] active:scale-[0.95] disabled:opacity-50 h-fit whitespace-nowrap"
+                disabled={backupBusy || !connectivity?.hasInternet || !connectivity?.serverAvailable}
+                title={!connectivity?.hasInternet ? "Check your internet connection" : !connectivity?.serverAvailable ? "Cloud server unavailable" : "Upload backup to cloud"}
+                className="w-full sm:w-auto flex items-center justify-center gap-3 rounded-xl bg-primary px-10 py-5 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-2xl shadow-primary/40 transition-all hover:scale-[1.05] active:scale-[0.95] disabled:opacity-50 disabled:cursor-not-allowed h-fit whitespace-nowrap"
               >
                 {backupBusy ? (
                   <div className="w-5 h-5 border-3 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
                 ) : <Database className="h-5 w-5 shrink-0" />}
-                <span>{backupBusy ? t("securing_data") : t("generate_backup")}</span>
+                <span>
+                  {backupBusy ? t("securing_data") : !connectivity?.hasInternet ? "Check Internet" : !connectivity?.serverAvailable ? "Server Unavailable" : t("generate_backup")}
+                </span>
               </button>
             </div>
           </div>

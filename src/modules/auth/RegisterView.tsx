@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/authStore";
 import { useUiStore } from "../../store/uiStore";
-import { useToastStore } from "../../store/toastStore";
 import currencies from "../../assets/currencies.json";
 import languagesData from "../../assets/languages.json";
 import pakistanCitiesEn from "../../assets/countries/Pakistan.en.json";
@@ -33,11 +32,7 @@ import { validatePakistaniPhone, validateUSPhone } from "../../utils/validations
 import { validateEmail } from "../../utils/validations/email";
 import { validatePakistaniCNIC, validatePakistaniNTN } from "../../utils/validations/identity";
 import { formatPakistaniCNIC, stripNonDigits, stripNonAlphaNumeric } from "../../utils/formatters";
-import { RecoveryKeyModal } from "../../components/modals/RecoveryKeyModal";
-import { sendRecoveryCodeEmail, performInitialBackup } from "../../utils/cloudSync";
-import { invoke } from "../../lib/api";
-import { isTauri } from "../../lib/platform";
-import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
+import { checkServerHealth, checkFullConnectivity } from "../../utils/connectivity";
 
 interface Currency {
   symbol: string;
@@ -57,7 +52,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
   const direction = getLanguageDirection(language);
   const ForwardIcon = getForwardIcon(direction);
   const isUrdu = language === "ur";
-  const { addToast } = useToastStore();
+  // const { addToast } = useToastStore();
 
   const [currenciesList, setCurrenciesList] = useState<Currency[]>([]);
 
@@ -80,11 +75,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
   const [customCountry, setCustomCountry] = useState("");
 
   const [isCloudAvailable, setIsCloudAvailable] = useState(false);
-  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [recoveryKey, setRecoveryKey] = useState("");
-  const [isEmailSent, setIsEmailSent] = useState(false);
-  const [cloudBusinessId, setCloudBusinessId] = useState("");
-  const [isSyncingBackup, setIsSyncingBackup] = useState(false);
+  const [, setCloudBusinessId] = useState("");
   const [pakistanCities, setPakistanCities] = useState<any[]>(pakistanCitiesEn);
 
   useEffect(() => {
@@ -107,16 +98,8 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     const checkCloudHealth = async () => {
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
-        const response = await fetch(`${apiUrl}/health`);
-        const data = await response.json();
-        if (data.status === "OK") {
-          setIsCloudAvailable(true);
-        }
-      } catch (e) {
-        setIsCloudAvailable(false);
-      }
+      const isAvailable = await checkServerHealth();
+      setIsCloudAvailable(isAvailable);
     };
     checkCloudHealth();
   }, []);
@@ -296,6 +279,15 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
     try {
       let businessId = "";
       if (isCloudAvailable) {
+        // Check connectivity before cloud registration
+        const connectivity = await checkFullConnectivity();
+        if (!connectivity.hasInternet) {
+          throw new Error(t("register_errors.sync_failed") || "No internet connection available");
+        }
+        if (!connectivity.serverAvailable) {
+          throw new Error(t("register_errors.sync_failed") || "Cloud server not available");
+        }
+
         const apiUrl = import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
         const cloudResponse = await fetch(`${apiUrl}/register-business`, {
           method: "POST",
@@ -307,6 +299,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
             phone,
             cnic,
             ntn: taxId,
+            streetAddress: address,
             city,
             state: stateRegion,
             country: country === "Others" ? customCountry : country,
@@ -318,7 +311,26 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
         if (!cloudResponse.ok) {
           const errorData = await cloudResponse.json().catch(() => ({}));
-          throw new Error(errorData.message || "Cloud synchronization failed. Please check your internet or try local-only setup.");
+          
+          // Handle 409 Conflict errors with specific field information
+          if (cloudResponse.status === 409) {
+            const serverError = errorData.error || "";
+            
+            if (serverError.includes("email")) {
+              throw new Error(t("register_errors.email_already_exists"));
+            } else if (serverError.includes("phone")) {
+              throw new Error(t("register_errors.phone_already_exists"));
+            } else if (serverError.includes("cnic")) {
+              throw new Error(t("register_errors.cnic_already_exists"));
+            } else if (serverError.includes("ntn")) {
+              throw new Error(t("register_errors.ntn_already_exists"));
+            } else {
+              throw new Error(serverError || "This information is already registered.");
+            }
+          }
+          
+          // Handle other errors
+          throw new Error(errorData.message || t("register_errors.sync_failed"));
         }
 
         const cloudData = await cloudResponse.json();
@@ -346,63 +358,16 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
       });
 
       if (isCloudAvailable && businessId) {
-        // Post-registration cloud tasks
-        const key = await invoke<string>("generate_recovery_key");
-        setRecoveryKey(key);
-
-        try {
-          await sendRecoveryCodeEmail(email, companyName, key);
-          setIsEmailSent(true);
-        } catch (e) {
-          console.error("Failed to send recovery email during registration:", e);
-        }
-
-        setShowRecoveryModal(true);
+        // Just store business ID, recovery key generation happens in settings
+        setCloudBusinessId(businessId);
       }
+
+      // Successfully registered, navigate to settings/dashboard
+      await checkRegistration();
     } catch (err: any) {
       setError(err.message || err?.toString() || t("register.error_failed"));
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleSaveKeyToFile = async () => {
-    if (!isTauri()) return;
-    try {
-      const { save } = await import("@tauri-apps/plugin-dialog");
-      const { writeTextFile } = await import("@tauri-apps/plugin-fs");
-      
-      const path = await save({
-        defaultPath: "teebot-recovery-key.txt",
-        filters: [{ name: "Text File", extensions: ["txt"] }]
-      });
-
-      if (path) {
-        await writeTextFile(path, `Teebot Flow Recovery Key\nBusiness: ${companyName}\nKey: ${recoveryKey}\n\nKEEP THIS SECURE.`);
-        addToast(t("common:saved"), "success");
-      }
-    } catch (e) {
-      console.error("Save failed:", e);
-    }
-  };
-
-  const handleRecoveryModalClose = async () => {
-    setShowRecoveryModal(false);
-    
-    if (isCloudAvailable && cloudBusinessId) {
-      setIsSyncingBackup(true);
-      try {
-        await performInitialBackup(cloudBusinessId, recoveryKey);
-        addToast("Initial cloud backup completed successfully.", "success");
-      } catch (e) {
-        addToast("Cloud backup failed, but your account is active. You can retry later from settings.", "error");
-      } finally {
-        setIsSyncingBackup(false);
-        // Finally trigger the dashboard navigation via checkRegistration
-        await checkRegistration();
-      }
-    } else {
-      await checkRegistration();
     }
   };
 
@@ -854,21 +819,6 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
           </form>
         </div>
       </div>
-
-      <RecoveryKeyModal
-        isOpen={showRecoveryModal}
-        onClose={handleRecoveryModalClose}
-        recoveryKey={recoveryKey}
-        onSaveToFile={handleSaveKeyToFile}
-        isEmailSent={isEmailSent}
-        email={email}
-      />
-
-      <FullscreenLoader
-        isVisible={isSyncingBackup}
-        message="Securing Your System"
-        subMessage="Generating your initial encrypted cloud backup. This may take a moment..."
-      />
     </div>
   );
 }
