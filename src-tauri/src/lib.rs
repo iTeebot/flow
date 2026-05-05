@@ -61,6 +61,7 @@ pub fn run() {
             modules::delivery_challan::create_delivery_challan,
             modules::delivery_challan::list_delivery_challans,
             modules::delivery_challan::get_delivery_challan,
+            modules::delivery_challan::update_delivery_challan,
             modules::delivery_challan::save_delivery_challan_pdf,
             modules::delivery_challan::delete_delivery_challan,
             modules::invoices::create_invoice_from_challan,

@@ -9,6 +9,15 @@ export type CreateDeliveryChallanInput = {
   company_id: number;
   customer_id: number;
   items: CreateDeliveryChallanItemInput[];
+  metadata?: any;
+};
+
+export type UpdateDeliveryChallanInput = {
+  id: number;
+  company_id: number;
+  customer_id: number;
+  items: CreateDeliveryChallanItemInput[];
+  metadata?: any;
 };
 
 export type DeliveryChallanResult = {
@@ -35,10 +44,15 @@ export type DeliveryChallan = {
   items: DeliveryChallanItem[];
   total_amount: number;
   created_at: string;
+  metadata?: any;
 };
 
 export async function createDeliveryChallan(input: CreateDeliveryChallanInput) {
   return invoke<DeliveryChallanResult>("create_delivery_challan", { input });
+}
+
+export async function updateDeliveryChallan(input: UpdateDeliveryChallanInput) {
+  return invoke<void>("update_delivery_challan", { input });
 }
 
 export async function listDeliveryChallans(company_id: number) {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Settings2, Package, Users, ArrowLeft, Minus, Trash2, Hash, CheckCircle2, Maximize2, Minimize2, Eye } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { createDeliveryChallan } from "./api";
+import { createDeliveryChallan, updateDeliveryChallan } from "./api";
 import { listCustomers, type Customer } from "../customers/api";
 import { listProducts, type Product } from "../inventory/api";
 import { useAuthStore } from "../../store/authStore";
@@ -40,6 +40,11 @@ export function CreateDeliveryChallanModule() {
   // Persist custom field labels in localStorage
   const CUSTOM_FIELDS_KEY = 'teebot_challan_custom_fields';
   const [customFields, setCustomFields] = useState<ChallanCustomField[]>(() => {
+    // 1. Try to load from editing challan first
+    if (editingChallan?.metadata?.customFields) {
+      return editingChallan.metadata.customFields;
+    }
+    // 2. Fallback to localStorage labels
     try {
       const saved = localStorage.getItem(CUSTOM_FIELDS_KEY);
       if (saved) {
@@ -57,23 +62,12 @@ export function CreateDeliveryChallanModule() {
     localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(labels));
   }, [customFields]);
 
-  // Prefill from edit state
+  // Prefill is handled inside loadData to ensure product objects are fully hydrated
   useEffect(() => {
-    if (editingChallan) {
-      setChallanItems(
-        editingChallan.items.map(i => ({
-          product_id: i.product_id,
-          quantity: i.quantity,
-          product: {
-            id: i.product_id,
-            name: i.product_name,
-            sku: i.product_sku,
-          } as Product,
-        }))
-      );
-      setSelectedCustomer({ id: editingChallan.customer_id, name: editingChallan.customer_name } as Customer);
+    if (editingChallan && editingChallan.metadata?.customFields) {
+      setCustomFields(editingChallan.metadata.customFields);
     }
-  }, []);
+  }, [editingChallan]);
 
   const { companyId } = useAuthStore();
   const currentCompanyId = companyId || 1;
@@ -96,6 +90,27 @@ export function CreateDeliveryChallanModule() {
       ]);
       setCustomers(custs);
       setProducts(prods);
+
+      // If editing, try to enrich pre-filled items with actual product data (like stock_qty)
+      if (editingChallan) {
+        setChallanItems(
+          editingChallan.items.map(i => {
+            const actualProduct = prods.find(p => p.id === i.product_id);
+            return {
+              product_id: i.product_id,
+              quantity: i.quantity,
+              product: actualProduct || ({
+                id: i.product_id,
+                name: i.product_name,
+                sku: i.product_sku,
+                stock_qty: i.quantity, // fallback
+              } as Product),
+            };
+          })
+        );
+        const actualCustomer = custs.find(c => c.id === editingChallan.customer_id);
+        setSelectedCustomer(actualCustomer || ({ id: editingChallan.customer_id, name: editingChallan.customer_name } as Customer));
+      }
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to load data", "error");
     } finally {
@@ -188,29 +203,37 @@ export function CreateDeliveryChallanModule() {
     setChallanItems(items => items.filter(item => item.product_id !== productId));
   };
 
-  const handleCreateChallan = async () => {
+  const handleSaveChallan = async () => {
     if (!selectedCustomer || challanItems.length === 0) return;
-    if (isEditMode) {
-      // No update API exists — edit mode is for preview/print/download only
-      addToast("Edit mode is for preview and print only. Use Download/Print from the preview.", "info");
-      return;
-    }
 
     try {
       setSubmitting(true);
-      await createDeliveryChallan({
+      const payload = {
         company_id: currentCompanyId,
         customer_id: selectedCustomer.id,
         items: challanItems.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity,
         })),
-      });
+        metadata: {
+          customFields
+        }
+      };
 
-      addToast("Delivery Challan created successfully", "success");
+      if (isEditMode && editingChallan) {
+        await updateDeliveryChallan({
+          ...payload,
+          id: editingChallan.id,
+        });
+        addToast("Delivery Challan updated successfully", "success");
+      } else {
+        await createDeliveryChallan(payload);
+        addToast("Delivery Challan created successfully", "success");
+      }
+
       navigate("/app/delivery-challan");
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to create delivery challan", "error");
+      addToast(err instanceof Error ? err.message : "Failed to save delivery challan", "error");
     } finally {
       setSubmitting(false);
     }
@@ -241,8 +264,8 @@ export function CreateDeliveryChallanModule() {
   const isFormReady = !!selectedCustomer && challanItems.length > 0;
 
   // Step completion state
-  const step1Done = !!selectedCustomer;
-  const step2Done = challanItems.length > 0;
+  const customerSelected = !!selectedCustomer;
+  const itemsAdded = challanItems.length > 0;
 
   // ── Live Preview HTML (reactive, recalculates on every form change) ──
   const previewHtml = useMemo(() => {
@@ -308,11 +331,62 @@ export function CreateDeliveryChallanModule() {
         <div className="flex-1 min-w-[380px] border-r border-border flex flex-col min-h-0">
           <div className="flex-1 overflow-y-auto">
 
-            {/* ── Step 1: Customer ── */}
+            {/* ── Step 1: Custom Fields (Optional) ── */}
             <div className="p-5 border-b border-border">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${step1Done ? 'bg-success text-white' : 'bg-surface border border-border text-text-muted'}`}>
-                  {step1Done ? <CheckCircle2 className="h-4 w-4" /> : '1'}
+                <div className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-black bg-surface border border-border text-text-muted">
+                  <Settings2 className="h-3.5 w-3.5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text-primary">{t('custom_fields')}</h3>
+                  <p className="text-[10px] text-text-muted">PO numbers, references, notes (optional)</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newFieldLabel}
+                  onChange={(e) => setNewFieldLabel(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddCustomField())}
+                  placeholder={t('cf_placeholder')}
+                  className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomField}
+                  disabled={!newFieldLabel.trim()}
+                  className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 hover:bg-primary/90 active:scale-95 transition-all"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              {customFields.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {customFields.map(f => (
+                    <div key={f.id} className="flex items-center gap-2 bg-background rounded-xl border border-border px-3 py-2 group hover:border-primary/20 transition-all">
+                      <Hash className="h-3 w-3 text-text-muted/30 shrink-0" />
+                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider shrink-0 w-20 truncate">{f.label}</span>
+                      <input
+                        type="text"
+                        value={f.value}
+                        onChange={(e) => handleUpdateCustomField(f.id, e.target.value)}
+                        placeholder={t('value_placeholder')}
+                        className="flex-1 bg-transparent text-xs outline-none text-text-primary placeholder:text-text-muted/30 font-medium"
+                      />
+                      <button onClick={() => handleRemoveCustomField(f.id)} className="text-text-muted/30 hover:text-error transition-colors shrink-0 opacity-0 group-hover:opacity-100">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Step 2: Customer ── */}
+            <div className="p-5 border-b border-border">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${customerSelected ? 'bg-success text-white' : 'bg-surface border border-border text-text-muted'}`}>
+                  {customerSelected ? <CheckCircle2 className="h-4 w-4" /> : '2'}
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-text-primary">{t('customer')}</h3>
@@ -342,11 +416,11 @@ export function CreateDeliveryChallanModule() {
               )}
             </div>
 
-            {/* ── Step 2: Add Products ── */}
+            {/* ── Step 3: Add Products ── */}
             <div className="p-5 border-b border-border">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${step2Done ? 'bg-success text-white' : 'bg-surface border border-border text-text-muted'}`}>
-                  {step2Done ? <CheckCircle2 className="h-4 w-4" /> : '2'}
+                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${itemsAdded ? 'bg-success text-white' : 'bg-surface border border-border text-text-muted'}`}>
+                  {itemsAdded ? <CheckCircle2 className="h-4 w-4" /> : '3'}
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-text-primary">{t('add_line_item')}</h3>
@@ -457,57 +531,6 @@ export function CreateDeliveryChallanModule() {
                 </div>
               )}
             </div>
-
-            {/* ── Step 3: Custom Fields (Optional) ── */}
-            <div className="p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-black bg-surface border border-border text-text-muted">
-                  <Settings2 className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-text-primary">{t('custom_fields')}</h3>
-                  <p className="text-[10px] text-text-muted">PO numbers, references, notes (optional)</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newFieldLabel}
-                  onChange={(e) => setNewFieldLabel(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddCustomField())}
-                  placeholder={t('cf_placeholder')}
-                  className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddCustomField}
-                  disabled={!newFieldLabel.trim()}
-                  className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 hover:bg-primary/90 active:scale-95 transition-all"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              </div>
-              {customFields.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {customFields.map(f => (
-                    <div key={f.id} className="flex items-center gap-2 bg-background rounded-xl border border-border px-3 py-2 group hover:border-primary/20 transition-all">
-                      <Hash className="h-3 w-3 text-text-muted/30 shrink-0" />
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider shrink-0 w-20 truncate">{f.label}</span>
-                      <input
-                        type="text"
-                        value={f.value}
-                        onChange={(e) => handleUpdateCustomField(f.id, e.target.value)}
-                        placeholder={t('value_placeholder')}
-                        className="flex-1 bg-transparent text-xs outline-none text-text-primary placeholder:text-text-muted/30 font-medium"
-                      />
-                      <button onClick={() => handleRemoveCustomField(f.id)} className="text-text-muted/30 hover:text-error transition-colors shrink-0 opacity-0 group-hover:opacity-100">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
 
           {/* ── Bottom Action Bar ── */}
@@ -528,13 +551,13 @@ export function CreateDeliveryChallanModule() {
             )}
             <div className="flex items-center gap-3">
               <Button
-                onClick={handleCreateChallan}
+                onClick={handleSaveChallan}
                 disabled={!isFormReady || submitting}
                 isLoading={submitting}
                 className="flex-1"
                 leftIcon={<CheckCircle2 className="h-4 w-4" />}
               >
-                {t('confirm_btn')}
+                {isEditMode ? t('common:save', 'Save Changes') : t('confirm_btn')}
               </Button>
               <Button
                 onClick={() => navigate("/app/delivery-challan")}
