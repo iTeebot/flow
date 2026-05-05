@@ -1,0 +1,35 @@
+{
+    "invoiceType": "Sale Invoice", //enum: ["Sale Invoice","Debit Note"]
+    "invoiceDate": "2025-04-21", // formatted date in dd-mm-yyyy format
+    "sellerNTNCNIC": "….7 or 13 digit of seller NTN/CNIC….", // 7 digit alphanumeric or 13 digit numeric
+    "sellerBusinessName": "Company 8", // string
+    "sellerProvince": "Sindh", // enum: ["Sindh", "Punjab", "Khyber Pakhtunkhwa", "Balochistan"]
+    "sellerAddress": "Karachi", // string
+    "buyerNTNCNIC": "….7 or 13 digit of buyer NTN/CNIC….", // 7 digit alphanumeric or 13 digit numeric
+    "buyerBusinessName": "FERTILIZER MANUFAC IRS NEW", // string
+    "buyerProvince": "Sindh", // enum: ["Sindh", "Punjab", "Khyber Pakhtunkhwa", "Balochistan"]
+    "buyerAddress": "Karachi", // string
+    "buyerRegistrationType": "Unregistered", // enum: ["Registered", "Unregistered"]
+    "invoiceRefNo": "", // string empty
+    "items": [
+        {
+            "hsCode": "0101.2100", // string
+            "productDescription": "product Description", // string
+            "rate": "18%", // string
+            "uoM": "Numbers, pieces, units", // string
+            "quantity": 1.0000, // number
+            "totalValues": 0.00, // number
+            "valueSalesExcludingST": 1000.00, // number
+            "fixedNotifiedValueOrRetailPrice": 0.00, // number
+            "salesTaxApplicable": 180.00, // number
+            "salesTaxWithheldAtSource": 0.00, // number
+            "extraTax": 0.00, // number
+            "furtherTax": 120.00, // number
+            "sroScheduleNo": "SRO123", // string
+            "fedPayable": 0.00, // number
+            "discount": 0.00, // number
+            "saleType": "Goods at standard rate (default)", // string
+            "sroItemSerialNo": "" // string 
+        }
+    ]
+}

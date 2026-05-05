@@ -50,18 +50,18 @@ export function LandingPage() {
       downloads: [
         {
           name: "AppImage",
-          url: "/releases/linux/teebot-flow_0.0.5_amd64.AppImage",
-          size: "~76.6 MB"
+          url: "https://drive.google.com/file/d/1hTLXOyAadl6AondEJJzemZBGQb9Ez2Rx/view?usp=sharing",
+          size: "~75.2 MB"
         },
         {
           name: "Debian Package",
-          url: "/releases/linux/teebot-flow_0.0.5_amd64.deb",
-          size: "~6.5 MB"
+          url: "https://drive.google.com/file/d/1PkrkqO-bUrvlZBH_YWedsDbHcWruoKmQ/view?usp=sharing",
+          size: "~4.7 MB"
         },
         {
           name: "RPM Package",
-          url: "/releases/linux/teebot-flow_0.0.5_x86_64.rpm",
-          size: "~6.5 MB"
+          url: "https://drive.google.com/file/d/1Yby7hzLJB9AKjYzfwbjtNY746h9s5-8S/view?usp=sharing",
+          size: "~4.7 MB"
         }
       ]
     },
@@ -94,7 +94,8 @@ export function LandingPage() {
           <div className="flex items-center gap-3">
             <a
               href={smartDownload.url}
-              download
+              target="_blank"
+              rel="noreferrer"
               className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:border-primary/50 transition font-medium text-sm"
             >
               <Download className="w-4 h-4 text-primary" />
@@ -128,7 +129,8 @@ export function LandingPage() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 pt-2">
           <a
             href={smartDownload.url}
-            download
+            target="_blank"
+            rel="noreferrer"
             className="w-full sm:w-auto px-8 py-3.5 bg-primary text-primary-foreground rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all font-semibold text-base flex items-center justify-center gap-3 shadow-lg shadow-primary/20"
           >
             <Download className="w-5 h-5" />
@@ -200,7 +202,8 @@ export function LandingPage() {
                     <a
                       key={dl.name}
                       href={dl.url}
-                      download
+                      target="_blank"
+                      rel="noreferrer"
                       className="block p-3 rounded-lg bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 transition"
                     >
                       <div className="flex items-center justify-between mb-1">

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Edit2, Printer, Download, Trash2, FileBadge2 } from "lucide-react";
+import { 
+  Search, Edit2, Printer, Download, Trash2, FileBadge2, 
+  Calendar, Check, X, Send, Clock
+} from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
-import { listQuotations, deleteQuotation, type Quotation } from "./api";
+import { listQuotations, deleteQuotation, updateQuotationStatus, type Quotation } from "./api";
 import { TablePagination } from "../shared/TablePagination";
 import { useToastStore } from "../../store/toastStore";
 import { Input } from "../../components/ui/Input";
@@ -26,7 +29,7 @@ export function QuotationsModule() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "sent">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -80,6 +83,16 @@ export function QuotationsModule() {
     }
   };
 
+  const handleUpdateStatus = async (quote: Quotation, newStatus: string) => {
+    try {
+      await updateQuotationStatus(quote.id, newStatus);
+      addToast(`Quotation marked as ${newStatus}`, "success");
+      await loadData();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Failed to update status", "error");
+    }
+  };
+
   const handlePrint = async (quote: Quotation) => {
     try {
       await printQuotation(quote);
@@ -91,12 +104,26 @@ export function QuotationsModule() {
   const handleDownloadPdf = async (quote: Quotation) => {
     setDownloadingId(quote.id);
     try {
-      await downloadQuotationPdf(quote);
-      addToast("PDF saved successfully!", "success");
+      const savedPath = await downloadQuotationPdf(quote);
+      addToast("Quotation PDF saved successfully!", "success", savedPath);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to download PDF", "error");
     } finally {
       setDownloadingId(null);
+    }
+  };
+
+  const getStatusStyle = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'accepted':
+        return 'bg-success/10 text-success border-success/20';
+      case 'sent':
+        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+      case 'rejected':
+        return 'bg-error/10 text-error border-error/20';
+      case 'draft':
+      default:
+        return 'bg-warning/10 text-warning border-warning/20';
     }
   };
 
@@ -136,6 +163,8 @@ export function QuotationsModule() {
               { label: t('status_all', 'Status: All'), value: "all" },
               { label: t('status_draft', 'Status: Draft'), value: "draft" },
               { label: t('status_sent', 'Status: Sent'), value: "sent" },
+              { label: t('status_accepted', 'Status: Accepted'), value: "accepted" },
+              { label: t('status_rejected', 'Status: Rejected'), value: "rejected" },
             ]}
           />
         </div>
@@ -171,7 +200,7 @@ export function QuotationsModule() {
       <DataTable
         data={paginated}
         keyExtractor={(item) => item.id}
-        onSort={() => { }} // Sorting handled by DataTable internal state if needed, or by parent
+        onSort={() => { }} 
         columns={[
           {
             accessor: "quote_number",
@@ -186,8 +215,19 @@ export function QuotationsModule() {
             className: "font-bold"
           },
           {
-            accessor: (item) => new Date(item.created_at).toLocaleDateString(),
-            header: t('col_date', "Date"),
+            accessor: (item) => (
+              <div className="flex flex-col items-start gap-1 py-1">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface border border-border/50 text-[11px] font-bold text-text-primary">
+                  <Calendar className="h-3 w-3 text-primary" />
+                  <span>{new Date(item.created_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-medium text-text-muted">
+                  <Clock className="h-2.5 w-2.5 opacity-50" />
+                  <span>{new Date(item.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              </div>
+            ),
+            header: t('col_date', "Generated On"),
             sortKey: "created_at",
           },
           {
@@ -201,12 +241,12 @@ export function QuotationsModule() {
           },
           {
             accessor: (item) => (
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight border ${item.status === 'sent'
-                  ? 'bg-success/10 text-success border-success/20'
-                  : 'bg-warning/10 text-warning border-warning/20'
-                }`}>
-                {item.status}
-              </span>
+              <div className="flex items-center">
+                <span className={`inline-flex items-center h-6 px-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all shadow-sm ${getStatusStyle(item.status)}`}>
+                  <span className="h-1 w-1 rounded-full bg-current mr-1.5" />
+                  {item.status}
+                </span>
+              </div>
             ),
             header: t('col_status', "Status"),
           }
@@ -216,6 +256,21 @@ export function QuotationsModule() {
             label: t('edit', 'Edit'),
             icon: Edit2,
             onClick: () => navigate("/app/quotations/edit", { state: { quotation: item } })
+          },
+          {
+            label: t('mark_as_sent', 'Mark as Sent'),
+            icon: Send,
+            onClick: () => handleUpdateStatus(item, 'sent')
+          },
+          {
+            label: t('mark_as_accepted', 'Mark as Accepted'),
+            icon: Check,
+            onClick: () => handleUpdateStatus(item, 'accepted')
+          },
+          {
+            label: t('mark_as_rejected', 'Mark as Rejected'),
+            icon: X,
+            onClick: () => handleUpdateStatus(item, 'rejected')
           },
           {
             label: t('print', 'Print'),

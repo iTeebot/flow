@@ -3,7 +3,7 @@ import {
   ArrowLeft, Plus, Package, Trash2,
   CheckCircle2, Users, Minus,
   Eye, Maximize2, Minimize2,
-  FileText
+  FileText, Calendar
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
@@ -19,6 +19,7 @@ import { Input } from "../../components/ui/Input";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
 import { CreateProductModal } from "../../components/modals/CreateProductModal";
+import { Select } from "../../components/ui/Select";
 
 interface QuotationItemInput {
   product_id?: number;
@@ -45,6 +46,12 @@ export function CreateQuotationModule() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [quotationItems, setQuotationItems] = useState<QuotationItemInput[]>([]);
   const [notes, setNotes] = useState("");
+  const [status, setStatus] = useState<string>("draft");
+  const [validUntil, setValidUntil] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().split('T')[0];
+  });
 
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
@@ -67,6 +74,10 @@ export function CreateQuotationModule() {
         if (isEditMode && initialQuotation) {
           setSelectedCustomer(cList.find(c => c.id === initialQuotation.customer_id) || null);
           setNotes(initialQuotation.notes || "");
+          setStatus(initialQuotation.status || "draft");
+          if (initialQuotation.valid_until) {
+            setValidUntil(initialQuotation.valid_until);
+          }
           setQuotationItems(initialQuotation.items.map(item => ({
             product_id: item.product_id,
             product: { name: item.product_name.toString(), sku: item.product_sku?.toString() || "", price: item.rate },
@@ -124,7 +135,9 @@ export function CreateQuotationModule() {
           quantity: item.quantity,
           rate: item.rate
         })),
-        notes
+        notes,
+        status,
+        valid_until: validUntil
       };
       await createQuotation(input);
       addToast(isEditMode ? "Quotation updated" : "Quotation created", "success");
@@ -147,7 +160,8 @@ export function CreateQuotationModule() {
       customer_phone: selectedCustomer.phone,
       company_id: companyId!,
       created_at: new Date().toISOString(),
-      status: "draft",
+      status: status,
+      valid_until: validUntil,
       notes,
       items: quotationItems.map((item, idx) => ({
         id: idx,
@@ -162,7 +176,14 @@ export function CreateQuotationModule() {
       total_amount: quotationItems.reduce((sum, item) => sum + (item.quantity * item.rate), 0)
     };
     return buildQuotationPreviewHtml(tempQuote as any, companyProfile);
-  }, [selectedCustomer, quotationItems, notes, companyProfile]);
+  }, [selectedCustomer, quotationItems, notes, companyProfile, status, validUntil]);
+
+  const statusOptions = [
+    { label: "Draft", value: "draft" },
+    { label: "Sent", value: "sent" },
+    { label: "Accepted", value: "accepted" },
+    { label: "Rejected", value: "rejected" },
+  ];
 
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-500">
@@ -203,8 +224,26 @@ export function CreateQuotationModule() {
               />
             </div>
 
+            {/* Status & Validity */}
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/50">
+              <Select 
+                label="Quotation Status"
+                value={status} 
+                options={statusOptions}
+                onChange={(e) => setStatus(e.target.value.toString())}
+              />
+              <Input 
+                type="date"
+                label="Pick a Date Until"
+                value={validUntil}
+                onChange={(e) => setValidUntil(e.target.value)}
+                leftIcon={<Calendar className="h-4 w-4" />}
+                className="h-11"
+              />
+            </div>
+
             {/* Step 2: Items */}
-            <div className="space-y-4">
+            <div className="space-y-4 pt-4 border-t border-border/50">
               <div className="flex items-center gap-3">
                 <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-black ${quotationItems.length > 0 ? 'bg-success text-white' : 'bg-surface border border-border'}`}>
                   {quotationItems.length > 0 ? <CheckCircle2 className="h-4 w-4" /> : '2'}
@@ -302,6 +341,7 @@ export function CreateQuotationModule() {
             </Button>
           </div>
         </div>
+
 
         <div className={`${previewExpanded ? 'flex-1' : 'w-[450px]'} shrink-0 bg-background overflow-hidden flex flex-col transition-all duration-300`}>
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-surface/30">

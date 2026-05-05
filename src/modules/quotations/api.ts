@@ -3,8 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 export interface QuotationItem {
   id: number;
   product_id?: number;
-  product_name: String;
-  product_sku?: String;
+  product_name: string;
+  product_sku?: string;
+
   description: string;
   quantity: number;
   rate: number;
@@ -23,6 +24,7 @@ export interface Quotation {
   total_amount: number;
   notes?: string;
   status: string;
+  valid_until?: string;
   created_at: string;
 }
 
@@ -31,6 +33,8 @@ export async function createQuotation(input: {
   customer_id: number;
   items: Array<{ product_id?: number; description: string; quantity: number; rate: number }>;
   notes?: string;
+  status?: string;
+  valid_until?: string;
 }) {
   return await invoke<{ id: number; quote_number: string }>("create_quotation", { input });
 }
@@ -39,6 +43,15 @@ export async function listQuotations(company_id: number) {
   return await invoke<Quotation[]>("list_quotations", { companyId: company_id });
 }
 
+
+
 export async function deleteQuotation(quote_id: number) {
   return await invoke<void>("delete_quotation", { quoteId: quote_id });
 }
+
+
+
+export async function updateQuotationStatus(quote_id: number, status: string) {
+  return await invoke<void>("update_quotation_status", { quoteId: quote_id, status });
+}
+

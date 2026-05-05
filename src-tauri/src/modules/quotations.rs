@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct CreateQuotationItemInput {
     pub product_id: Option<i64>,
     pub description: String,
-    pub quantity: i64,
+    pub quantity: f64,
     pub rate: f64,
 }
 
@@ -16,6 +16,8 @@ pub struct CreateQuotationInput {
     pub customer_id: i64,
     pub items: Vec<CreateQuotationItemInput>,
     pub notes: Option<String>,
+    pub status: Option<String>,
+    pub valid_until: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -31,7 +33,7 @@ pub struct QuotationItem {
     pub product_name: String,
     pub product_sku: Option<String>,
     pub description: String,
-    pub quantity: i64,
+    pub quantity: f64,
     pub rate: f64,
     pub amount: f64,
 }
@@ -49,6 +51,7 @@ pub struct Quotation {
     pub total_amount: f64,
     pub notes: Option<String>,
     pub status: String,
+    pub valid_until: Option<String>,
     pub created_at: String,
 }
 
@@ -75,16 +78,18 @@ pub fn create_quotation(
 
     let quote_number = generate_quote_number(&tx)?;
     
+    let status = input.status.unwrap_or_else(|| "draft".to_string());
+
     tx.execute(
-        "INSERT INTO quotations (quote_number, customer_id, company_id, notes, status) VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![quote_number, input.customer_id, input.company_id, input.notes, "draft"],
+        "INSERT INTO quotations (quote_number, customer_id, company_id, notes, status, valid_until) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![quote_number, input.customer_id, input.company_id, input.notes, status, input.valid_until],
     )
     .map_err(|e| format!("Failed to create quotation: {e}"))?;
 
     let quote_id = tx.last_insert_rowid();
 
     for item in &input.items {
-        let amount = item.quantity as f64 * item.rate;
+        let amount = item.quantity * item.rate;
         tx.execute(
             "INSERT INTO quotation_items (quote_id, product_id, description, quantity, rate, amount) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![quote_id, item.product_id, item.description, item.quantity, item.rate, amount],
@@ -114,12 +119,12 @@ pub fn list_quotations(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Quo
             SELECT 
                 q.id, q.quote_number, q.customer_id, q.company_id, q.notes, q.status, q.created_at,
                 c.name as customer_name, c.address as customer_address, c.phone as customer_phone,
-                COALESCE(SUM(qi.amount), 0) as total_amount
+                COALESCE(SUM(qi.amount), 0) as total_amount, q.valid_until
             FROM quotations q
             JOIN customers c ON q.customer_id = c.id
             LEFT JOIN quotation_items qi ON q.id = qi.quote_id
             WHERE q.company_id = ?1 AND q.deleted_at IS NULL
-            GROUP BY q.id, q.quote_number, q.customer_id, q.company_id, q.notes, q.status, q.created_at, c.name, c.address, c.phone
+            GROUP BY q.id, q.quote_number, q.customer_id, q.company_id, q.notes, q.status, q.created_at, c.name, c.address, c.phone, q.valid_until
             ORDER BY q.created_at DESC
             "#,
         )
@@ -139,6 +144,7 @@ pub fn list_quotations(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Quo
                 customer_address: row.get(8)?,
                 customer_phone: row.get(9)?,
                 total_amount: row.get(10)?,
+                valid_until: row.get(11)?,
                 items: Vec::new(), // Will be filled below
             })
         })
@@ -152,6 +158,17 @@ pub fn list_quotations(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Quo
     }
     
     Ok(quotations)
+}
+
+#[tauri::command]
+pub fn update_quotation_status(app: tauri::AppHandle, quote_id: i64, status: String) -> Result<(), String> {
+    let conn = db::open_connection(&app)?;
+    conn.execute(
+        "UPDATE quotations SET status = ?1 WHERE id = ?2",
+        params![status, quote_id],
+    )
+    .map_err(|e| format!("Failed to update quotation status: {e}"))?;
+    Ok(())
 }
 
 #[tauri::command]

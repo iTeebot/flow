@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import { invoke } from "../lib/api";
 import { loadRecoveryKey } from "../utils/recoveryKeyStore";
-import { saveBusinessJwt, clearBusinessJwt } from "../utils/businessJwtStore";
+import { saveBusinessJwt, clearBusinessJwt, loadBusinessJwt } from "../utils/businessJwtStore";
 import { checkFullConnectivity } from "../utils/connectivity";
+import { uploadBackup } from "../utils/cloudSync";
+import { readFile } from "@tauri-apps/plugin-fs";
 
 export interface User {
   id: number;
@@ -36,7 +38,6 @@ interface AuthState {
 }
 
 async function ensureBusinessJwtFromServer(userId?: number): Promise<string | null> {
-  const { loadBusinessJwt } = await import("../utils/businessJwtStore");
   const existingToken = await loadBusinessJwt();
   if (existingToken) {
     return existingToken;
@@ -234,12 +235,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           
           // Try to upload backup to cloud
           try {
-            const { readFile } = await import("@tauri-apps/plugin-fs");
             const fileData = await readFile(backupInfo.backup_path || "");
             const backupBlob = new Blob([fileData], { type: "application/octet-stream" });
             
-            // Import uploadBackup dynamically to avoid circular dependencies
-            const { uploadBackup } = await import("../utils/cloudSync");
             await uploadBackup(backupBlob);
             console.log("✅ Cloud backup completed on logout");
           } catch (uploadErr) {

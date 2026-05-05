@@ -90,7 +90,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
             name        TEXT NOT NULL,
             description TEXT,
             sku         TEXT NOT NULL UNIQUE,
-            stock_qty   INTEGER NOT NULL DEFAULT 0,
+            stock_qty   REAL NOT NULL DEFAULT 0,
             price       REAL NOT NULL DEFAULT 0,
             company_id  INTEGER,
             external_id  TEXT UNIQUE NOT NULL DEFAULT (lower(hex(randomblob(16)))),
@@ -134,7 +134,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             dc_id       INTEGER NOT NULL,
             product_id  INTEGER NOT NULL,
-            quantity    INTEGER NOT NULL,
+            quantity    REAL NOT NULL,
             rate        REAL NOT NULL,
             external_id  TEXT UNIQUE NOT NULL DEFAULT (lower(hex(randomblob(16)))),
             sync_status  TEXT NOT NULL DEFAULT 'local_only',
@@ -169,8 +169,8 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
             invoice_id INTEGER NOT NULL,
             product_id INTEGER,
             description TEXT NOT NULL,
-            quantity INTEGER NOT NULL,
-            rate REAL NOT NULL,
+            quantity REAL NOT NULL,
+            rate REAL,
             amount REAL NOT NULL,
             external_id  TEXT UNIQUE NOT NULL DEFAULT (lower(hex(randomblob(16)))),
             sync_status  TEXT NOT NULL DEFAULT 'local_only',
@@ -200,6 +200,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
             sync_version INTEGER NOT NULL DEFAULT 1,
             last_synced_at TEXT,
             deleted_at   TEXT,
+            valid_until  TEXT,
             created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(customer_id) REFERENCES customers(id)
         );
@@ -209,7 +210,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
             quote_id    INTEGER NOT NULL,
             product_id  INTEGER,
             description TEXT NOT NULL,
-            quantity    INTEGER NOT NULL,
+            quantity    REAL NOT NULL,
             rate        REAL NOT NULL,
             amount      REAL NOT NULL,
             external_id  TEXT UNIQUE NOT NULL DEFAULT (lower(hex(randomblob(16)))),
@@ -225,6 +226,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to initialize database schema: {e}"))?;
 
+    ensure_column(&conn, "quotations", "valid_until", "TEXT")?;
     ensure_column(&conn, "products", "company_id", "INTEGER")?;
     ensure_column(&conn, "users", "permissions", "TEXT")?;
     ensure_column(&conn, "products", "description", "TEXT")?;
@@ -245,6 +247,10 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     ensure_column(&conn, "company_profiles", "postal_code", "TEXT")?;
     ensure_column(&conn, "company_profiles", "country", "TEXT")?;
     ensure_column(&conn, "customers", "tax_registration_number", "TEXT")?;
+    ensure_column(&conn, "customers", "province", "TEXT")?;
+    ensure_column(&conn, "customers", "registration_type", "TEXT")?;
+    ensure_column(&conn, "products", "hs_code", "TEXT")?;
+    ensure_column(&conn, "products", "uom", "TEXT")?;
     ensure_column(
         &conn,
         "company_profiles",
@@ -318,6 +324,56 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     ensure_column(&conn, "dc_items", "created_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")?;
     ensure_column(&conn, "invoices", "created_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")?;
     ensure_column(&conn, "invoice_items", "created_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")?;
+
+    // Detailed Invoice Schema Migration
+    ensure_column(&conn, "invoices", "invoice_type", "TEXT")?;
+    ensure_column(&conn, "invoices", "invoice_date", "TEXT")?;
+    ensure_column(&conn, "invoices", "seller_ntn_cnic", "TEXT")?;
+    ensure_column(&conn, "invoices", "seller_province", "TEXT")?;
+    ensure_column(&conn, "invoices", "buyer_ntn_cnic", "TEXT")?;
+    ensure_column(&conn, "invoices", "buyer_province", "TEXT")?;
+    ensure_column(&conn, "invoices", "buyer_registration_type", "TEXT")?;
+    ensure_column(&conn, "invoices", "invoice_ref_no", "TEXT")?;
+
+    ensure_column(&conn, "invoice_items", "unit_price", "REAL")?;
+    ensure_column(&conn, "invoice_items", "tax_rate", "TEXT")?;
+    ensure_column(&conn, "invoice_items", "hs_code", "TEXT")?;
+    ensure_column(&conn, "invoice_items", "uom", "TEXT")?;
+    ensure_column(&conn, "invoice_items", "value_sales_excluding_st", "REAL")?;
+    ensure_column(&conn, "invoice_items", "fixed_notified_value_or_retail_price", "REAL")?;
+    ensure_column(&conn, "invoice_items", "sales_tax_applicable", "REAL")?;
+    ensure_column(&conn, "invoice_items", "sales_tax_withheld_at_source", "REAL")?;
+    ensure_column(&conn, "invoice_items", "extra_tax", "REAL")?;
+    ensure_column(&conn, "invoice_items", "further_tax", "REAL")?;
+    ensure_column(&conn, "invoice_items", "sro_schedule_no", "TEXT")?;
+    ensure_column(&conn, "invoice_items", "fed_payable", "REAL")?;
+    ensure_column(&conn, "invoice_items", "discount", "REAL")?;
+    ensure_column(&conn, "invoice_items", "sale_type", "TEXT")?;
+    ensure_column(&conn, "invoice_items", "sro_item_serial_no", "TEXT")?;
+    
+    // Extensibility: JSON metadata for future-proofing across ALL major tables
+    ensure_column(&conn, "customers", "metadata", "TEXT")?;
+    ensure_column(&conn, "products", "metadata", "TEXT")?;
+    ensure_column(&conn, "delivery_challans", "metadata", "TEXT")?;
+    ensure_column(&conn, "dc_items", "metadata", "TEXT")?;
+    ensure_column(&conn, "invoices", "metadata", "TEXT")?;
+    ensure_column(&conn, "invoice_items", "metadata", "TEXT")?;
+
+    // Backward Compatibility: Migrate legacy 'rate' to 'unit_price' if rate exists
+    // We check if 'rate' column exists before trying to migrate
+    let has_rate: bool = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('invoice_items') WHERE name='rate'",
+        [],
+        |row| Ok(row.get::<_, i64>(0)? > 0)
+    ).unwrap_or(false);
+
+    if has_rate {
+        let _ = conn.execute(
+            "UPDATE invoice_items SET unit_price = rate WHERE unit_price IS NULL OR unit_price = 0",
+            [],
+        );
+    }
+
     ensure_index(
         &conn,
         "idx_products_company_active",

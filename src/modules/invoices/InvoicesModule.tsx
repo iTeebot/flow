@@ -1,17 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, PlusCircle, Search, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { FileText, PlusCircle, Search, Eye, Download, Printer, Edit, Trash2 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { listDeliveryChallans, type DeliveryChallan } from "../deliveryChallan/api";
 import { TablePagination } from "../shared/TablePagination";
-import { createInvoiceFromChallan, listInvoices, type Invoice } from "./api";
+import { listInvoices, deleteInvoice, type Invoice } from "./api";
+
 import { formatCurrency } from "../../lib/utils";
 import { useToastStore } from "../../store/toastStore";
 import { ModulePage } from "../../components/ModulePage";
 import { DataTable } from "../../components/DataTable";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
+import { Dialog } from "../../components/ui/Dialog";
+
+
+import { downloadInvoicePdf, printInvoice } from "../reports/pdf";
 
 export function InvoicesModule() {
+  const navigate = useNavigate();
   const { companyId, currency } = useAuthStore();
   const currentCompanyId = companyId || 1;
   const { addToast } = useToastStore();
@@ -26,8 +33,9 @@ export function InvoicesModule() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
 
   const loadData = async () => {
     try {
@@ -42,7 +50,7 @@ export function InvoicesModule() {
         setSelectedDcId(challanRows[0].id);
       }
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to load invoices", "error");
+      addToast(typeof err === 'string' ? err : (err instanceof Error ? err.message : "Failed to load invoices"), "error");
     } finally {
       setLoading(false);
     }
@@ -54,23 +62,24 @@ export function InvoicesModule() {
     }
   }, [currentCompanyId]);
 
-  const handleCreate = async () => {
-    if (!selectedDcId) return;
+  const confirmDelete = async () => {
+    if (!invoiceToDelete) return;
     try {
-      setBusy(true);
-      const result = await createInvoiceFromChallan({
-        company_id: currentCompanyId,
-        dc_id: selectedDcId,
-        notes: notes || null,
-      });
-      addToast(`Invoice ${result.invoice_number} created successfully!`, "success");
-      setNotes("");
-      await loadData();
+      setIsDeleting(true);
+      await deleteInvoice(invoiceToDelete.id);
+      addToast("Invoice deleted successfully", "success");
+      setInvoices(invoices.filter(i => i.id !== invoiceToDelete.id));
+      setInvoiceToDelete(null);
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to create invoice", "error");
+      addToast(err instanceof Error ? err.message : "Failed to delete invoice", "error");
     } finally {
-      setBusy(false);
+      setIsDeleting(false);
     }
+  };
+
+  const handleCreate = () => {
+    if (!selectedDcId) return;
+    navigate(`/app/invoices/create?dcId=${selectedDcId}`);
   };
 
   const handleSort = (key: any) => {
@@ -130,6 +139,11 @@ export function InvoicesModule() {
       listIcon={<FileText className="h-5 w-5" />}
       listTitle="Invoice Registry"
       count={filtered.length}
+      action={{
+        label: "New Detailed Invoice",
+        onClick: () => navigate("/app/invoices/create")
+      }}
+
       filterBar={
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 w-full">
           <div className="md:col-span-2">
@@ -181,8 +195,8 @@ export function InvoicesModule() {
             <PlusCircle className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-text-primary leading-tight">Generate New Invoice</h2>
-            <p className="text-[10px] text-text-muted uppercase font-black tracking-tighter">Drafting Engine</p>
+            <h2 className="text-lg font-bold text-text-primary leading-tight">Quick Invoice (from DC)</h2>
+            <p className="text-[10px] text-text-muted uppercase font-black tracking-tighter">Fast Drafting Engine</p>
           </div>
         </div>
 
@@ -193,7 +207,7 @@ export function InvoicesModule() {
               <select
                 value={selectedDcId ?? ""}
                 onChange={(e) => setSelectedDcId(Number(e.target.value))}
-                className="w-full"
+                className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm"
               >
                 {challans.length === 0 && <option>No available challans</option>}
                 {challans.map((challan) => (
@@ -210,7 +224,7 @@ export function InvoicesModule() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Reference numbers, special terms, or internal memos..."
-                className="w-full"
+                className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm"
               />
             </div>
           </div>
@@ -219,18 +233,26 @@ export function InvoicesModule() {
             <button
               type="button"
               onClick={handleCreate}
-              disabled={busy || !selectedDcId}
+              disabled={!selectedDcId}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >
-              {busy ? (
-                <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
-              ) : <PlusCircle className="h-4 w-4" />}
-              {busy ? "Drafting Document..." : "Finalize & Create Invoice"}
+              <PlusCircle className="h-4 w-4" />
+              Review & Create Invoice
             </button>
           </div>
         </div>
       </div>
-
+      <Dialog
+        isOpen={!!invoiceToDelete}
+        onClose={() => setInvoiceToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Invoice?"
+        description={`Are you sure you want to delete ${invoiceToDelete?.invoice_number}? This action will permanently remove the record.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+      />
       <DataTable
         data={paginated}
         keyExtractor={(item) => item.id}
@@ -241,12 +263,17 @@ export function InvoicesModule() {
         emptyMessage="No invoice records identified"
         columns={[
           {
-            header: "Invoice #",
+            header: "Invoice Details",
             sortKey: "invoice",
             accessor: (invoice) => (
-              <span className="font-mono text-sm font-bold text-primary bg-primary/5 px-2 py-1 rounded border border-primary/10 tracking-tight">
-                {invoice.invoice_number}
-              </span>
+              <div className="space-y-1">
+                <span className="font-mono text-sm font-bold text-primary bg-primary/5 px-2 py-1 rounded border border-primary/10 tracking-tight">
+                  {invoice.invoice_number}
+                </span>
+                <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                  {invoice.invoice_type || "Sale Invoice"}
+                </div>
+              </div>
             )
           },
           {
@@ -261,7 +288,12 @@ export function InvoicesModule() {
             header: "Client Name",
             sortKey: "customer",
             accessor: (invoice) => (
-              <div className="font-semibold text-text-primary text-sm">{invoice.customer_name}</div>
+              <div className="space-y-0.5">
+                <div className="font-semibold text-text-primary text-sm">{invoice.customer_name}</div>
+                {invoice.buyer_ntn_cnic && (
+                  <div className="text-[10px] text-text-muted font-mono">{invoice.buyer_ntn_cnic}</div>
+                )}
+              </div>
             )
           },
           {
@@ -283,21 +315,57 @@ export function InvoicesModule() {
             )
           },
           {
-            header: "Created At",
+            header: "Invoice Date",
             sortKey: "date",
             accessor: (invoice) => (
               <div className="text-sm text-text-muted flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-success/60"></span>
-                {new Date(invoice.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                {invoice.invoice_date 
+                  ? invoice.invoice_date 
+                  : new Date(invoice.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
             )
           }
         ]}
-        actions={(_invoice) => [
+        actions={(invoice) => [
           {
-            label: "View Document",
+            label: "View Details",
             icon: Eye,
-            onClick: () => { /* View logic */ }
+            onClick: () => navigate(`/app/invoices/view/${invoice.id}`)
+          },
+          {
+            label: "Edit Invoice",
+            icon: Edit,
+            onClick: () => navigate(`/app/invoices/edit/${invoice.id}`)
+          },
+          {
+            label: "Download PDF",
+            icon: Download,
+            onClick: async () => {
+              try {
+                const savedPath = await downloadInvoicePdf(invoice);
+                addToast("Invoice PDF saved successfully", "success", savedPath);
+              } catch (err) {
+                addToast(err instanceof Error ? err.message : "Failed to generate PDF", "error");
+              }
+            }
+          },
+          {
+            label: "Print",
+            icon: Printer,
+            onClick: async () => {
+              try {
+                await printInvoice(invoice);
+              } catch (err) {
+                addToast(err instanceof Error ? err.message : "Failed to open print view", "error");
+              }
+            }
+          },
+          {
+            label: "Delete",
+            icon: Trash2,
+            variant: "danger",
+            onClick: () => setInvoiceToDelete(invoice)
           }
         ]}
       />

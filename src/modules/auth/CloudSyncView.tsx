@@ -25,6 +25,7 @@ import { getLanguageDirection, getForwardIcon } from "../../utils/layout";
 import { stripNonAlphaNumeric, stripNonDigits } from "../../utils/formatters";
 import { downloadLatestBackup } from "../../utils/cloudSync";
 import { saveRecoveryKey } from "../../utils/recoveryKeyStore";
+import { saveBusinessJwt } from "../../utils/businessJwtStore";
 import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
 import { invoke } from "../../lib/api";
 import { isTauri } from "../../lib/platform";
@@ -222,7 +223,6 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       const responseData = await response.json();
       
       if (responseData.businessJwt) {
-        const { saveBusinessJwt } = await import("../../utils/businessJwtStore");
         await saveBusinessJwt(responseData.businessJwt);
       }
 

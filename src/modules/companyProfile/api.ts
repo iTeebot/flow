@@ -53,6 +53,8 @@ export async function getCompanyProfile(company_id: number) {
   return invoke<CompanyProfile>("get_company_profile", { companyId: company_id });
 }
 
+
+
 export async function updateCompanyProfile(input: UpdateCompanyProfileInput) {
   return invoke<CompanyProfile>("update_company_profile", { input });
 }

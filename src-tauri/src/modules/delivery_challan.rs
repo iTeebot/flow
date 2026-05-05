@@ -8,7 +8,7 @@ use std::path::PathBuf;
 #[derive(Debug, Deserialize)]
 pub struct CreateDeliveryChallanItemInput {
     pub product_id: i64,
-    pub quantity: i64,
+    pub quantity: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -30,7 +30,7 @@ pub struct DeliveryChallanItem {
     pub product_id: i64,
     pub product_name: String,
     pub product_sku: String,
-    pub quantity: i64,
+    pub quantity: f64,
     pub rate: f64,
     pub amount: f64,
 }
@@ -94,11 +94,11 @@ pub fn create_delivery_challan(
         if item.product_id <= 0 {
             return Err("Invalid product in items".to_string());
         }
-        if item.quantity <= 0 {
+        if item.quantity <= 0.0 {
             return Err("Item quantity must be greater than zero".to_string());
         }
 
-        let stock: i64 = tx
+        let stock: f64 = tx
             .query_row(
                 "SELECT stock_qty FROM products WHERE id = ?1 AND company_id = ?2",
                 params![item.product_id, input.company_id],
@@ -108,7 +108,7 @@ pub fn create_delivery_challan(
 
         if stock < item.quantity {
             return Err(format!(
-                "Insufficient stock for product {} (available: {}, requested: {})",
+                "Insufficient stock for product {} (available: {:.2}, requested: {:.2})",
                 item.product_id, stock, item.quantity
             ));
         }
@@ -219,13 +219,13 @@ pub fn get_delivery_challan(app: tauri::AppHandle, dc_id: i64) -> Result<Deliver
     }
 
     let conn = db::open_connection(&app)?;
-    let (id, dc_number, customer_id, customer_name, company_id, created_at, total_amount): (i64, String, i64, String, i64, String, f64) = conn
+    let (id, dc_number, customer_id, company_id, created_at, customer_name, total_amount): (i64, String, i64, i64, String, String, f64) = conn
         .query_row(
             r#"
             SELECT 
                 dc.id, dc.dc_number, dc.customer_id, dc.company_id, dc.created_at,
                 c.name as customer_name,
-                COALESCE(SUM(dci.quantity * dci.rate), 0) as total_amount
+                COALESCE(SUM(dci.quantity * dci.rate), 0.0) as total_amount
             FROM delivery_challans dc
             JOIN customers c ON dc.customer_id = c.id
             LEFT JOIN dc_items dci ON dc.id = dci.dc_id
@@ -237,6 +237,7 @@ pub fn get_delivery_challan(app: tauri::AppHandle, dc_id: i64) -> Result<Deliver
                 row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?
             )),
         )
+
         .map_err(|_| "Delivery challan not found".to_string())?;
 
     let items = get_delivery_challan_items(&conn, id)?;
@@ -270,7 +271,7 @@ fn get_delivery_challan_items(conn: &rusqlite::Connection, dc_id: i64) -> Result
 
     let rows = stmt
         .query_map([dc_id], |row| {
-            let quantity: i64 = row.get(2)?;
+            let quantity: f64 = row.get(2)?;
             let rate: f64 = row.get(3)?;
             Ok(DeliveryChallanItem {
                 id: row.get(0)?,
@@ -279,7 +280,7 @@ fn get_delivery_challan_items(conn: &rusqlite::Connection, dc_id: i64) -> Result
                 product_sku: row.get(5)?,
                 quantity,
                 rate,
-                amount: quantity as f64 * rate,
+                amount: quantity * rate,
             })
         })
         .map_err(|e| format!("Failed to fetch DC items: {e}"))?;
@@ -351,7 +352,7 @@ pub fn delete_delivery_challan(app: tauri::AppHandle, dc_id: i64) -> Result<(), 
         .prepare("SELECT product_id, quantity FROM dc_items WHERE dc_id = ?1 AND deleted_at IS NULL")
         .map_err(|e| format!("Failed to prepare items query: {e}"))?;
 
-    let items: Vec<(i64, i64)> = stmt
+    let items: Vec<(i64, f64)> = stmt
         .query_map([dc_id], |row| Ok((row.get(0)?, row.get(1)?)))
         .map_err(|e| format!("Failed to fetch items: {e}"))?
         .filter_map(|r| r.ok())

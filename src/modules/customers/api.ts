@@ -9,6 +9,9 @@ export type Customer = {
   address?: string | null;
   city?: string | null;
   state?: string | null;
+  province?: string | null;
+  registration_type?: string | null;
+  metadata?: any;
 };
 
 export type CreateCustomerInput = {
@@ -19,6 +22,9 @@ export type CreateCustomerInput = {
   address?: string | null;
   city?: string | null;
   state?: string | null;
+  province?: string | null;
+  registration_type?: string | null;
+  metadata?: any;
 };
 
 export type UpdateCustomerInput = {
@@ -29,7 +35,11 @@ export type UpdateCustomerInput = {
   address?: string | null;
   city?: string | null;
   state?: string | null;
+  province?: string | null;
+  registration_type?: string | null;
+  metadata?: any;
 };
+
 
 export async function createCustomer(input: CreateCustomerInput) {
   return invoke<Customer>("create_customer", { input });
@@ -39,6 +49,8 @@ export async function listCustomers(company_id: number) {
   return invoke<Customer[]>("list_customers", { companyId: company_id });
 }
 
+
+
 export async function updateCustomer(input: UpdateCustomerInput) {
   return invoke<Customer>("update_customer", { input });
 }
@@ -46,3 +58,5 @@ export async function updateCustomer(input: UpdateCustomerInput) {
 export async function deleteCustomer(customer_id: number) {
   return invoke<string>("delete_customer", { customerId: customer_id });
 }
+
+

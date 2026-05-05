@@ -55,7 +55,7 @@ export function ReportsModule() {
       if (savedPath === "browser-download") {
         addToast("Document has been downloaded to your browser.", "info");
       } else {
-        addToast("PDF saved successfully!", "success", savedPath);
+        addToast("Document PDF saved successfully!", "success", savedPath);
       }
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to download PDF", "error");

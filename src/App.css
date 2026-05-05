@@ -212,6 +212,19 @@ select {
   background-size: 1.2em 1.2em;
   padding-right: 2.5rem;
 }
+/* Premium Date Picker Styling */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8) sepia(1) saturate(5) hue-rotate(175deg); /* Match primary sky color */
+  opacity: 0.6;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 4px;
+  border-radius: 4px;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
 
 select option {
   background-color: var(--color-surface);

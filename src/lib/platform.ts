@@ -40,7 +40,7 @@ export const getBestDownloadForOS = (os: string) => {
     case "Linux":
       return {
         label: "Download for Linux (.deb)",
-        url: "/releases/linux/teebot-flow_0.0.5_amd64.deb"
+        url: "https://drive.google.com/file/d/1PkrkqO-bUrvlZBH_YWedsDbHcWruoKmQ/view?usp=sharing"
       };
     default:
       return {

@@ -45,10 +45,15 @@ export async function listDeliveryChallans(company_id: number) {
   return invoke<DeliveryChallan[]>("list_delivery_challans", { companyId: company_id });
 }
 
+
+
 export async function getDeliveryChallan(dc_id: number) {
   return invoke<DeliveryChallan>("get_delivery_challan", { dcId: dc_id });
 }
 
+
 export async function deleteDeliveryChallan(dc_id: number) {
   return invoke<void>("delete_delivery_challan", { dcId: dc_id });
 }
+
+

@@ -9,6 +9,9 @@ export type Product = {
   stock_qty: number;
   price: number;
   created_at: string;
+  hs_code?: string | null;
+  uom?: string | null;
+  metadata?: any;
 };
 
 export type CreateProductInput = {
@@ -18,6 +21,9 @@ export type CreateProductInput = {
   sku: string;
   stock_qty: number;
   price: number;
+  hs_code?: string | null;
+  uom?: string | null;
+  metadata?: any;
 };
 
 export type UpdateProductInput = {
@@ -27,6 +33,9 @@ export type UpdateProductInput = {
   sku: string;
   stock_qty: number;
   price: number;
+  hs_code?: string | null;
+  uom?: string | null;
+  metadata?: any;
 };
 
 export type AdjustStockInput = {
@@ -42,6 +51,8 @@ export async function listProducts(company_id: number) {
   return invoke<Product[]>("list_products", { companyId: company_id });
 }
 
+
+
 export async function updateProduct(input: UpdateProductInput) {
   return invoke<Product>("update_product", { input });
 }
@@ -49,6 +60,8 @@ export async function updateProduct(input: UpdateProductInput) {
 export async function deleteProduct(product_id: number) {
   return invoke<string>("delete_product", { productId: product_id });
 }
+
+
 
 export async function adjustStock(input: AdjustStockInput) {
   return invoke<Product>("adjust_stock", { input });
