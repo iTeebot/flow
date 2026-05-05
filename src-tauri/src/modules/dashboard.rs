@@ -18,7 +18,7 @@ pub struct SalesTrendPoint {
 #[derive(Debug, Serialize)]
 pub struct InventoryItem {
     pub product_name: String,
-    pub stock_qty: i64,
+    pub stock_qty: f64,
     pub stock_value: f64,
 }
 
@@ -65,7 +65,7 @@ pub fn get_dashboard_summary(app: tauri::AppHandle, company_id: i64) -> Result<D
 
     let total_sales: f64 = conn
         .query_row(
-            "SELECT COALESCE(SUM(dci.quantity * dci.rate), 0) FROM dc_items dci 
+            "SELECT COALESCE(SUM(dci.quantity * dci.rate), 0.0) FROM dc_items dci 
              JOIN delivery_challans dc ON dci.dc_id = dc.id 
              WHERE dc.company_id = ?1 AND dc.deleted_at IS NULL",
             [company_id],
@@ -91,7 +91,7 @@ pub fn get_dashboard_summary(app: tauri::AppHandle, company_id: i64) -> Result<D
     // Get sales trend (last 7 days)
     let mut stmt = conn
         .prepare(
-            "SELECT DATE(dc.created_at) as date, COALESCE(SUM(dci.quantity * dci.rate), 0) as amount
+            "SELECT DATE(dc.created_at) as date, COALESCE(SUM(dci.quantity * dci.rate), 0.0) as amount
              FROM delivery_challans dc
              LEFT JOIN dc_items dci ON dc.id = dci.dc_id
              WHERE dc.company_id = ?1 AND dc.deleted_at IS NULL
@@ -104,7 +104,7 @@ pub fn get_dashboard_summary(app: tauri::AppHandle, company_id: i64) -> Result<D
     let sales_trend: Vec<SalesTrendPoint> = stmt
         .query_map([company_id], |row| {
             Ok(SalesTrendPoint {
-                date: row.get(0)?,
+                date: row.get::<_, Option<String>>(0)?.unwrap_or_else(|| "Unknown".to_string()),
                 amount: row.get(1)?,
             })
         })
@@ -115,7 +115,7 @@ pub fn get_dashboard_summary(app: tauri::AppHandle, company_id: i64) -> Result<D
     // Get inventory status (top 10 products by value)
     let mut stmt = conn
         .prepare(
-            "SELECT name, stock_qty, (stock_qty * price) as stock_value
+            "SELECT name, stock_qty, (COALESCE(stock_qty, 0.0) * COALESCE(price, 0.0)) as stock_value
              FROM products
              WHERE company_id = ?1 AND deleted_at IS NULL
              ORDER BY stock_value DESC
@@ -141,8 +141,8 @@ pub fn get_dashboard_summary(app: tauri::AppHandle, company_id: i64) -> Result<D
     // Recent delivery challans
     let mut stmt = conn
         .prepare(
-            "SELECT id, 'Delivery Challan Created' as activity_type, 
-             'Delivery challan ' || dc_number || ' created' as description, created_at
+            "SELECT id, 'Delivery Challan' as activity_type, 
+             'Delivery challan ' || COALESCE(dc_number, 'N/A') || ' created' as description, created_at
              FROM delivery_challans
              WHERE company_id = ?1 AND deleted_at IS NULL
              ORDER BY created_at DESC
@@ -150,17 +150,21 @@ pub fn get_dashboard_summary(app: tauri::AppHandle, company_id: i64) -> Result<D
         )
         .map_err(|e| format!("Failed to prepare activity query: {e}"))?;
 
-    stmt.query_map([company_id], |row| {
-        activity.push(ActivityItem {
+    let rows = stmt.query_map([company_id], |row| {
+        Ok(ActivityItem {
             id: row.get(0)?,
             activity_type: row.get(1)?,
             description: row.get(2)?,
             created_at: row.get(3)?,
-        });
-        Ok(())
+        })
     })
-    .map_err(|e| format!("Failed to fetch activity: {e}"))?
-    .try_for_each(|_| Ok::<_, String>(()))?;
+    .map_err(|e| format!("Failed to fetch activity: {e}"))?;
+
+    for row in rows {
+        if let Ok(item) = row {
+            activity.push(item);
+        }
+    }
 
     // Sort activity by date (newest first) and take top 5
     activity.sort_by(|a, b| b.created_at.cmp(&a.created_at));

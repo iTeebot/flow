@@ -32,6 +32,7 @@ export function DashboardModule() {
   const { t } = useTranslation("dashboard");
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const { companyId, currency } = useAuthStore();
   const currentCompanyId = companyId || 1;
@@ -45,10 +46,12 @@ export function DashboardModule() {
   const loadDashboard = async () => {
     try {
       setLoading(true);
+      setError(null);
       const summary = await getDashboardSummary(currentCompanyId);
       setData(summary);
-    } catch {
-      // Data remains null on error
+    } catch (err: any) {
+      setError(err.toString());
+      console.error("Dashboard error:", err);
     } finally {
       setLoading(false);
     }
@@ -63,10 +66,17 @@ export function DashboardModule() {
     );
   }
 
-  if (!data) {
+  if (error || !data) {
     return (
-      <div className="rounded-xl border border-error/20 bg-error/5 p-8 text-center text-error border-dashed">
-        {t("error")}
+      <div className="rounded-xl border border-error/20 bg-error/5 p-8 text-center text-error border-dashed flex flex-col items-center gap-2">
+        <p className="font-bold">{t("error")}</p>
+        {error && <p className="text-xs opacity-70 font-mono bg-error/10 p-2 rounded">{error}</p>}
+        <button 
+          onClick={loadDashboard}
+          className="mt-4 px-4 py-2 bg-error text-white rounded-lg text-sm font-bold hover:bg-error/80 transition-colors"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
