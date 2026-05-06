@@ -30,7 +30,7 @@ export const getBestDownloadForOS = (os: string) => {
     case "Windows":
       return {
         label: "Download for Windows",
-        url: "/releases/win/teebot-flow_0.0.5_x64-setup.exe"
+        url: "https://drive.google.com/file/d/1hPVT538Dm5HP9lItGpwfP8FGZnUrsXOp/view?usp=sharing"
       };
     case "macOS":
       return {

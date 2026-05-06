@@ -12,12 +12,13 @@ import { useNavigate } from "react-router-dom";
 import { ModulePage } from "../../components/ModulePage";
 import { DataTable } from "../../components/DataTable";
 import { Dialog } from "../../components/ui/Dialog";
+import { useUiStore } from "../../store/uiStore";
 
 export function DeliveryChallanModule() {
   const { t } = useTranslation("delivery_chalan");
   const navigate = useNavigate();
   const [deliveryChallans, setDeliveryChallans] = useState<DeliveryChallan[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useUiStore();
   const { addToast } = useToastStore();
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [challanToDelete, setChallanToDelete] = useState<DeliveryChallan | null>(null);
@@ -40,7 +41,7 @@ export function DeliveryChallanModule() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      setLoading(true, t("loading_challans", "Accessing Delivery Records..."));
       const challans = await listDeliveryChallans(currentCompanyId);
       setDeliveryChallans(challans);
     } catch (err) {
@@ -148,19 +149,12 @@ export function DeliveryChallanModule() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-text-muted">Loading delivery challans...</div>
-      </div>
-    );
-  }
-
+  // Loading is now handled globally via useUiStore.setLoading
   return (
     <ModulePage
       title={t('title')}
       subtitle={t('subtitle')}
-      loading={loading}
+      loading={false}
       action={{
         label: t('common:add', 'Add'),
         onClick: () => navigate("/app/delivery-challan/create")

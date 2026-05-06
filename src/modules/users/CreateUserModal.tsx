@@ -5,6 +5,7 @@ import { useToastStore } from "../../store/toastStore";
 import { X } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Portal } from "../../components/ui/Portal";
+import { useUiStore } from "../../store/uiStore";
 
 interface Props {
   isOpen: boolean;
@@ -26,6 +27,7 @@ const MODULES = [
 export function CreateUserModal({ isOpen, onClose, onCreated }: Props) {
   const { t } = useTranslation("users");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { setLoading } = useUiStore();
   const { addToast } = useToastStore();
 
   const [formData, setFormData] = useState({
@@ -54,6 +56,7 @@ export function CreateUserModal({ isOpen, onClose, onCreated }: Props) {
 
     try {
       setIsSubmitting(true);
+      setLoading(true, "Creating User Identity...");
       
       const payload = {
         ...formData,
@@ -68,6 +71,7 @@ export function CreateUserModal({ isOpen, onClose, onCreated }: Props) {
       addToast(err instanceof Error ? err.message : t("create_error", "Failed to create user"), "error");
     } finally {
       setIsSubmitting(false);
+      setLoading(false);
     }
   };
 

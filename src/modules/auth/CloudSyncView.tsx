@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getApiUrl } from '../../utils/apiConfig';
 import { useTranslation } from "react-i18next";
 import {
   ShieldCheck,
@@ -18,14 +19,13 @@ import { Button } from "../../components/ui/Button";
 import { useToastStore } from "../../store/toastStore";
 import { useAuthStore } from "../../store/authStore";
 import { useUiStore } from "../../store/uiStore";
+import { downloadLatestBackup } from "../../utils/cloudSync";
 import { validatePakistaniPhone } from "../../utils/validations/phone";
 import { validateEmail } from "../../utils/validations/email";
 import { validatePakistaniCNIC, validatePakistaniNTN } from "../../utils/validations/identity";
 import { getLanguageDirection, getForwardIcon } from "../../utils/layout";
 import { stripNonAlphaNumeric, stripNonDigits } from "../../utils/formatters";
-import { downloadLatestBackup } from "../../utils/cloudSync";
 import { saveRecoveryKey } from "../../utils/recoveryKeyStore";
-import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
 import { invoke } from "../../lib/api";
 import { isTauri } from "../../lib/platform";
 
@@ -39,7 +39,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
   const { t } = useTranslation("auth");
   const { addToast } = useToastStore();
   const { checkRegistration, register } = useAuthStore();
-  const { language } = useUiStore();
+  const { language, setLoading } = useUiStore();
   const isUrdu = language === "ur";
   const direction = getLanguageDirection(language);
   const ForwardIcon = getForwardIcon(direction);
@@ -51,7 +51,6 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [cloudId, setCloudId] = useState("");
   const [recoveryKey, setRecoveryKey] = useState("");
-  const [isRestoringBackup, setIsRestoringBackup] = useState(false);
 
   // Step 1: Initial Identifiers
   const [ntn, setNtn] = useState("");
@@ -123,7 +122,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
     setIsLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
+      const apiUrl = getApiUrl();
       const response = await fetch(`${apiUrl}/sync-business`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -176,7 +175,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
     setIsLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
+      const apiUrl = getApiUrl();
       const response = await fetch(`${apiUrl}/verify-sync-data`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -206,7 +205,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
     setIsLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
+      const apiUrl = getApiUrl();
       const response = await fetch(`${apiUrl}/verify-sync-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -253,7 +252,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
       // Validate required fields
       if (!registrationData.company_name) {
-        console.error("❌ Company name missing from cloud data!");
+        console.error("âŒ Company name missing from cloud data!");
         console.error("Raw server response:", JSON.stringify(businessData, null, 2));
         console.error("All available fields:", Object.keys(businessData));
         throw new Error(`Company name missing from cloud data. Raw response: ${JSON.stringify(businessData)}`);
@@ -312,7 +311,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
     setIsLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
+      const apiUrl = getApiUrl();
       const response = await fetch(`${apiUrl}/resend-sync-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -351,7 +350,8 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       return;
     }
 
-    setIsRestoringBackup(true);
+    setIsLoading(true);
+    setLoading(true, "Restoring Your Data");
     try {
       // 1. Download blob from cloud
       const backupBlob = await downloadLatestBackup(cloudId);
@@ -380,7 +380,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
       // 4. Save recovery key to desktop app config after successful restore
       await saveRecoveryKey(recoveryKey);
-      console.log("✅ Recovery key saved to desktop storage");
+      console.log("âœ… Recovery key saved to desktop storage");
 
       addToast(t("cloud_sync_messages.restore_success"), "success");
       await checkRegistration();
@@ -391,7 +391,8 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       addToast("Backup restoration skipped. Your business data is ready to use.", "info");
       await checkRegistration();
     } finally {
-      setIsRestoringBackup(false);
+      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -630,11 +631,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
         </div>
       </div>
 
-      <FullscreenLoader
-        isVisible={isRestoringBackup}
-        message="Restoring Your Data"
-        subMessage="Downloading and decrypting your cloud backup. Please do not close the application..."
-      />
+      {/* GlobalLoader handles full screen loading */}
     </div>
   );
 };

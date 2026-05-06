@@ -74,7 +74,7 @@ export function ProfileModule() {
   });
   const [customCountry, setCustomCountry] = useState("");
   const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useUiStore();
   const { addToast } = useToastStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,6 +111,7 @@ export function ProfileModule() {
         return;
       }
       try {
+        setLoading(true, "Synchronizing Company Records...");
         const profile = await getCompanyProfile(companyId);
         setCompanyProfile(profile);
         setForm({
@@ -178,6 +179,7 @@ export function ProfileModule() {
     if (!user || !companyProfile) return;
     try {
       setSaving(true);
+      setLoading(true, "Synchronizing Identity...");
 
       const updatedUser = await invoke<User>(
         "update_user_profile",
@@ -210,18 +212,11 @@ export function ProfileModule() {
       addToast(err instanceof Error ? err.message : t("update_error"), "error");
     } finally {
       setSaving(false);
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-        <p className="text-sm text-text-muted animate-pulse">{t("loading")}</p>
-      </div>
-    );
-  }
-
+  // Loading is now handled globally via useUiStore.setLoading
   return (
     <div className="space-y-8 animate-in fade-in duration-600">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

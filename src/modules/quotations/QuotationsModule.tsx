@@ -13,13 +13,14 @@ import { DataTable } from "../../components/DataTable";
 import { Dialog } from "../../components/ui/Dialog";
 import { formatCurrency } from "../../lib/utils";
 import { downloadQuotationPdf, printQuotation } from "../reports/pdf";
+import { useUiStore } from "../../store/uiStore";
 
 export function QuotationsModule() {
   const { t } = useTranslation("quotations");
   const navigate = useNavigate();
   const { companyId, currency } = useAuthStore();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useUiStore();
   const { addToast } = useToastStore();
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [quoteToDelete, setQuoteToDelete] = useState<Quotation | null>(null);
@@ -33,7 +34,7 @@ export function QuotationsModule() {
   const loadData = async () => {
     if (!companyId) return;
     try {
-      setLoading(true);
+      setLoading(true, t("loading_quotes", "Processing Quotations..."));
       const data = await listQuotations(companyId);
       setQuotations(data);
     } catch (err) {
@@ -104,7 +105,7 @@ export function QuotationsModule() {
     <ModulePage
       title={t('title', 'Quotations')}
       subtitle={t('subtitle', 'Create and manage price quotes for your customers')}
-      loading={loading}
+      loading={false}
       action={{
         label: t('create_btn', 'Create Quotation'),
         onClick: () => navigate("/app/quotations/create")

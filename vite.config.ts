@@ -47,6 +47,13 @@ export default defineConfig(({ mode }) => {
           port: 1421,
         }
         : undefined,
+      proxy: {
+        '/api': {
+          target: 'https://api.afmsolution.tech',
+          changeOrigin: true,
+          secure: false,
+        }
+      },
       watch: {
         ignored: ["**/src-tauri/**"],
       },

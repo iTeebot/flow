@@ -43,7 +43,7 @@ export function ModulePage({
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -62,7 +62,7 @@ export function ModulePage({
 
       {/* List Container */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden h-fit">
-        <div className="border-b border-border bg-surface/30 px-6 py-5">
+        <div className="border-b border-border bg-surface/30 px-5 py-4">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-2">
               {listIcon && <div className="text-primary">{listIcon}</div>}

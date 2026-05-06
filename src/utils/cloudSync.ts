@@ -4,8 +4,9 @@ import { isTauri } from '../lib/platform';
 import { checkFullConnectivity } from './connectivity';
 import { loadBusinessJwt, clearBusinessJwt } from './businessJwtStore';
 import { gunzipSync, gzipSync } from 'fflate';
+import { getApiUrl } from './apiConfig';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.afmsolution.tech/api/teebot-flow';
+const API_BASE_URL = getApiUrl();
 
 /**
  * Sends the recovery code to the user's email.

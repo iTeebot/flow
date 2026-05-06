@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useUiStore } from "../../store/uiStore";
 import { useTranslation } from "react-i18next";
 import { ModulePage } from "../../components/ModulePage";
 import { DataTable } from "../../components/DataTable";
@@ -18,8 +19,8 @@ export function AnalyticsModule() {
   const { t } = useTranslation("analytics");
   const { companyId } = useAuthStore();
   const { addToast } = useToastStore();
+  const { setLoading } = useUiStore();
 
-  const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [sessions, setSessions] = useState<UserSession[]>([]);
@@ -34,7 +35,7 @@ export function AnalyticsModule() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      setLoading(true, "Aggregating System Intelligence...");
       const [stats, logs, sess] = await Promise.all([
         getAdminAnalytics(currentCompanyId),
         listAuditLogs(),
@@ -66,7 +67,7 @@ export function AnalyticsModule() {
     <ModulePage
       title={t("title", "Admin Analytics")}
       subtitle={t("subtitle", "Monitor user activity and system modifications")}
-      loading={loading}
+      loading={false}
     >
       <div className="space-y-8 p-6">
         {analytics && (

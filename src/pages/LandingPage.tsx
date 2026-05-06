@@ -34,13 +34,13 @@ export function LandingPage() {
       downloads: [
         {
           name: "Installer (EXE)",
-          url: "/releases/win/teebot-flow_0.0.5_x64-setup.exe",
-          size: "~4.1 MB"
+          url: "https://drive.google.com/file/d/1hPVT538Dm5HP9lItGpwfP8FGZnUrsXOp/view?usp=sharing",
+          size: "18.9mb"
         },
         {
           name: "MSI Package",
-          url: "/releases/win/teebot-flow_0.0.5_x64_en-US.msi",
-          size: "~5.3 MB"
+          url: "https://drive.google.com/file/d/11fnNIFBA0_OwsESukhY8-vlFztZj-dcb/view?usp=sharing",
+          size: "21.5mb"
         }
       ]
     },
@@ -94,7 +94,8 @@ export function LandingPage() {
           <div className="flex items-center gap-3">
             <a
               href={smartDownload.url}
-              download
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center gap-2 px-4 py-2 bg-surface border border-border text-text-primary rounded-lg hover:border-primary/50 transition font-medium text-sm"
             >
               <Download className="w-4 h-4 text-primary" />
@@ -128,7 +129,8 @@ export function LandingPage() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 pt-2">
           <a
             href={smartDownload.url}
-            download
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-full sm:w-auto px-8 py-3.5 bg-primary text-primary-foreground rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all font-semibold text-base flex items-center justify-center gap-3 shadow-lg shadow-primary/20"
           >
             <Download className="w-5 h-5" />
@@ -200,7 +202,8 @@ export function LandingPage() {
                     <a
                       key={dl.name}
                       href={dl.url}
-                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="block p-3 rounded-lg bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 transition"
                     >
                       <div className="flex items-center justify-between mb-1">

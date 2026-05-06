@@ -167,7 +167,6 @@ function buildQuotationHtml(
     .replace("{{CUSTOMER_PHONE}}", quotation.customer_phone || "No phone provided")
     .replace("{{DATE}}", displayDate)
     .replace("{{VALID_UNTIL}}", validUntil)
-    .replace("{{STATUS}}", quotation.status)
     .replace("{{ITEM_ROWS}}", itemRows)
     .replace("{{EMPTY_ROWS}}", emptyRows)
     .replace(/{{CURRENCY}}/g, company.currency || "PKR")
@@ -672,3 +671,212 @@ export function buildQuotationPreviewHtml(quotation: Quotation, company: any): s
   const companyLogo = useAuthStore.getState().companyLogo;
   return buildQuotationHtml(quotation, companyLogo, company);
 }
+
+function buildInvoiceHtml(
+  invoice: any,
+  companyLogo: string | null,
+  company: any
+): string {
+  const displayDate = new Date(invoice.created_at).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const validUntil = new Date(new Date(invoice.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  const logoHtml = companyLogo
+    ? `<img src="${companyLogo}" style="height:52px;width:52px;object-fit:contain;border-radius:6px;background:#fff;padding:3px;margin-right:12px;" />`
+    : "";
+
+  const itemRows = invoice.items
+    .map(
+      (item: any, idx: number) => `
+      <tr style="background:${idx % 2 === 0 ? "#fff" : "#f8fafc"};">
+        <td class="col-description" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;">
+          <div style="font-weight:700;color:#0f172a;">${item.description}</div>
+        </td>
+        <td class="col-qty" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;text-align:center;font-weight:700;">${item.quantity}</td>
+        <td class="col-rate" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;text-align:right;color:#64748b;">${company.currency} ${item.rate.toLocaleString()}</td>
+        <td class="col-amount" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;font-size:12px;text-align:right;font-weight:700;color:#0f172a;">${company.currency} ${item.amount.toLocaleString()}</td>
+      </tr>`
+    )
+    .join("");
+
+  const emptyRowCount = Math.max(0, 5 - invoice.items.length);
+  const emptyRows = Array.from({ length: emptyRowCount })
+    .map(
+      () => `
+      <tr>
+        <td class="col-description" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;">&nbsp;</td>
+        <td class="col-qty" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;"></td>
+        <td class="col-rate" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;"></td>
+        <td class="col-amount" style="padding:12px 10px;border-bottom:1px solid #f1f5f9;"></td>
+      </tr>`
+    )
+    .join("");
+
+  const notesHtml = invoice.notes 
+    ? `<div class="notes"><h4>Notes & Terms</h4>${invoice.notes}</div>` 
+    : "";
+
+  const subtotal = invoice.total_amount;
+  const total = invoice.total_amount;
+
+  return quotationTemplate
+    .replace("{{LOGO_HTML}}", logoHtml)
+    .replace("QUOTATION", "TAX INVOICE")
+    .replace("QUOTATION", "TAX INVOICE")
+    .replace("Quotation Preview", "Invoice Preview")
+    .replace(/{{QUOTE_NUMBER}}/g, invoice.invoice_number)
+    .replace(/{{COMPANY_NAME}}/g, company.company_name || "Company Name")
+    .replace("{{COMPANY_ADDRESS}}", company.address || "")
+    .replace("{{COMPANY_CITY}}", company.city || "")
+    .replace("{{COMPANY_STATE}}", company.state || "")
+    .replace("{{COMPANY_POSTAL}}", company.postal_code || "")
+    .replace("{{COMPANY_PHONE}}", company.phone || "")
+    .replace("{{COMPANY_EMAIL}}", company.email || "")
+    .replace("{{COMPANY_WEBSITE}}", company.website || "")
+    .replace("{{CUSTOMER_NAME}}", invoice.customer_name)
+    .replace("{{CUSTOMER_ADDRESS}}", "No address provided")
+    .replace("{{CUSTOMER_PHONE}}", "No phone provided")
+    .replace("{{DATE}}", displayDate)
+    .replace("{{VALID_UNTIL}}", validUntil)
+    .replace("{{ITEM_ROWS}}", itemRows)
+    .replace("{{EMPTY_ROWS}}", emptyRows)
+    .replace(/{{CURRENCY}}/g, company.currency || "PKR")
+    .replace("{{SUBTOTAL}}", subtotal.toLocaleString())
+    .replace("{{TOTAL}}", total.toLocaleString())
+    .replace("{{NOTES_HTML}}", notesHtml)
+    .replace("{{APP_VERSION}}", APP_VERSION);
+}
+
+export async function printInvoice(invoice: any) {
+  const companyLogo = useAuthStore.getState().companyLogo;
+  const companyId = useAuthStore.getState().companyId;
+  if (!companyId) throw new Error("Company ID not found");
+  
+  const company = await getCompanyProfile(companyId);
+  const html = buildInvoiceHtml(invoice, companyLogo, company);
+
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (doc) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      document.body.removeChild(iframe);
+    }, 500);
+  }
+}
+
+export async function downloadInvoicePdf(invoice: any): Promise<string> {
+  const companyLogo = useAuthStore.getState().companyLogo;
+  const companyId = useAuthStore.getState().companyId;
+  if (!companyId) throw new Error("Company ID not found");
+
+  const company = await getCompanyProfile(companyId);
+  const html = buildInvoiceHtml(invoice, companyLogo, company);
+
+  return new Promise((resolve, reject) => {
+    const doc = new jsPDF("p", "pt", "a4");
+    doc.html(html, {
+      callback: async (doc) => {
+        try {
+          const pdfBase64 = toBase64(doc.output("arraybuffer"));
+          const filename = `Invoice-${invoice.invoice_number}.pdf`;
+          const savedPath = await invoke<string>("save_delivery_challan_pdf", { filename, base64Data: pdfBase64 });
+          resolve(savedPath);
+        } catch (err) {
+          reject(err);
+        }
+      },
+      width: 595,
+      windowWidth: 595,
+    }).catch(reject);
+  });
+}
+
+export async function previewInvoice(invoice: any) {
+  const companyLogo = useAuthStore.getState().companyLogo;
+  const companyId = useAuthStore.getState().companyId;
+  if (!companyId) throw new Error("Company ID not found");
+
+  const company = await getCompanyProfile(companyId);
+  const html = buildInvoiceHtml(invoice, companyLogo, company);
+
+  if (isTauri()) {
+    try {
+      const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+      const { writeTextFile, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+      const { convertFileSrc } = await import("@tauri-apps/api/core");
+      const { tempDir } = await import("@tauri-apps/api/path");
+
+      const previewFile = "invoice-live-preview.html";
+      await writeTextFile(previewFile, html, { baseDir: BaseDirectory.Temp });
+
+      if (_previewLabel) {
+        const existing = await WebviewWindow.getByLabel(_previewLabel);
+        if (existing) {
+          const tmpDir = await tempDir();
+          const assetUrl = convertFileSrc(`${tmpDir}${previewFile}`);
+          await (existing as any).eval(`window.location.replace("${assetUrl}")`);
+          await (existing as any).setFocus?.();
+          return;
+        }
+      }
+
+      const tmpDir = await tempDir();
+      const filePath = `${tmpDir}${previewFile}`;
+      const assetUrl = convertFileSrc(filePath);
+
+      const label = `invoice-preview-${Date.now()}`;
+      _previewLabel = label;
+
+      const webview = new WebviewWindow(label, {
+        url: assetUrl,
+        title: `Invoice Preview — ${invoice.invoice_number}`,
+        width: 900,
+        height: 1000,
+        resizable: true,
+        center: true,
+      });
+
+      webview.once("tauri://error", () => { _previewLabel = null; });
+      webview.once("tauri://destroyed", () => { _previewLabel = null; });
+    } catch { _previewLabel = null; }
+  } else {
+    if (_previewPopup && !_previewPopup.closed) {
+      _previewPopup.document.open();
+      _previewPopup.document.write(html);
+      _previewPopup.document.close();
+      _previewPopup.focus();
+    } else {
+      _previewPopup = window.open("", "invoice-live-preview", "width=900,height=1100,resizable=yes,scrollbars=yes");
+      if (_previewPopup) {
+        _previewPopup.document.open();
+        _previewPopup.document.write(html);
+        _previewPopup.document.close();
+        _previewPopup.focus();
+      }
+    }
+  }
+}
+
+

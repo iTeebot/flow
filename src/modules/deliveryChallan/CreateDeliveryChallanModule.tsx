@@ -10,8 +10,9 @@ import { useToastStore } from "../../store/toastStore";
 import { Button } from "../../components/ui/Button";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { useTranslation } from "react-i18next";
-import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
 import { CreateProductModal } from "../../components/modals/CreateProductModal";
+import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
+import { useUiStore } from "../../store/uiStore";
 import { X } from "lucide-react";
 
 type ChallanItem = {
@@ -29,7 +30,7 @@ export function CreateDeliveryChallanModule() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const { addToast } = useToastStore();
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useUiStore();
   const [submitting, setSubmitting] = useState(false);
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -89,7 +90,7 @@ export function CreateDeliveryChallanModule() {
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      setLoading(true, "Synchronizing Inventory & Contacts...");
       const [custs, prods] = await Promise.all([
         listCustomers(currentCompanyId),
         listProducts(currentCompanyId),
@@ -198,6 +199,7 @@ export function CreateDeliveryChallanModule() {
 
     try {
       setSubmitting(true);
+      setLoading(true, "Finalizing Delivery Records...");
       await createDeliveryChallan({
         company_id: currentCompanyId,
         customer_id: selectedCustomer.id,
@@ -213,6 +215,7 @@ export function CreateDeliveryChallanModule() {
       addToast(err instanceof Error ? err.message : "Failed to create delivery challan", "error");
     } finally {
       setSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -266,17 +269,7 @@ export function CreateDeliveryChallanModule() {
     return buildPreviewHtml(tempChallan as any, customFields);
   }, [selectedCustomer, challanItems, customFields]);
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <div className="text-sm text-text-muted font-medium">Loading resources...</div>
-        </div>
-      </div>
-    );
-  }
-
+  // Loading is now handled globally via useUiStore.setLoading
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-500">
       {/* ── HEADER ── */}

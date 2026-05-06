@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, PlusCircle, Search, Eye } from "lucide-react";
+import { FileText, PlusCircle, Search, Eye, ArrowLeft, Users, Package, Trash2, Info } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
-import { listDeliveryChallans, type DeliveryChallan } from "../deliveryChallan/api";
+import { listDeliveryChallans, getDeliveryChallan, type DeliveryChallan } from "../deliveryChallan/api";
 import { TablePagination } from "../shared/TablePagination";
-import { createInvoiceFromChallan, listInvoices, type Invoice } from "./api";
+import { createInvoiceFromChallan, listInvoices, deleteInvoice, updateInvoice, type Invoice } from "./api";
 import { formatCurrency } from "../../lib/utils";
 import { useToastStore } from "../../store/toastStore";
 import { ModulePage } from "../../components/ModulePage";
 import { DataTable } from "../../components/DataTable";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
+import { Dialog } from "../../components/ui/Dialog";
+import { Edit2, Printer, Download } from "lucide-react";
+import { printInvoice, downloadInvoicePdf, previewInvoice } from "../reports/pdf";
+import { useUiStore } from "../../store/uiStore";
 
 export function InvoicesModule() {
   const { companyId, currency } = useAuthStore();
@@ -27,11 +31,21 @@ export function InvoicesModule() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useUiStore();
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [isFinalized, setIsFinalized] = useState(false);
+  const [reviewDc, setReviewDc] = useState<DeliveryChallan | null>(null);
+
+  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
+  
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      setLoading(true, "Synchronizing financial records...");
       const [invoiceRows, challanRows] = await Promise.all([
         listInvoices(currentCompanyId),
         listDeliveryChallans(currentCompanyId),
@@ -54,10 +68,52 @@ export function InvoicesModule() {
     }
   }, [currentCompanyId]);
 
-  const handleCreate = async () => {
+  const handleReview = async () => {
     if (!selectedDcId) return;
     try {
       setBusy(true);
+      setLoading(true, "Accessing Delivery Records...");
+      const dc = await getDeliveryChallan(selectedDcId);
+      setReviewDc(dc);
+      setIsReviewing(true);
+      setIsFinalized(false);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Failed to load challan details", "error");
+    } finally {
+      setBusy(false);
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (invoiceToEdit) {
+      try {
+        setBusy(true);
+        setLoading(true, "Updating Invoice...");
+        await updateInvoice({
+          invoice_id: invoiceToEdit.id,
+          status: invoiceToEdit.status,
+          notes: notes || null,
+        });
+        addToast(`Invoice ${invoiceToEdit.invoice_number} updated successfully!`, "success");
+        setNotes("");
+        setIsFinalized(false);
+        handleCancelReview();
+        await loadData();
+      } catch (err) {
+        addToast(err instanceof Error ? err.message : "Failed to update invoice", "error");
+      } finally {
+        setBusy(false);
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (!selectedDcId) return;
+
+    try {
+      setBusy(true);
+      setLoading(true, "Generating Document...");
       const result = await createInvoiceFromChallan({
         company_id: currentCompanyId,
         dc_id: selectedDcId,
@@ -65,11 +121,14 @@ export function InvoicesModule() {
       });
       addToast(`Invoice ${result.invoice_number} created successfully!`, "success");
       setNotes("");
+      setIsFinalized(false);
+      handleCancelReview();
       await loadData();
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to create invoice", "error");
     } finally {
       setBusy(false);
+      setLoading(false);
     }
   };
 
@@ -113,20 +172,302 @@ export function InvoicesModule() {
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  if (loading) {
+  const confirmDelete = async () => {
+    if (!invoiceToDelete) return;
+    try {
+      setIsDeleting(true);
+      await deleteInvoice(invoiceToDelete.id);
+      addToast(`Invoice ${invoiceToDelete.invoice_number} deleted`, "success");
+      await loadData();
+      setInvoiceToDelete(null);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Failed to delete", "error");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelReview = () => {
+    setIsReviewing(false);
+    setInvoiceToEdit(null);
+  };
+
+  const handleDownloadPdf = async (invoice: Invoice) => {
+    try {
+      setDownloadingId(invoice.id);
+      const savedPath = await downloadInvoicePdf(invoice);
+      addToast("Invoice PDF saved", "success", savedPath);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Failed to download", "error");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  if (isReviewing && reviewDc) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-        <p className="text-sm text-text-muted animate-pulse">Synchronizing financial records...</p>
+      <div className="flex flex-col h-full bg-background relative animate-in fade-in duration-300">
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/95 px-6 py-4 backdrop-blur">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={handleCancelReview}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface hover:bg-surface-hover transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 text-text-muted" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-text-primary leading-tight">
+                {invoiceToEdit ? "Edit Sales Invoice" : "Create Sales Invoice"}
+              </h1>
+              <p className="text-[10px] font-black uppercase tracking-widest text-text-muted mt-1">Regulatory Compliance Mode</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleCancelReview}
+              className="px-6 py-2.5 rounded-lg border border-border bg-surface text-sm font-bold text-text-primary hover:bg-surface-hover transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => setIsFinalized(true)}
+              disabled={isFinalized}
+              className={`px-6 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${
+                isFinalized 
+                  ? "bg-primary/50 text-primary-foreground/50 cursor-not-allowed" 
+                  : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              {isFinalized ? "Finalized" : invoiceToEdit ? "Update" : "Finalize Invoice"}
+            </button>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 max-w-7xl mx-auto">
+             {/* LEFT COLUMN */}
+             <div className="lg:col-span-2 space-y-5">
+                {/* INVOICE HEADER */}
+                <div className="bg-surface border border-border rounded-xl p-5 shadow-md">
+                  <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-text-primary mb-5">
+                    <FileText className="h-4 w-4 text-primary" /> Invoice Header
+                  </h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Invoice Type</label>
+                      <select disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg">
+                        <option>Sale Invoice</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Invoice Date</label>
+                      <input type="date" disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg px-3" value={new Date().toISOString().split('T')[0]} readOnly />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Reference Number</label>
+                      <input type="text" disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-bold rounded-lg px-3" defaultValue="" placeholder="Optional reference..." />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-5">
+                  {/* SELLER DETAILS */}
+                  <div className="bg-surface border border-border rounded-xl p-5 shadow-md">
+                    <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-success mb-5">
+                      <div className="w-2 h-2 rounded-full bg-success"></div> Seller Details (You)
+                    </h3>
+                    <div className="space-y-5">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Business Name</label>
+                        <div className="text-sm font-bold">Teebot03</div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">NTN / CNIC</label>
+                          <div className="text-sm font-bold">1231111</div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Province</label>
+                          <div className="text-sm font-bold">Sindh</div>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Address</label>
+                        <div className="text-sm font-bold text-text-secondary">house 326 street 7</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* BUYER DETAILS */}
+                  <div className="bg-surface border border-border rounded-xl p-5 shadow-md">
+                    <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-primary mb-5">
+                      <Users className="h-4 w-4" /> Buyer Details
+                    </h3>
+                    <div className="space-y-5">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Select Buyer</label>
+                        <select disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg">
+                          <option>{reviewDc.customer_name}</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">NTN / CNIC (7 or 13 digits)</label>
+                        <input type="text" disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-bold rounded-lg px-3" defaultValue="1231111" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Province</label>
+                          <select disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg">
+                            <option>Sindh</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Registration</label>
+                          <select disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg">
+                            <option>Unregistered</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Buyer Address</label>
+                        <input type="text" disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg px-3" defaultValue="house 326 street 7" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+
+             </div>
+
+             {/* RIGHT COLUMN */}
+             <div className="space-y-5">
+                {/* FINANCIAL SUMMARY */}
+                <div className="bg-surface border border-border rounded-xl p-5 shadow-md">
+                   <h3 className="text-xs font-black uppercase tracking-widest text-primary mb-6">Financial Summary</h3>
+                   
+                   <div className="space-y-4 mb-6">
+                     <div className="flex justify-between items-center text-xs font-black tracking-widest uppercase text-text-muted">
+                       <span>Value Excl. ST</span>
+                       <span className="text-text-primary">PKR {reviewDc.total_amount.toFixed(2)}</span>
+                     </div>
+                     <div className="flex justify-between items-center text-xs font-black tracking-widest uppercase text-text-muted">
+                       <span>Sales Tax (18%)</span>
+                       <span className="text-primary">PKR {(reviewDc.total_amount * 0.18).toFixed(2)}</span>
+                     </div>
+                     <div className="pt-5 border-t border-border flex justify-between items-center">
+                       <span className="text-xs font-black uppercase tracking-widest text-text-muted">Grand Total</span>
+                       <span className="text-2xl font-black text-primary tracking-tight">PKR {(reviewDc.total_amount * 1.18).toFixed(2)}</span>
+                     </div>
+                   </div>
+
+                   <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex gap-3 mb-6">
+                     <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                     <p className="text-[10px] leading-relaxed font-medium text-text-muted">
+                       All calculations are based on regulatory standards. Ensure the <strong className="text-primary font-bold">HS Code</strong> and <strong className="text-primary font-bold">Buyer NTN</strong> are accurate for valid tax reporting.
+                     </p>
+                   </div>
+
+                   <button
+                     onClick={handleCreate}
+                     disabled={!isFinalized || busy}
+                     className={`w-full py-3.5 rounded-lg text-sm font-black uppercase tracking-widest shadow-lg transition-all ${
+                       !isFinalized 
+                         ? "bg-background border border-border text-text-muted cursor-not-allowed" 
+                         : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98]"
+                     }`}
+                   >
+                     {busy ? "Processing..." : invoiceToEdit ? "Update" : "Generate Document"}
+                   </button>
+                </div>
+
+                {/* INTERNAL NOTES */}
+                <div className="bg-surface border border-border rounded-xl p-5 shadow-md">
+                   <h3 className="text-xs font-black uppercase tracking-widest text-text-muted mb-4">Internal Notes</h3>
+                   <textarea
+                     disabled={isFinalized}
+                     value={notes}
+                     onChange={e => setNotes(e.target.value)}
+                     placeholder="Add any internal remarks or terms here..."
+                     className="w-full bg-background border border-border rounded-lg p-3 text-sm min-h-[120px] resize-none focus:border-primary transition-colors disabled:opacity-50"
+                   />
+                </div>
+              </div>
+
+              {/* FULL WIDTH LINE ITEMS */}
+              <div className="lg:col-span-3">
+                <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-lg">
+                   <div className="p-5 border-b border-border flex items-center justify-between bg-surface/50">
+                     <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-primary">
+                       <Package className="h-4 w-4" /> Line Items
+                     </h3>
+                     <button disabled={isFinalized} className="px-4 py-2 rounded-lg bg-background border border-border text-xs font-bold text-text-muted hover:text-text-primary transition-colors disabled:opacity-50">Add Product...</button>
+                   </div>
+                   <div className="w-full overflow-x-auto">
+                     <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-background/80 border-b border-border">
+                            <th className="p-4 text-[10px] font-black uppercase tracking-widest text-text-muted">Product / HS Code</th>
+                            <th className="p-4 text-[10px] font-black uppercase tracking-widest text-text-muted">Qty / UOM</th>
+                            <th className="p-4 text-[10px] font-black uppercase tracking-widest text-text-muted">Unit Price (PKR)</th>
+                            <th className="p-4 text-[10px] font-black uppercase tracking-widest text-text-muted text-center">Tax Rate %</th>
+                            <th className="p-4 text-[10px] font-black uppercase tracking-widest text-text-muted">Sales Tax</th>
+                            <th className="p-4 text-[10px] font-black uppercase tracking-widest text-text-muted">Amount</th>
+                            <th className="p-4"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {reviewDc.items.map((item, i) => {
+                            const salesTax = item.amount * 0.18;
+                            const totalWithTax = item.amount + salesTax;
+                            return (
+                              <tr key={i} className="border-b border-border/50 hover:bg-surface-hover/30 transition-colors">
+                                <td className="p-4">
+                                  <div className="font-bold text-sm text-text-primary mb-1.5">{item.product_name}</div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">HS:</span>
+                                    <button disabled={isFinalized} className="text-[10px] font-bold px-2 py-0.5 rounded border border-border bg-background text-text-muted hover:text-text-primary disabled:opacity-50">Set HS Code</button>
+                                  </div>
+                                </td>
+                                <td className="p-4">
+                                  <input type="number" disabled={isFinalized} className="w-20 h-9 bg-background border border-border text-center font-bold rounded text-sm text-text-primary disabled:opacity-50" defaultValue={item.quantity} />
+                                  <div className="text-[9px] font-bold text-text-muted mt-1.5">Numbers, pieces, units</div>
+                                </td>
+                                <td className="p-4">
+                                  <input type="number" disabled={isFinalized} className="w-20 h-9 bg-background border border-border text-center font-bold rounded text-sm text-text-primary disabled:opacity-50" defaultValue={item.rate} />
+                                </td>
+                                <td className="p-4 text-center">
+                                  <div className="px-3 py-1.5 rounded bg-background border border-border font-bold text-sm inline-block text-text-primary">18%</div>
+                                </td>
+                                <td className="p-4">
+                                  <div className="text-xs font-bold text-primary mb-1">PKR {salesTax.toFixed(2)}</div>
+                                  <div className="text-[9px] font-bold text-text-muted">Further Tax:<br/>PKR 0.00</div>
+                                </td>
+                                <td className="p-4 font-black text-sm text-text-primary">PKR {totalWithTax.toFixed(2)}</td>
+                                <td className="p-4 text-right">
+                                  <button disabled={isFinalized} className="p-2 text-text-muted hover:text-error hover:bg-error/10 rounded-lg transition-colors disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                     </table>
+                   </div>
+                </div>
+              </div>
+           </div>
+        </div>
       </div>
     );
   }
 
+  // Loading is now handled globally via useUiStore.setLoading
   return (
     <ModulePage
       title="Financial Invoicing"
       subtitle="Convert delivery challans into professional invoices"
-      loading={loading}
+      loading={false}
       listIcon={<FileText className="h-5 w-5" />}
       listTitle="Invoice Registry"
       count={filtered.length}
@@ -186,8 +527,8 @@ export function InvoicesModule() {
           </div>
         </div>
 
-        <div className="p-6 space-y-6 bg-gradient-to-br from-card to-surface/30">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="p-6 space-y-5 bg-gradient-to-br from-card to-surface/30">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             <div className="space-y-2">
               <label className="block text-[11px] font-bold uppercase text-text-muted ml-1 tracking-wider">Target Delivery Challan</label>
               <select
@@ -198,7 +539,7 @@ export function InvoicesModule() {
                 {challans.length === 0 && <option>No available challans</option>}
                 {challans.map((challan) => (
                   <option key={challan.id} value={challan.id}>
-                    {challan.dc_number} — {challan.customer_name}
+                    {challan.dc_number} â€” {challan.customer_name}
                   </option>
                 ))}
               </select>
@@ -218,18 +559,30 @@ export function InvoicesModule() {
           <div className="flex items-center justify-end pt-4 border-t border-border/60">
             <button
               type="button"
-              onClick={handleCreate}
+              onClick={handleReview}
               disabled={busy || !selectedDcId}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >
               {busy ? (
                 <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
               ) : <PlusCircle className="h-4 w-4" />}
-              {busy ? "Drafting Document..." : "Finalize & Create Invoice"}
+              Review and Finalize
             </button>
           </div>
         </div>
       </div>
+
+      <Dialog
+        isOpen={!!invoiceToDelete}
+        onClose={() => setInvoiceToDelete(null)}
+        onConfirm={confirmDelete}
+        title="Delete Invoice?"
+        description={`Are you sure you want to delete ${invoiceToDelete?.invoice_number}?`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+      />
 
       <DataTable
         data={paginated}
@@ -293,11 +646,55 @@ export function InvoicesModule() {
             )
           }
         ]}
-        actions={(_invoice) => [
+        actions={(invoice) => [
           {
-            label: "View Document",
+            label: "View Details",
             icon: Eye,
-            onClick: () => { /* View logic */ }
+            onClick: () => previewInvoice(invoice)
+          },
+          {
+            label: "Edit Invoice",
+            icon: Edit2,
+            onClick: () => {
+              setInvoiceToEdit(invoice);
+              setReviewDc({
+                id: invoice.dc_id || 0,
+                dc_number: invoice.dc_number || "",
+                customer_id: invoice.customer_id,
+                customer_name: invoice.customer_name,
+                company_id: invoice.company_id,
+                items: invoice.items.map(i => ({
+                  id: i.id,
+                  product_id: i.product_id || 0,
+                  product_name: i.description,
+                  product_sku: '',
+                  quantity: i.quantity,
+                  rate: i.rate,
+                  amount: i.amount
+                })),
+                total_amount: invoice.total_amount,
+                created_at: invoice.created_at,
+              });
+              setNotes(invoice.notes || "");
+              setIsReviewing(true);
+              setIsFinalized(false);
+            }
+          },
+          {
+            label: "Print",
+            icon: Printer,
+            onClick: () => printInvoice(invoice)
+          },
+          {
+            label: downloadingId === invoice.id ? "Downloading..." : "Download PDF",
+            icon: Download,
+            onClick: () => handleDownloadPdf(invoice)
+          },
+          {
+            label: "Delete",
+            icon: Trash2,
+            variant: "danger",
+            onClick: () => setInvoiceToDelete(invoice)
           }
         ]}
       />

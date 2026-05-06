@@ -64,14 +64,14 @@ export function DataTable<T>({
               ) : (
                 <th
                   key={idx}
-                  className={`px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-text-muted ${col.className || ""}`}
+                  className={`px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-text-muted ${col.className || ""}`}
                 >
                   {col.header}
                 </th>
               )
             ))}
             {actions && (
-              <th className="sticky right-0 z-10 bg-surface/90 w-14 px-2 py-4 text-right text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-[-4px_0_10px_rgba(0,0,0,0.1)] backdrop-blur-sm"></th>
+              <th className="sticky right-0 z-10 bg-surface/90 w-14 px-2 py-3.5 text-right text-[11px] font-bold uppercase tracking-wider text-text-muted shadow-[-4px_0_10px_rgba(0,0,0,0.1)] backdrop-blur-sm"></th>
             )}
           </tr>
         </thead>
@@ -82,7 +82,7 @@ export function DataTable<T>({
               className="group hover:bg-surface/30 transition-all duration-200"
             >
               {columns.map((col, colIdx) => (
-                <td key={colIdx} className={`px-6 py-4 ${col.className || ""}`}>
+                <td key={colIdx} className={`px-5 py-3.5 ${col.className || ""}`}>
                   {typeof col.accessor === "function"
                     ? col.accessor(item)
                     : col.accessor
@@ -91,7 +91,7 @@ export function DataTable<T>({
                 </td>
               ))}
               {actions && (
-                <td className="sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-4 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm">
+                <td className="sticky right-0 z-10 bg-card/95 group-hover:bg-surface/95 w-14 px-2 py-3.5 transition-colors shadow-[-4px_0_10px_rgba(0,0,0,0.05)] backdrop-blur-sm">
                   <div className="flex items-center justify-end">
                     <TableActions actions={actions(item)} />
                   </div>

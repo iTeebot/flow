@@ -11,11 +11,12 @@ import { Select } from "../../components/ui/Select";
 import { Input } from "../../components/ui/Input";
 import { ModulePage } from "../../components/ModulePage";
 import { DataTable } from "../../components/DataTable";
+import { useUiStore } from "../../store/uiStore";
 
 export function InventoryModule() {
   const { t } = useTranslation("inventory");
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useUiStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [adjustingStock, setAdjustingStock] = useState<Product | null>(null);
@@ -45,14 +46,12 @@ export function InventoryModule() {
 
   const loadProducts = async (retryCount = 0) => {
     if (!currentCompanyId) return;
-
     try {
-      setLoading(true);
+      setLoading(true, t("loading_inventory", "Processing Catalog Assets..."));
       const data = await listProducts(currentCompanyId);
       setProducts(data);
     } catch (err) {
       if (retryCount < 3) {
-        // Wait 500ms and try again
         await new Promise(r => setTimeout(r, 500));
         return loadProducts(retryCount + 1);
       }
@@ -147,19 +146,12 @@ export function InventoryModule() {
   const safePage = Math.min(page, totalPages);
   const paginatedProducts = filteredProducts.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="text-text-muted">{t("loading")}</div>
-      </div>
-    );
-  }
-
+  // Loading is now handled globally via useUiStore.setLoading
   return (
     <ModulePage
       title={t("title")}
       subtitle={t("subtitle")}
-      loading={loading}
+      loading={false}
       action={{
         label: t("create_btn"),
         onClick: () => setShowAddForm(true)

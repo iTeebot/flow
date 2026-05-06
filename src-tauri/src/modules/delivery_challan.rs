@@ -223,14 +223,13 @@ pub fn get_delivery_challan(app: tauri::AppHandle, dc_id: i64) -> Result<Deliver
         .query_row(
             r#"
             SELECT 
-                dc.id, dc.dc_number, dc.customer_id, dc.company_id, dc.created_at,
-                c.name as customer_name,
+                dc.id, dc.dc_number, dc.customer_id, c.name as customer_name, dc.company_id, dc.created_at,
                 COALESCE(SUM(dci.quantity * dci.rate), 0) as total_amount
             FROM delivery_challans dc
             JOIN customers c ON dc.customer_id = c.id
             LEFT JOIN dc_items dci ON dc.id = dci.dc_id
             WHERE dc.id = ?1 AND dc.deleted_at IS NULL
-            GROUP BY dc.id, dc.dc_number, dc.customer_id, dc.company_id, dc.created_at, c.name
+            GROUP BY dc.id, dc.dc_number, dc.customer_id, c.name, dc.company_id, dc.created_at
             "#,
             [dc_id],
             |row| Ok((

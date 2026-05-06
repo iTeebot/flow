@@ -36,10 +36,13 @@ type UiState = {
   themeMode: ThemeMode;
   resolvedTheme: ResolvedTheme;
   language: LanguageKey;
+  isLoading: boolean;
+  loadingMessage: string | null;
   setActiveModule: (module: ModuleKey) => void;
   toggleSidebar: () => void;
   setThemeMode: (mode: ThemeMode) => void;
   setLanguage: (lang: LanguageKey) => void;
+  setLoading: (isLoading: boolean, message?: string | null) => void;
   initializeStore: () => void;
   syncSystemTheme: () => void;
 };
@@ -50,6 +53,8 @@ export const useUiStore = create<UiState>((set) => ({
   themeMode: "system",
   resolvedTheme: getSystemTheme(),
   language: "en",
+  isLoading: false,
+  loadingMessage: null,
   setActiveModule: (module) => set({ activeModule: module }),
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -64,6 +69,7 @@ export const useUiStore = create<UiState>((set) => ({
     i18n.changeLanguage(lang);
     set({ language: lang });
   },
+  setLoading: (isLoading, message = null) => set({ isLoading, loadingMessage: message }),
   initializeStore: () => {
     // Theme initialization
     const storedTheme = localStorage.getItem("ui-theme-mode");

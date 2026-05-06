@@ -37,3 +37,12 @@ export async function listInvoices(company_id: number) {
 export async function createInvoiceFromChallan(input: CreateInvoiceFromChallanInput) {
   return invoke<{ id: number; invoice_number: string }>("create_invoice_from_challan", { input });
 }
+
+export async function deleteInvoice(invoice_id: number) {
+  return invoke<void>("delete_invoice", { invoiceId: invoice_id });
+}
+
+export async function updateInvoice(input: { invoice_id: number; status: string; notes?: string | null }) {
+  return invoke<void>("update_invoice", { input });
+}
+

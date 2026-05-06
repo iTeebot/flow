@@ -6,6 +6,7 @@ import { getDashboardSummary, type DashboardSummary } from "../dashboard/api";
 import { listDeliveryChallans, type DeliveryChallan } from "../deliveryChallan/api";
 import { downloadDeliveryChallanPdf, printDeliveryChallan } from "./pdf";
 import { useToastStore } from "../../store/toastStore";
+import { useUiStore } from "../../store/uiStore";
 
 export function ReportsModule() {
   const { companyId, currency } = useAuthStore();
@@ -13,14 +14,14 @@ export function ReportsModule() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [challans, setChallans] = useState<DeliveryChallan[]>([]);
   const [selectedChallanId, setSelectedChallanId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useUiStore();
   const { addToast } = useToastStore();
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     const loadReports = async () => {
       try {
-        setLoading(true);
+        setLoading(true, "Processing Business Intelligence...");
         const [dashboardData, deliveryChallans] = await Promise.all([
           getDashboardSummary(currentCompanyId),
           listDeliveryChallans(currentCompanyId),
@@ -50,6 +51,7 @@ export function ReportsModule() {
   const handleDownload = async () => {
     if (!selectedChallan) return;
     setIsDownloading(true);
+    setLoading(true, "Generating PDF Document...");
     try {
       const savedPath = await downloadDeliveryChallanPdf(selectedChallan);
       if (savedPath === "browser-download") {
@@ -61,6 +63,7 @@ export function ReportsModule() {
       addToast(err instanceof Error ? err.message : "Failed to download PDF", "error");
     } finally {
       setIsDownloading(false);
+      setLoading(false);
     }
   };
 
@@ -79,10 +82,7 @@ export function ReportsModule() {
     }
   };
 
-  if (loading) {
-    return <div className="text-text-muted">Loading reports...</div>;
-  }
-
+  // Loading is now handled globally via useUiStore.setLoading
   if (!summary) {
     return (
       <div className="p-4 text-text-muted">

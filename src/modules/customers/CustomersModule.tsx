@@ -10,11 +10,12 @@ import { Input } from "../../components/ui/Input";
 import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
 import { ModulePage } from "../../components/ModulePage";
 import { DataTable } from "../../components/DataTable";
+import { useUiStore } from "../../store/uiStore";
 
 export function CustomersModule() {
   const { t } = useTranslation("customers");
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useUiStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -42,7 +43,7 @@ export function CustomersModule() {
     if (!currentCompanyId) return;
 
     try {
-      setLoading(true);
+      setLoading(true, t("loading_customers", "Synchronizing Customer Directory..."));
       const data = await listCustomers(currentCompanyId);
       setCustomers(data);
     } catch (err) {
@@ -120,19 +121,12 @@ export function CustomersModule() {
   const safePage = Math.min(page, totalPages);
   const paginatedCustomers = filteredCustomers.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
-      </div>
-    );
-  }
-
+  // Loading is now handled globally via useUiStore.setLoading
   return (
     <ModulePage
       title={t("title")}
       subtitle={t("subtitle")}
-      loading={loading}
+      loading={false}
       action={{
         label: t("create_btn"),
         onClick: () => setShowAddForm(true)

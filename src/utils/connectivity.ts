@@ -1,3 +1,5 @@
+import { getApiUrl } from "./apiConfig";
+
 export interface ConnectivityStatus {
   hasInternet: boolean | null;
   serverAvailable: boolean | null;
@@ -43,7 +45,7 @@ export const checkInternetConnectivity = async (): Promise<boolean> => {
  */
 export const checkServerHealth = async (apiUrl?: string): Promise<boolean> => {
   try {
-    const baseUrl = apiUrl || import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
+    const baseUrl = apiUrl || getApiUrl();
     console.log('Checking server health at:', `${baseUrl}/health`);
 
     const response = await fetch(`${baseUrl}/health`, {

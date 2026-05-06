@@ -8,7 +8,7 @@ import { useToastStore } from "../../store/toastStore";
 import { useAuthStore } from "../../store/authStore";
 import { isTauri, invoke } from "../../lib/api";
 import { RestoreConfirmModal } from "../../components/modals/RestoreConfirmModal";
-import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
+import { useUiStore } from "../../store/uiStore";
 
 interface OnboardingViewProps {
   onSelectRegister: () => void;
@@ -19,6 +19,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
   const { t } = useTranslation("auth");
   const { addToast } = useToastStore();
   const { checkRegistration } = useAuthStore();
+  const { setLoading } = useUiStore();
   const [isRestoring, setIsRestoring] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [isCloudAvailable, setIsCloudAvailable] = useState<boolean | null>(null); // null = checking, true = available, false = unavailable
@@ -131,6 +132,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
   const executeRestore = async (key?: string) => {
     if (!pendingFile) return;
     setIsRestoring(true);
+    setLoading(true, t("onboarding.restoring_data", "Restoring Data"));
     try {
       if (isTauri()) {
         await invoke("restore_database", { path: pendingFile.path, encryptionKey: key });
@@ -146,6 +148,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
       addToast(msg, "error");
     } finally {
       setIsRestoring(false);
+      setLoading(false);
       setShowRestoreConfirm(false);
       setPendingFile(null);
     }
@@ -194,9 +197,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
         ? t("onboarding.check_internet_btn", "Check Internet Again")
         : isCloudAvailable === false 
         ? t("onboarding.check_server_btn", "Check Server Again")
-        : isCloudAvailable === null
-        ? t("onboarding.checking_btn", "Checking...")
         : t("onboarding.cloud_btn"),
+      loadingText: isCloudAvailable === null ? t("onboarding.checking_btn", "Checking...") : undefined,
       loading: isCloudAvailable === null,
       disabled: isCloudAvailable === null,
       visible: true
@@ -244,6 +246,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
                     onClick={opt.action}
                     disabled={opt.disabled || opt.loading}
                     isLoading={opt.loading}
+                    loadingText={(opt as any).loadingText}
                     variant={opt.primary ? "primary" : "secondary"}
                     className="shrink-0 w-full sm:w-auto px-6 h-9 text-xs"
                     rightIcon={!opt.loading && <ArrowRight className="h-3.5 w-3.5" />}
@@ -288,11 +291,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onSelectRegister
         />
       )}
 
-      <FullscreenLoader
-        isVisible={isRestoring && !showRestoreConfirm}
-        message={t("onboarding.restoring_data", "Restoring Data")}
-        subMessage={t("onboarding.restore_wait_msg", "Please wait while we decrypt and restore your financial data. Do not close the app.")}
-      />
+      {/* GlobalLoader handles full screen loading */}
     </div>
   );
 };

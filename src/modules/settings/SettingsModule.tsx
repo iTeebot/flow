@@ -9,7 +9,6 @@ import { openPath, invoke } from "../../lib/api";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import languagesData from "../../assets/languages.json";
 import { RestoreConfirmModal } from "../../components/modals/RestoreConfirmModal";
-import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
 import { sendRecoveryCodeEmail, uploadBackup } from "../../utils/cloudSync";
 import { checkFullConnectivity } from "../../utils/connectivity";
 import { loadRecoveryKey, saveRecoveryKey } from "../../utils/recoveryKeyStore";
@@ -26,6 +25,7 @@ export function SettingsModule() {
   const [connectivity, setConnectivity] = useState<{ hasInternet: boolean; serverAvailable: boolean } | null>(null);
   const [businessJwtPresent, setBusinessJwtPresent] = useState<boolean | null>(null);
   const { addToast } = useToastStore();
+  const { setLoading } = useUiStore();
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [pendingFile, setPendingFile] = useState<{
     path: string;
@@ -188,6 +188,7 @@ export function SettingsModule() {
   const handleCreateBackup = async () => {
     try {
       setBackupBusy(true);
+      setLoading(true, t("securing_data", "Processing Data"));
 
       // Ensure recovery key exists before creating backup
       const key = await ensureRecoveryKeyExists();
@@ -233,12 +234,14 @@ export function SettingsModule() {
       }
     } finally {
       setBackupBusy(false);
+      setLoading(false);
     }
   };
 
   const handleExportBackup = async () => {
     try {
       setBackupBusy(true);
+      setLoading(true, "Exporting Backup...");
 
       // Ensure recovery key exists before exporting backup
       const key = await ensureRecoveryKeyExists();
@@ -261,6 +264,7 @@ export function SettingsModule() {
       addToast(err instanceof Error ? err.message : t("export_error", "Failed to export backup"), "error");
     } finally {
       setBackupBusy(false);
+      setLoading(false);
     }
   };
 
@@ -293,6 +297,7 @@ export function SettingsModule() {
   const executeRestore = async (key?: string) => {
     if (!pendingFile) return;
     setBackupBusy(true);
+    setLoading(true, "Restoring Database...");
     try {
       await invoke("restore_database", { path: pendingFile.path, encryptionKey: key });
       addToast(t("restore_success", "Database restored successfully!"), "success");
@@ -303,6 +308,7 @@ export function SettingsModule() {
       addToast(msg, "error");
     } finally {
       setBackupBusy(false);
+      setLoading(false);
       setShowRestoreConfirm(false);
       setPendingFile(null);
     }
@@ -311,6 +317,7 @@ export function SettingsModule() {
   const handleGenerateKey = async () => {
     try {
       setBackupBusy(true);
+      setLoading(true, "Securing Encryption Key");
       await ensureRecoveryKeyExists();
     } catch (err) {
       console.error("Generate key error:", err);
@@ -318,6 +325,7 @@ export function SettingsModule() {
       addToast(t("key_error", `Failed to generate key: ${msg}`), "error");
     } finally {
       setBackupBusy(false);
+      setLoading(false);
     }
   };
 
@@ -547,11 +555,7 @@ export function SettingsModule() {
         />
       )}
 
-      <FullscreenLoader
-        isVisible={backupBusy && !showRestoreConfirm}
-        message={t("securing_data", "Processing Data")}
-        subMessage={t("backup_wait_msg", "Please wait while we securely process your financial data. Do not close the app.")}
-      />
+      {/* GlobalLoader is now handled by the layout */}
     </div>
   );
 }

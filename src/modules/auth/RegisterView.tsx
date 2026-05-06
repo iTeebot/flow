@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getApiUrl } from '../../utils/apiConfig';
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../../store/authStore";
 import { useUiStore } from "../../store/uiStore";
@@ -75,6 +76,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
   const [customCountry, setCustomCountry] = useState("");
 
   const [isCloudAvailable, setIsCloudAvailable] = useState(false);
+  const [isCheckingCloud, setIsCheckingCloud] = useState(true);
   const [, setCloudBusinessId] = useState("");
   const [pakistanCities, setPakistanCities] = useState<any[]>(pakistanCitiesEn);
 
@@ -98,8 +100,13 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     const checkCloudHealth = async () => {
-      const isAvailable = await checkServerHealth();
-      setIsCloudAvailable(isAvailable);
+      try {
+        setIsCheckingCloud(true);
+        const isAvailable = await checkServerHealth();
+        setIsCloudAvailable(isAvailable);
+      } finally {
+        setIsCheckingCloud(false);
+      }
     };
     checkCloudHealth();
   }, []);
@@ -138,6 +145,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const { setLoading } = useUiStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -276,6 +284,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
     }
 
     setIsSubmitting(true);
+    setLoading(true, t("register.processing", "Creating Your Workspace..."));
     try {
       let businessId = "";
       if (isCloudAvailable) {
@@ -288,7 +297,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
           throw new Error(t("register_errors.sync_failed") || "Cloud server not available");
         }
 
-        const apiUrl = import.meta.env.VITE_API_URL || "https://api.afmsolution.tech/api/teebot-flow";
+        const apiUrl = getApiUrl();
         const cloudResponse = await fetch(`${apiUrl}/register-business`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -374,6 +383,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
       setError(err.message || err?.toString() || t("register.error_failed"));
     } finally {
       setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -383,7 +393,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
 
         <Sidebar type="register" />
 
-        {/* ── Form Area ── */}
+        {/* â”€â”€ Form Area â”€â”€ */}
         <div className="w-full p-8 lg:p-12 flex flex-col overflow-hidden bg-surface">
 
           {/* Header */}
@@ -406,7 +416,7 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
           <form onSubmit={handleSubmit} noValidate className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto pr-1 space-y-6">
 
-              {/* ── All Fields ── */}
+              {/* â”€â”€ All Fields â”€â”€ */}
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 {/* Identity & Business */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -815,9 +825,10 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
               <Button
                 type="submit"
                 className={`px-8 py-3 ${isUrdu ? "text-[10px]" : "text-xs"} uppercase tracking-widest`}
-                rightIcon={<ForwardIcon className="h-4 w-4" />}
+                rightIcon={isCheckingCloud ? undefined : <ForwardIcon className="h-4 w-4" />}
                 variant={isCloudAvailable ? "primary" : "secondary"}
-                isLoading={isSubmitting}
+                isLoading={isSubmitting || isCheckingCloud}
+                loadingText={isCheckingCloud ? t("onboarding.checking_btn", "Checking...") : undefined}
               >
                 {isCloudAvailable ? t("register.cloud_register_button") : t("register.finish_button")}
               </Button>

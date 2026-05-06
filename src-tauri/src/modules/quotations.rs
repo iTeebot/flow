@@ -18,6 +18,15 @@ pub struct CreateQuotationInput {
     pub notes: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateQuotationInput {
+    pub quote_id: i64,
+    pub company_id: i64,
+    pub customer_id: i64,
+    pub items: Vec<CreateQuotationItemInput>,
+    pub notes: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct QuotationResult {
     pub id: i64,
@@ -97,6 +106,65 @@ pub fn create_quotation(
 
     Ok(QuotationResult {
         id: quote_id,
+        quote_number,
+    })
+}
+
+#[tauri::command]
+pub fn update_quotation(
+    app: tauri::AppHandle,
+    input: UpdateQuotationInput,
+) -> Result<QuotationResult, String> {
+    if input.company_id <= 0 {
+        return Err("Company profile is required".to_string());
+    }
+    if input.customer_id <= 0 {
+        return Err("Customer is required".to_string());
+    }
+    if input.items.is_empty() {
+        return Err("At least one item is required".to_string());
+    }
+
+    let mut conn = db::open_connection(&app)?;
+
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Failed to start transaction: {e}"))?;
+
+    let quote_number: String = tx
+        .query_row(
+            "SELECT quote_number FROM quotations WHERE id = ?1 AND company_id = ?2",
+            params![input.quote_id, input.company_id],
+            |row| row.get(0),
+        )
+        .map_err(|_| "Quotation not found".to_string())?;
+
+    tx.execute(
+        "UPDATE quotations SET customer_id = ?1, notes = ?2 WHERE id = ?3",
+        params![input.customer_id, input.notes, input.quote_id],
+    )
+    .map_err(|e| format!("Failed to update quotation: {e}"))?;
+
+    tx.execute(
+        "DELETE FROM quotation_items WHERE quote_id = ?1",
+        params![input.quote_id],
+    )
+    .map_err(|e| format!("Failed to delete existing quotation items: {e}"))?;
+
+    for item in &input.items {
+        let amount = item.quantity as f64 * item.rate;
+        tx.execute(
+            "INSERT INTO quotation_items (quote_id, product_id, description, quantity, rate, amount) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![input.quote_id, item.product_id, item.description, item.quantity, item.rate, amount],
+        )
+        .map_err(|e| format!("Failed to insert quotation item: {e}"))?;
+    }
+
+    tx.commit()
+        .map_err(|e| format!("Failed to commit quotation transaction: {e}"))?;
+
+    Ok(QuotationResult {
+        id: input.quote_id,
         quote_number,
     })
 }

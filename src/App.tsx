@@ -14,6 +14,7 @@ import {
   Users,
   Activity,
   LogOut,
+  Zap,
 } from "lucide-react";
 import "./App.css";
 import { theme } from "./theme";
@@ -23,6 +24,7 @@ import { ToastContainer } from "./components/ToastContainer";
 import { GlobalRestoreHandler } from "./components/GlobalRestoreHandler";
 import { LandingPage } from "./pages/LandingPage";
 import { isTauri } from "./lib/platform";
+import { GlobalLoader } from "./components/ui/GlobalLoader";
 
 // Lazy-loaded Business Modules
 const DashboardModule = lazy(() => import("./modules/dashboard/DashboardModule").then(m => ({ default: m.DashboardModule })));
@@ -43,9 +45,20 @@ const LoadingFallback = () => {
   const { t } = useTranslation("sidebar");
   return (
     <div className="flex h-full w-full items-center justify-center animate-in fade-in duration-500">
-      <div className="flex flex-col items-center gap-4">
-        <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">{t("loading_module")}</span>
+      <div className="flex flex-col items-center gap-6">
+        <div className="relative">
+          <div className="absolute inset-0 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+          <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
+            <Zap className="h-6 w-6 text-primary animate-pulse" />
+          </div>
+        </div>
+        <div className="text-center">
+          <h1 className="text-xl font-black tracking-tighter text-text-primary flex items-center justify-center gap-2">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">TEEBOT</span>
+            <span className="font-light text-text-muted">FLOW</span>
+          </h1>
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-text-muted mt-1">{t("loading_module")}</p>
+        </div>
       </div>
     </div>
   );
@@ -172,7 +185,28 @@ function AppContent() {
   }
 
   if (isLoading) {
-    return <div className="flex h-screen items-center justify-center bg-background text-text-primary">{t("loading")}</div>;
+    return (
+      <>
+        <div className="fixed inset-0 flex items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative">
+              <div className="absolute inset-0 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+              <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <Zap className="h-8 w-8 text-primary animate-pulse" />
+              </div>
+            </div>
+            <div className="text-center">
+              <h1 className="text-2xl font-black tracking-tighter text-text-primary flex items-center justify-center gap-2">
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">TEEBOT</span>
+                <span className="font-light text-text-muted">FLOW</span>
+              </h1>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted mt-2">Initializing System</p>
+            </div>
+          </div>
+        </div>
+        <ToastContainer />
+      </>
+    );
   }
 
   if (!isAuthenticated) {
@@ -352,6 +386,7 @@ function AppContent() {
       </div>
       <ToastContainer />
       <GlobalRestoreHandler />
+      <GlobalLoader />
     </div>
   );
 }

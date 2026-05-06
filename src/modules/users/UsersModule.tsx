@@ -8,28 +8,28 @@ import { DataTable } from "../../components/DataTable";
 import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { CreateUserModal } from "./CreateUserModal";
-import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
+import { useUiStore } from "../../store/uiStore";
 import type { DataColumn } from "../../components/DataTable";
 
 export function UsersModule() {
   const { t } = useTranslation("users");
   const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const { addToast } = useToastStore();
   const { user: currentUser } = useAuthStore();
+  const { setLoading } = useUiStore();
 
   const fetchUsers = async () => {
     try {
-      setIsLoading(true);
+      setLoading(true, t("loading_users", "Loading Users..."));
       const data = await listUsers();
       setUsers(data);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to load users", "error");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -95,8 +95,6 @@ export function UsersModule() {
       ),
     },
   ];
-
-  if (isLoading) return <FullscreenLoader isVisible message={t("loading_users", "Loading Users...")} />;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">

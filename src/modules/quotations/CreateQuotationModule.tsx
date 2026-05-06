@@ -10,7 +10,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useToastStore } from "../../store/toastStore";
 import { listCustomers, type Customer } from "../customers/api";
 import { listProducts, type Product } from "../inventory/api";
-import { createQuotation, type Quotation } from "./api";
+import { createQuotation, updateQuotation, type Quotation } from "./api";
 import { buildQuotationPreviewHtml } from "../reports/pdf";
 import { getCompanyProfile, type CompanyProfile } from "../companyProfile/api";
 
@@ -19,6 +19,7 @@ import { Input } from "../../components/ui/Input";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
 import { CreateProductModal } from "../../components/modals/CreateProductModal";
+import { useUiStore } from "../../store/uiStore";
 
 interface QuotationItemInput {
   product_id?: number;
@@ -37,7 +38,7 @@ export function CreateQuotationModule() {
   const isEditMode = !!location.state?.quotation;
   const initialQuotation = location.state?.quotation as Quotation | undefined;
 
-  const [loading, setLoading] = useState(true);
+  const { setLoading, isLoading: isGlobalLoading } = useUiStore();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
@@ -54,7 +55,7 @@ export function CreateQuotationModule() {
     const loadResources = async () => {
       if (!companyId) return;
       try {
-        setLoading(true);
+        setLoading(true, "Synchronizing Resource Catalog...");
         const [cList, pList, profile] = await Promise.all([
           listCustomers(companyId),
           listProducts(companyId),
@@ -114,19 +115,35 @@ export function CreateQuotationModule() {
   const handleSave = async () => {
     if (!companyId || !selectedCustomer || quotationItems.length === 0) return;
     try {
-      setLoading(true);
-      const input = {
-        company_id: companyId,
-        customer_id: selectedCustomer.id,
-        items: quotationItems.map(item => ({
-          product_id: item.product_id,
-          description: item.description,
-          quantity: item.quantity,
-          rate: item.rate
-        })),
-        notes
-      };
-      await createQuotation(input);
+      setLoading(true, isEditMode ? "Updating Quotation Records..." : "Generating Price Quotation...");
+      if (isEditMode && initialQuotation) {
+        const input = {
+          quote_id: initialQuotation.id,
+          company_id: companyId,
+          customer_id: selectedCustomer.id,
+          items: quotationItems.map(item => ({
+            product_id: item.product_id,
+            description: item.description,
+            quantity: item.quantity,
+            rate: item.rate
+          })),
+          notes
+        };
+        await updateQuotation(input);
+      } else {
+        const input = {
+          company_id: companyId,
+          customer_id: selectedCustomer.id,
+          items: quotationItems.map(item => ({
+            product_id: item.product_id,
+            description: item.description,
+            quantity: item.quantity,
+            rate: item.rate
+          })),
+          notes
+        };
+        await createQuotation(input);
+      }
       addToast(isEditMode ? "Quotation updated" : "Quotation created", "success");
       navigate("/app/quotations");
     } catch (err) {
@@ -295,7 +312,7 @@ export function CreateQuotationModule() {
             <Button variant="outline" onClick={() => navigate("/app/quotations")} className="flex-1 h-11 uppercase font-black tracking-widest text-[10px]">Cancel</Button>
             <Button
               onClick={handleSave}
-              disabled={!selectedCustomer || quotationItems.length === 0 || loading}
+              disabled={!selectedCustomer || quotationItems.length === 0 || isGlobalLoading}
               className="flex-[2] h-11 uppercase font-black tracking-widest text-[10px]"
             >
               {isEditMode ? "Update Quotation" : "Confirm & Create"}

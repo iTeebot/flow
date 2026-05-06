@@ -42,3 +42,13 @@ export async function listQuotations(company_id: number) {
 export async function deleteQuotation(quote_id: number) {
   return await invoke<void>("delete_quotation", { quoteId: quote_id });
 }
+
+export async function updateQuotation(input: {
+  quote_id: number;
+  company_id: number;
+  customer_id: number;
+  items: Array<{ product_id?: number; description: string; quantity: number; rate: number }>;
+  notes?: string;
+}) {
+  return await invoke<{ id: number; quote_number: string }>("update_quotation", { input });
+}

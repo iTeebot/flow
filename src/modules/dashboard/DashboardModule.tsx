@@ -27,11 +27,12 @@ import { getDashboardSummary, type DashboardSummary } from "./api";
 import { useAuthStore } from "../../store/authStore";
 import { formatCurrency } from "../../lib/utils";
 import { Table } from "../../components/ui/Table";
+import { useUiStore } from "../../store/uiStore";
 
 export function DashboardModule() {
   const { t } = useTranslation("dashboard");
   const [data, setData] = useState<DashboardSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useUiStore();
 
   const { companyId, currency } = useAuthStore();
   const currentCompanyId = companyId || 1;
@@ -44,7 +45,7 @@ export function DashboardModule() {
 
   const loadDashboard = async () => {
     try {
-      setLoading(true);
+      setLoading(true, t("loading_dashboard", "Analyzing Business Analytics..."));
       const summary = await getDashboardSummary(currentCompanyId);
       setData(summary);
     } catch {
@@ -54,15 +55,7 @@ export function DashboardModule() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-        <p className="text-sm text-text-muted animate-pulse">{t("loading")}</p>
-      </div>
-    );
-  }
-
+  // Loading is now handled by the global system via useUiStore.setLoading
   if (!data) {
     return (
       <div className="rounded-xl border border-error/20 bg-error/5 p-8 text-center text-error border-dashed">

@@ -117,11 +117,12 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
     try {
       setIsSubmitting(true);
       if (editingCustomer) {
-        await updateCustomer({
+        const updated = await updateCustomer({
           id: editingCustomer.id,
           ...form
         });
         addToast(t("toast_updated"), "success");
+        onSuccess(updated);
       } else {
         const created = await createCustomer({
           company_id: companyId,

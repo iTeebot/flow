@@ -55,11 +55,12 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     try {
       setIsSubmitting(true);
       if (editingProduct) {
-        await updateProduct({
+        const updated = await updateProduct({
           id: editingProduct.id,
           ...form
         });
         addToast(t("toast_updated"), "success");
+        onSuccess(updated);
       } else {
         const created = await createProduct({
           company_id: companyId,

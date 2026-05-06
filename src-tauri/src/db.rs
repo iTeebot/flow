@@ -245,6 +245,8 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     ensure_column(&conn, "company_profiles", "postal_code", "TEXT")?;
     ensure_column(&conn, "company_profiles", "country", "TEXT")?;
     ensure_column(&conn, "customers", "tax_registration_number", "TEXT")?;
+    ensure_column(&conn, "customers", "city", "TEXT")?;
+    ensure_column(&conn, "customers", "state", "TEXT")?;
     ensure_column(
         &conn,
         "company_profiles",
