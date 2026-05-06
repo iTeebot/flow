@@ -34,13 +34,13 @@ export function LandingPage() {
       downloads: [
         {
           name: "Installer (EXE)",
-          url: "https://drive.google.com/file/d/1hPVT538Dm5HP9lItGpwfP8FGZnUrsXOp/view?usp=sharing",
-          size: "18.9mb"
+          url: "https://drive.google.com/file/d/1u1Ew3cTunbZpWyTphzXf704B9LjsY-AD/view?usp=sharing",
+          size: "4.1 MB"
         },
         {
           name: "MSI Package",
-          url: "https://drive.google.com/file/d/11fnNIFBA0_OwsESukhY8-vlFztZj-dcb/view?usp=sharing",
-          size: "21.5mb"
+          url: "https://drive.google.com/file/d/1hO3VqE5bCyFDMhscXD07C0ghflGAEA9n/view?usp=sharing",
+          size: "5.3 MB"
         }
       ]
     },
