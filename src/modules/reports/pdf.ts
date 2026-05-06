@@ -4,7 +4,9 @@ import type { DeliveryChallan } from "../deliveryChallan/api";
 import { useAuthStore } from "../../store/authStore";
 import challanTemplate from "./html/index.html?raw";
 import quotationTemplate from "./html/quotation.html?raw";
+
 import type { Quotation } from "../quotations/api";
+import type { Invoice } from "../invoices/api";
 import { getCompanyProfile } from "../companyProfile/api";
 
 export type ChallanCustomField = {
@@ -106,11 +108,17 @@ function buildQuotationHtml(
     year: "numeric",
   });
 
-  const validUntil = new Date(new Date(quotation.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  const validUntil = quotation.valid_until
+    ? new Date(quotation.valid_until).toLocaleDateString(undefined, {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : new Date(new Date(quotation.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
 
   const logoHtml = companyLogo
     ? `<img src="${companyLogo}" style="height:52px;width:52px;object-fit:contain;border-radius:6px;background:#fff;padding:3px;margin-right:12px;" />`
@@ -168,6 +176,7 @@ function buildQuotationHtml(
     .replace("{{DATE}}", displayDate)
     .replace("{{VALID_UNTIL}}", validUntil)
     .replace("{{ITEM_ROWS}}", itemRows)
+
     .replace("{{EMPTY_ROWS}}", emptyRows)
     .replace(/{{CURRENCY}}/g, company.currency || "PKR")
     .replace("{{SUBTOTAL}}", subtotal.toLocaleString())
@@ -175,6 +184,9 @@ function buildQuotationHtml(
     .replace("{{NOTES_HTML}}", notesHtml)
     .replace("{{APP_VERSION}}", APP_VERSION);
 }
+
+
+
 
 export async function downloadDeliveryChallanPdf(
   challan: DeliveryChallan,
@@ -647,24 +659,230 @@ export async function printQuotation(quotation: Quotation) {
   }
 }
 
-export async function downloadQuotationPdf(quotation: Quotation) {
+export async function downloadQuotationPdf(quotation: Quotation): Promise<string> {
   const companyLogo = useAuthStore.getState().companyLogo;
   const companyId = useAuthStore.getState().companyId;
+  const currency = useAuthStore.getState().currency || "PKR";
   if (!companyId) throw new Error("Company ID not found");
 
   const company = await getCompanyProfile(companyId);
-  const html = buildQuotationHtml(quotation, companyLogo, company);
 
-  const doc = new jsPDF("p", "pt", "a4");
-  await doc.html(html, {
-    callback: async (doc) => {
-      const pdfBase64 = toBase64(doc.output("arraybuffer"));
-      const filename = `Quotation-${quotation.quote_number}.pdf`;
-      await invoke("save_delivery_challan_pdf", { filename, base64Data: pdfBase64 });
-    },
-    width: 595,
-    windowWidth: 595,
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+
+  // ── Header Band ──────────────────────────────────────────────
+  doc.setFillColor(15, 23, 42); // Slate 900
+  doc.rect(0, 0, pageWidth, 100, "F");
+
+  // Logo
+  if (companyLogo) {
+    try {
+      doc.addImage(companyLogo, "PNG", margin, 20, 60, 60);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(24);
+      doc.setTextColor(255, 255, 255);
+      doc.text("QUOTATION", margin + 75, 55);
+    } catch {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(24);
+      doc.setTextColor(255, 255, 255);
+      doc.text("QUOTATION", margin, 55);
+    }
+  } else {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(24);
+    doc.setTextColor(255, 255, 255);
+    doc.text("QUOTATION", margin, 55);
+  }
+
+  // Quote info box (top-right)
+  doc.setFillColor(255, 255, 255, 0.1);
+  doc.roundedRect(pageWidth - margin - 160, 20, 160, 60, 6, 6, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(148, 163, 184); // Slate 400
+  doc.text("QUOTE NUMBER", pageWidth - margin - 80, 40, { align: "center" });
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255);
+  doc.text(quotation.quote_number, pageWidth - margin - 80, 65, { align: "center" });
+
+  // ── Info Grid ─────────────────────────────────────────────
+  let y = 130;
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139); // Slate 500
+  doc.setFont("helvetica", "bold");
+  doc.text("FROM", margin, y);
+  doc.text("BILL TO", pageWidth / 2 + 20, y);
+
+  y += 20;
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42); // Slate 900
+  doc.text(company.company_name || "Company Name", margin, y);
+  doc.text(quotation.customer_name, pageWidth / 2 + 20, y);
+
+  y += 18;
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(71, 85, 105); // Slate 600
+  
+  // Company address lines
+  const companyAddr = [
+    company.address,
+    `${company.city}, ${company.state} ${company.postal_code}`,
+    `Phone: ${company.phone}`,
+    `Email: ${company.email}`
+  ].filter(Boolean);
+  
+  let addrY = y;
+  companyAddr.forEach(line => {
+    doc.text(line || "", margin, addrY);
+    addrY += 14;
   });
+
+  // Customer address lines
+  const customerAddr = [
+    quotation.customer_address,
+    `Phone: ${quotation.customer_phone}`
+  ].filter(Boolean);
+  
+  addrY = y;
+  customerAddr.forEach(line => {
+    doc.text(line || "", pageWidth / 2 + 20, addrY);
+    addrY += 14;
+  });
+
+  y = Math.max(addrY, y + 60);
+
+  // Quote metadata
+  doc.setFillColor(248, 250, 252); // Slate 50
+  doc.roundedRect(margin, y, pageWidth - 2 * margin, 40, 4, 4, "F");
+  
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(100, 116, 139);
+  doc.text("DATE:", margin + 15, y + 25);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(15, 23, 42);
+  doc.text(new Date(quotation.created_at).toLocaleDateString(), margin + 55, y + 25);
+  
+  const validUntilStr = quotation.valid_until 
+    ? new Date(quotation.valid_until).toLocaleDateString()
+    : new Date(new Date(quotation.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString();
+
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(100, 116, 139);
+  doc.text("VALID UNTIL:", margin + 180, y + 25);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(15, 23, 42);
+  doc.text(validUntilStr, margin + 255, y + 25);
+
+
+  // ── Table ────────────────────────────────────────────────────
+  y += 65;
+  const colWidths = [260, 60, 95, 100]; // Total 515
+  const colX = [margin, margin + colWidths[0], margin + colWidths[0] + colWidths[1], margin + colWidths[0] + colWidths[1] + colWidths[2]];
+  const rowH = 30;
+
+  // Header row
+  doc.setFillColor(15, 23, 42);
+  doc.rect(margin, y, pageWidth - 2 * margin, rowH, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
+  doc.text("DESCRIPTION", colX[0] + 10, y + 19);
+  doc.text("QTY", colX[1] + colWidths[1] / 2, y + 19, { align: "center" });
+  doc.text("RATE", colX[2] + colWidths[2] - 10, y + 19, { align: "right" });
+  doc.text("AMOUNT", colX[3] + colWidths[3] - 10, y + 19, { align: "right" });
+  
+  y += rowH;
+
+  // Items
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(11);
+  quotation.items.forEach((item, idx) => {
+    if (y > pageHeight - 150) {
+      doc.addPage();
+      y = margin;
+    }
+
+    doc.setFillColor(idx % 2 === 0 ? 255 : 249, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 251);
+    doc.rect(margin, y, pageWidth - 2 * margin, rowH, "F");
+    doc.setDrawColor(241, 245, 249);
+    doc.line(margin, y + rowH, pageWidth - margin, y + rowH);
+
+    doc.setFont("helvetica", "bold");
+    doc.text(item.product_name, colX[0] + 10, y + 18);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(String(item.quantity), colX[1] + colWidths[1] / 2, y + 18, { align: "center" });
+    doc.text(`${currency} ${item.rate.toLocaleString()}`, colX[2] + colWidths[2] - 10, y + 18, { align: "right" });
+    
+    doc.setFont("helvetica", "bold");
+    doc.text(`${currency} ${item.amount.toLocaleString()}`, colX[3] + colWidths[3] - 10, y + 18, { align: "right" });
+    
+    y += rowH;
+  });
+
+  // ── Totals ───────────────────────────────────────────────────
+  y += 20;
+  const totalW = 200;
+  const totalX = pageWidth - margin - totalW;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(100, 116, 139);
+  doc.text("Subtotal", totalX, y);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`${currency} ${quotation.total_amount.toLocaleString()}`, pageWidth - margin, y, { align: "right" });
+
+  y += 25;
+  doc.setDrawColor(15, 23, 42);
+  doc.setLineWidth(1.5);
+  doc.line(totalX, y, pageWidth - margin, y);
+  
+  y += 20;
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("Total", totalX, y);
+  doc.text(`${currency} ${quotation.total_amount.toLocaleString()}`, pageWidth - margin, y, { align: "right" });
+
+  // Notes
+  if (quotation.notes) {
+    y += 50;
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "bold");
+    doc.text("NOTES & TERMS", margin, y);
+    y += 15;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    const splitNotes = doc.splitTextToSize(quotation.notes, pageWidth - 2 * margin);
+    doc.text(splitNotes, margin, y);
+  }
+
+  // Footer
+  doc.setFontSize(9);
+  doc.setTextColor(148, 163, 184);
+  doc.text(`Generated by Teebot Flow v${APP_VERSION}`, margin, pageHeight - 30);
+  doc.text("Page 1 of 1", pageWidth - margin, pageHeight - 30, { align: "right" });
+
+  // ── Save ─────────────────────────────────────────────────────
+  const fileName = `Quotation-${quotation.quote_number}.pdf`;
+  const arrayBuffer = doc.output("arraybuffer");
+  const base64Data = toBase64(arrayBuffer);
+
+  const savedPath = await invoke<string>("save_delivery_challan_pdf", {
+    filename: fileName,
+    base64Data,
+  });
+
+  try { await openPath(savedPath); } catch { /* ignore */ }
+  return savedPath;
 }
 
 export function buildQuotationPreviewHtml(quotation: Quotation, company: any): string {
@@ -721,45 +939,103 @@ function buildInvoiceHtml(
     .join("");
 
   const notesHtml = invoice.notes 
-    ? `<div class="notes"><h4>Notes & Terms</h4>${invoice.notes}</div>` 
+    ? `<div style="margin-top:32px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+         <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">Notes & Conditions</div>
+         <div style="font-size:12px;color:#334155;line-height:1.5;">${invoice.notes}</div>
+       </div>`
     : "";
 
-  const subtotal = invoice.total_amount;
-  const total = invoice.total_amount;
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+          body { font-family: 'Inter', sans-serif; color: #0f172a; margin: 0; padding: 40px; background: #fff; }
+          .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
+          .company-info h1 { margin: 0; font-size: 24px; color: #0f172a; }
+          .invoice-label { font-size: 32px; font-weight: 700; color: #0f172a; text-transform: uppercase; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #0f172a; color: #fff; text-align: left; padding: 12px 10px; font-size: 10px; text-transform: uppercase; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div style="display:flex;align-items:center;">
+            ${logoHtml}
+            <div class="company-info">
+              <h1>${company.company_name}</h1>
+              <div style="font-size:12px;color:#64748b;margin-top:4px;">${company.address || ""}</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div class="invoice-label">Invoice</div>
+            <div style="font-size:14px;font-weight:700;color:#3b82f6;margin-top:4px;">#${invoice.invoice_number}</div>
+          </div>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:40px;">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px;">Bill To</div>
+            <div style="font-size:16px;font-weight:700;color:#0f172a;">${invoice.customer_name}</div>
+            <div style="font-size:12px;color:#64748b;margin-top:4px;line-height:1.5;">${invoice.customer_address || ""}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="margin-bottom:12px;">
+              <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Invoice Date</div>
+              <div style="font-size:14px;font-weight:700;">${displayDate}</div>
+            </div>
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Due Date</div>
+              <div style="font-size:14px;font-weight:700;">${validUntil}</div>
+            </div>
+          </div>
+        </div>
 
-  return quotationTemplate
-    .replace("{{LOGO_HTML}}", logoHtml)
-    .replace("QUOTATION", "TAX INVOICE")
-    .replace("QUOTATION", "TAX INVOICE")
-    .replace("Quotation Preview", "Invoice Preview")
-    .replace(/{{QUOTE_NUMBER}}/g, invoice.invoice_number)
-    .replace(/{{COMPANY_NAME}}/g, company.company_name || "Company Name")
-    .replace("{{COMPANY_ADDRESS}}", company.address || "")
-    .replace("{{COMPANY_CITY}}", company.city || "")
-    .replace("{{COMPANY_STATE}}", company.state || "")
-    .replace("{{COMPANY_POSTAL}}", company.postal_code || "")
-    .replace("{{COMPANY_PHONE}}", company.phone || "")
-    .replace("{{COMPANY_EMAIL}}", company.email || "")
-    .replace("{{COMPANY_WEBSITE}}", company.website || "")
-    .replace("{{CUSTOMER_NAME}}", invoice.customer_name)
-    .replace("{{CUSTOMER_ADDRESS}}", "No address provided")
-    .replace("{{CUSTOMER_PHONE}}", "No phone provided")
-    .replace("{{DATE}}", displayDate)
-    .replace("{{VALID_UNTIL}}", validUntil)
-    .replace("{{ITEM_ROWS}}", itemRows)
-    .replace("{{EMPTY_ROWS}}", emptyRows)
-    .replace(/{{CURRENCY}}/g, company.currency || "PKR")
-    .replace("{{SUBTOTAL}}", subtotal.toLocaleString())
-    .replace("{{TOTAL}}", total.toLocaleString())
-    .replace("{{NOTES_HTML}}", notesHtml)
-    .replace("{{APP_VERSION}}", APP_VERSION);
+        <table>
+          <thead>
+            <tr>
+              <th style="width:50%;">Description</th>
+              <th style="text-align:center;">Qty</th>
+              <th style="text-align:right;">Rate</th>
+              <th style="text-align:right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+            ${emptyRows}
+          </tbody>
+        </table>
+
+        <div style="margin-top:24px;display:flex;justify-content:flex-end;">
+          <div style="width:240px;">
+            <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f1f5f9;">
+              <span style="font-size:14px;color:#64748b;">Subtotal</span>
+              <span style="font-size:14px;font-weight:700;">${company.currency} ${invoice.total_amount.toLocaleString()}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:20px 0;margin-top:4px;">
+              <span style="font-size:16px;font-weight:700;color:#0f172a;">Total</span>
+              <span style="font-size:20px;font-weight:700;color:#3b82f6;">${company.currency} ${invoice.total_amount.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        ${notesHtml}
+
+        <div style="margin-top:60px;text-align:center;padding-top:24px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;">
+          Thank you for your business. Please contact us if you have any questions.
+        </div>
+      </body>
+    </html>
+  `;
 }
 
-export async function printInvoice(invoice: any) {
+export async function printInvoice(invoice: Invoice) {
   const companyLogo = useAuthStore.getState().companyLogo;
   const companyId = useAuthStore.getState().companyId;
   if (!companyId) throw new Error("Company ID not found");
-  
+
   const company = await getCompanyProfile(companyId);
   const html = buildInvoiceHtml(invoice, companyLogo, company);
 
@@ -878,5 +1154,3 @@ export async function previewInvoice(invoice: any) {
     }
   }
 }
-
-

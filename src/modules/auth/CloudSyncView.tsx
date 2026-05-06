@@ -26,6 +26,8 @@ import { validatePakistaniCNIC, validatePakistaniNTN } from "../../utils/validat
 import { getLanguageDirection, getForwardIcon } from "../../utils/layout";
 import { stripNonAlphaNumeric, stripNonDigits } from "../../utils/formatters";
 import { saveRecoveryKey } from "../../utils/recoveryKeyStore";
+import { saveBusinessJwt } from "../../utils/businessJwtStore";
+import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
 import { invoke } from "../../lib/api";
 import { isTauri } from "../../lib/platform";
 
@@ -132,7 +134,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         let errorMessage = t("register_errors.sync_failed");
-        
+
         // Priority: custom error from server > message > generic fallback
         if (errorData.error) {
           errorMessage = errorData.error;
@@ -151,7 +153,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
         } else if (errorData.message) {
           errorMessage = errorData.message;
         }
-        
+
         throw new Error(errorMessage);
       }
 
@@ -219,9 +221,8 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       }
 
       const responseData = await response.json();
-      
+
       if (responseData.businessJwt) {
-        const { saveBusinessJwt } = await import("../../utils/businessJwtStore");
         await saveBusinessJwt(responseData.businessJwt);
       }
 
@@ -260,7 +261,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
       // Register locally with cloud data
       await register(registrationData);
-      
+
       // Explicitly store email and cloud_business_id in auth store
       const { setUser, user } = useAuthStore.getState();
       if (user) {
@@ -271,12 +272,12 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
           cloud_business_id: businessData._id,
         });
       }
-      
+
       addToast(t("cloud_sync.sync_success"), "success");
-      
+
       // Store cloud ID for potential backup restoration
       setCloudId(businessData._id);
-      
+
       // Check if a backup exists on the server
       try {
         const backupBlob = await downloadLatestBackup(businessData._id);
@@ -320,14 +321,14 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        
+
         // Handle 429 rate limit with cooldown
         if (response.status === 429 && errorData.cooldownSeconds) {
           setResendCooldown(errorData.cooldownSeconds);
           const errorMsg = errorData.error || errorData.message || "Please wait before resending";
           throw new Error(errorMsg);
         }
-        
+
         // Handle other errors
         const errorMsg = errorData.error || errorData.message || "Failed to resend OTP";
         throw new Error(errorMsg);
@@ -355,7 +356,7 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
     try {
       // 1. Download blob from cloud
       const backupBlob = await downloadLatestBackup(cloudId);
-      
+
       if (!backupBlob || backupBlob.size === 0) {
         console.log("No backup file found on server. Proceeding with local registration.");
         addToast("No backup file found. Proceeding with your synced business data.", "info");
@@ -366,16 +367,16 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
       if (isTauri()) {
         const { tempDir, join } = await import("@tauri-apps/api/path");
         const { writeFile, remove } = await import("@tauri-apps/plugin-fs");
-        
+
         const tempPath = await join(await tempDir(), `restore-${Date.now()}.tbf`);
         const arrayBuffer = await backupBlob.arrayBuffer();
         await writeFile(tempPath, new Uint8Array(arrayBuffer));
 
         // 2. Call Tauri restore command
         await invoke("restore_database", { path: tempPath, encryptionKey: recoveryKey });
-        
+
         // 3. Cleanup temp file
-        try { await remove(tempPath); } catch (e) {}
+        try { await remove(tempPath); } catch (e) { }
       }
 
       // 4. Save recovery key to desktop app config after successful restore
@@ -594,8 +595,8 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({ onBack }) => {
                     autoFocus
                   />
                   <div className="pt-2 text-center">
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => checkRegistration()}
                       className="text-xs text-text-muted hover:text-primary transition-colors font-medium underline underline-offset-4"
                     >

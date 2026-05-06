@@ -25,9 +25,11 @@ export async function createUser(input: any) {
   return await invoke<User>("create_user", { input });
 }
 
-export async function deleteUser(userId: number) {
-  return await invoke<void>("delete_user", { userId });
+export async function deleteUser(user_id: number) {
+  return await invoke<void>("delete_user", { userId: user_id });
 }
+
+
 
 export async function listUserSessions() {
   return await invoke<UserSession[]>("list_user_sessions");

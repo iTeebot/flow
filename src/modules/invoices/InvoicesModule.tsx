@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { FileText, PlusCircle, Search, Eye, ArrowLeft, Users, Package, Trash2, Info } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { FileText, PlusCircle, Search, Eye, Download, Printer, Edit2, Trash2, ArrowLeft, Users, Package, Info } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { listDeliveryChallans, getDeliveryChallan, type DeliveryChallan } from "../deliveryChallan/api";
 import { TablePagination } from "../shared/TablePagination";
@@ -11,11 +12,13 @@ import { DataTable } from "../../components/DataTable";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Dialog } from "../../components/ui/Dialog";
-import { Edit2, Printer, Download } from "lucide-react";
 import { printInvoice, downloadInvoicePdf, previewInvoice } from "../reports/pdf";
 import { useUiStore } from "../../store/uiStore";
+import { getCompanyProfile, type CompanyProfile } from "../companyProfile/api";
+import { listCustomers, type Customer } from "../customers/api";
 
 export function InvoicesModule() {
+  const navigate = useNavigate();
   const { companyId, currency } = useAuthStore();
   const currentCompanyId = companyId || 1;
   const { addToast } = useToastStore();
@@ -35,28 +38,38 @@ export function InvoicesModule() {
   const [isReviewing, setIsReviewing] = useState(false);
   const [isFinalized, setIsFinalized] = useState(false);
   const [reviewDc, setReviewDc] = useState<DeliveryChallan | null>(null);
-
   const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
+
+  const reviewTotals = useMemo(() => {
+    if (!reviewDc) return { subtotal: 0, tax: 0, total: 0 };
+    const subtotal = reviewDc.items.reduce((sum, item) => sum + item.amount, 0);
+    const tax = subtotal * 0.18;
+    const total = subtotal + tax;
+    return { subtotal, tax, total };
+  }, [reviewDc]);
   const [isDeleting, setIsDeleting] = useState(false);
   
   const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null);
-  
+  const [customerProfile, setCustomerProfile] = useState<Customer | null>(null);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
 
   const loadData = async () => {
     try {
       setLoading(true, "Synchronizing financial records...");
-      const [invoiceRows, challanRows] = await Promise.all([
+      const [invoiceRows, challanRows, profile] = await Promise.all([
         listInvoices(currentCompanyId),
         listDeliveryChallans(currentCompanyId),
+        getCompanyProfile(currentCompanyId),
       ]);
       setInvoices(invoiceRows);
       setChallans(challanRows);
+      setCompanyProfile(profile);
       if (challanRows.length > 0 && selectedDcId == null) {
         setSelectedDcId(challanRows[0].id);
       }
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to load invoices", "error");
+      addToast(typeof err === 'string' ? err : (err instanceof Error ? err.message : "Failed to load invoices"), "error");
     } finally {
       setLoading(false);
     }
@@ -74,6 +87,13 @@ export function InvoicesModule() {
       setBusy(true);
       setLoading(true, "Accessing Delivery Records...");
       const dc = await getDeliveryChallan(selectedDcId);
+      
+      if (currentCompanyId) {
+        const customers = await listCustomers(currentCompanyId);
+        const customer = customers.find(c => c.id === dc.customer_id);
+        setCustomerProfile(customer || null);
+      }
+
       setReviewDc(dc);
       setIsReviewing(true);
       setIsFinalized(false);
@@ -91,10 +111,18 @@ export function InvoicesModule() {
         setBusy(true);
         setLoading(true, "Updating Invoice...");
         await updateInvoice({
-          invoice_id: invoiceToEdit.id,
-          status: invoiceToEdit.status,
+          id: invoiceToEdit.id,
+          customer_id: invoiceToEdit.customer_id,
+          invoice_type: invoiceToEdit.invoice_type || "Sale Invoice",
+          invoice_date: invoiceToEdit.invoice_date || new Date().toISOString().split('T')[0],
           notes: notes || null,
-        });
+          items: invoiceToEdit.items.map(item => ({
+            product_id: item.product_id,
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+          }))
+        } as any);
         addToast(`Invoice ${invoiceToEdit.invoice_number} updated successfully!`, "success");
         setNotes("");
         setIsFinalized(false);
@@ -131,6 +159,23 @@ export function InvoicesModule() {
       setLoading(false);
     }
   };
+
+  const confirmDelete = async () => {
+    if (!invoiceToDelete) return;
+    try {
+      setIsDeleting(true);
+      await deleteInvoice(invoiceToDelete.id);
+      addToast("Invoice deleted successfully", "success");
+      setInvoices(invoices.filter(i => i.id !== invoiceToDelete.id));
+      setInvoiceToDelete(null);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Failed to delete invoice", "error");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
 
   const handleSort = (key: any) => {
     if (sortBy === key) {
@@ -172,20 +217,7 @@ export function InvoicesModule() {
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  const confirmDelete = async () => {
-    if (!invoiceToDelete) return;
-    try {
-      setIsDeleting(true);
-      await deleteInvoice(invoiceToDelete.id);
-      addToast(`Invoice ${invoiceToDelete.invoice_number} deleted`, "success");
-      await loadData();
-      setInvoiceToDelete(null);
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to delete", "error");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+
 
   const handleCancelReview = () => {
     setIsReviewing(false);
@@ -281,21 +313,21 @@ export function InvoicesModule() {
                     <div className="space-y-5">
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Business Name</label>
-                        <div className="text-sm font-bold">Teebot03</div>
+                        <div className="text-sm font-bold">{companyProfile?.company_name || "Teebot"}</div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">NTN / CNIC</label>
-                          <div className="text-sm font-bold">1231111</div>
+                          <div className="text-sm font-bold">{companyProfile?.tax_registration_number || "—"}</div>
                         </div>
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Province</label>
-                          <div className="text-sm font-bold">Sindh</div>
+                          <div className="text-sm font-bold">{companyProfile?.state || "—"}</div>
                         </div>
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Address</label>
-                        <div className="text-sm font-bold text-text-secondary">house 326 street 7</div>
+                        <div className="text-sm font-bold text-text-secondary truncate">{companyProfile?.address || "-"}</div>
                       </div>
                     </div>
                   </div>
@@ -314,25 +346,25 @@ export function InvoicesModule() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">NTN / CNIC (7 or 13 digits)</label>
-                        <input type="text" disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-bold rounded-lg px-3" defaultValue="1231111" />
+                        <input type="text" disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-bold rounded-lg px-3" value={customerProfile?.tax_registration_number || ""} readOnly />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Province</label>
                           <select disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg">
-                            <option>Sindh</option>
+                            <option>{customerProfile?.province || "Not Set"}</option>
                           </select>
                         </div>
                         <div className="space-y-2">
                           <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Registration</label>
                           <select disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg">
-                            <option>Unregistered</option>
+                            <option>{customerProfile?.registration_type || "Unregistered"}</option>
                           </select>
                         </div>
                       </div>
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Buyer Address</label>
-                        <input type="text" disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg px-3" defaultValue="house 326 street 7" />
+                        <input type="text" disabled={isFinalized} className="w-full h-11 bg-background border-border text-sm font-medium rounded-lg px-3" value={customerProfile?.address || ""} readOnly />
                       </div>
                     </div>
                   </div>
@@ -350,15 +382,15 @@ export function InvoicesModule() {
                    <div className="space-y-4 mb-6">
                      <div className="flex justify-between items-center text-xs font-black tracking-widest uppercase text-text-muted">
                        <span>Value Excl. ST</span>
-                       <span className="text-text-primary">PKR {reviewDc.total_amount.toFixed(2)}</span>
+                       <span className="text-text-primary">PKR {reviewTotals.subtotal.toFixed(2)}</span>
                      </div>
                      <div className="flex justify-between items-center text-xs font-black tracking-widest uppercase text-text-muted">
                        <span>Sales Tax (18%)</span>
-                       <span className="text-primary">PKR {(reviewDc.total_amount * 0.18).toFixed(2)}</span>
+                       <span className="text-primary">PKR {reviewTotals.tax.toFixed(2)}</span>
                      </div>
                      <div className="pt-5 border-t border-border flex justify-between items-center">
                        <span className="text-xs font-black uppercase tracking-widest text-text-muted">Grand Total</span>
-                       <span className="text-2xl font-black text-primary tracking-tight">PKR {(reviewDc.total_amount * 1.18).toFixed(2)}</span>
+                       <span className="text-2xl font-black text-primary tracking-tight">PKR {reviewTotals.total.toFixed(2)}</span>
                      </div>
                    </div>
 
@@ -471,6 +503,11 @@ export function InvoicesModule() {
       listIcon={<FileText className="h-5 w-5" />}
       listTitle="Invoice Registry"
       count={filtered.length}
+      action={{
+        label: "New Detailed Invoice",
+        onClick: () => navigate("/app/invoices/create")
+      }}
+
       filterBar={
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 w-full">
           <div className="md:col-span-2">
@@ -522,8 +559,8 @@ export function InvoicesModule() {
             <PlusCircle className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-text-primary leading-tight">Generate New Invoice</h2>
-            <p className="text-[10px] text-text-muted uppercase font-black tracking-tighter">Drafting Engine</p>
+            <h2 className="text-lg font-bold text-text-primary leading-tight">Quick Invoice (from DC)</h2>
+            <p className="text-[10px] text-text-muted uppercase font-black tracking-tighter">Fast Drafting Engine</p>
           </div>
         </div>
 
@@ -534,12 +571,12 @@ export function InvoicesModule() {
               <select
                 value={selectedDcId ?? ""}
                 onChange={(e) => setSelectedDcId(Number(e.target.value))}
-                className="w-full"
+                className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm"
               >
                 {challans.length === 0 && <option>No available challans</option>}
                 {challans.map((challan) => (
                   <option key={challan.id} value={challan.id}>
-                    {challan.dc_number} â€” {challan.customer_name}
+                    {challan.dc_number} - {challan.customer_name}
                   </option>
                 ))}
               </select>
@@ -551,7 +588,7 @@ export function InvoicesModule() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Reference numbers, special terms, or internal memos..."
-                className="w-full"
+                className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm"
               />
             </div>
           </div>
@@ -577,7 +614,7 @@ export function InvoicesModule() {
         onClose={() => setInvoiceToDelete(null)}
         onConfirm={confirmDelete}
         title="Delete Invoice?"
-        description={`Are you sure you want to delete ${invoiceToDelete?.invoice_number}?`}
+        description={`Are you sure you want to delete ${invoiceToDelete?.invoice_number}? This action will permanently remove the record.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"
@@ -594,12 +631,17 @@ export function InvoicesModule() {
         emptyMessage="No invoice records identified"
         columns={[
           {
-            header: "Invoice #",
+            header: "Invoice Details",
             sortKey: "invoice",
             accessor: (invoice) => (
-              <span className="font-mono text-sm font-bold text-primary bg-primary/5 px-2 py-1 rounded border border-primary/10 tracking-tight">
-                {invoice.invoice_number}
-              </span>
+              <div className="space-y-1">
+                <span className="font-mono text-sm font-bold text-primary bg-primary/5 px-2 py-1 rounded border border-primary/10 tracking-tight">
+                  {invoice.invoice_number}
+                </span>
+                <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
+                  {invoice.invoice_type || "Sale Invoice"}
+                </div>
+              </div>
             )
           },
           {
@@ -614,7 +656,12 @@ export function InvoicesModule() {
             header: "Client Name",
             sortKey: "customer",
             accessor: (invoice) => (
-              <div className="font-semibold text-text-primary text-sm">{invoice.customer_name}</div>
+              <div className="space-y-0.5">
+                <div className="font-semibold text-text-primary text-sm">{invoice.customer_name}</div>
+                {invoice.buyer_ntn_cnic && (
+                  <div className="text-[10px] text-text-muted font-mono">{invoice.buyer_ntn_cnic}</div>
+                )}
+              </div>
             )
           },
           {
@@ -636,12 +683,14 @@ export function InvoicesModule() {
             )
           },
           {
-            header: "Created At",
+            header: "Invoice Date",
             sortKey: "date",
             accessor: (invoice) => (
               <div className="text-sm text-text-muted flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-success/60"></span>
-                {new Date(invoice.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                {invoice.invoice_date 
+                  ? invoice.invoice_date 
+                  : new Date(invoice.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
             )
           }
@@ -669,7 +718,7 @@ export function InvoicesModule() {
                   product_name: i.description,
                   product_sku: '',
                   quantity: i.quantity,
-                  rate: i.rate,
+                  rate: i.unit_price,
                   amount: i.amount
                 })),
                 total_amount: invoice.total_amount,
@@ -681,14 +730,14 @@ export function InvoicesModule() {
             }
           },
           {
-            label: "Print",
-            icon: Printer,
-            onClick: () => printInvoice(invoice)
-          },
-          {
             label: downloadingId === invoice.id ? "Downloading..." : "Download PDF",
             icon: Download,
             onClick: () => handleDownloadPdf(invoice)
+          },
+          {
+            label: "Print",
+            icon: Printer,
+            onClick: () => printInvoice(invoice)
           },
           {
             label: "Delete",

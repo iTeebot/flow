@@ -15,17 +15,6 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      // When building for Tauri, strip the large release binaries from the output
-      ...(isTauri ? [{
-        name: 'exclude-releases',
-        generateBundle(_opts: any, bundle: any) {
-          for (const key of Object.keys(bundle)) {
-            if (key.startsWith('releases/')) {
-              delete bundle[key];
-            }
-          }
-        }
-      }] : [])
     ],
 
     // Inject compile-time constant so app code can reliably detect Tauri vs Web
@@ -59,6 +48,10 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      // Optimize for production
+      target: isTauri ? 'chrome105' : 'esnext',
+      minify: 'esbuild',
+      sourcemap: false,
       // Explicitly set the input to avoid any "tauri/index.html" resolution issues
       rollupOptions: {
         input: {
@@ -73,6 +66,9 @@ export default defineConfig(({ mode }) => {
         }
       },
       chunkSizeWarningLimit: 1000
+    },
+    esbuild: {
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
     }
   };
 });

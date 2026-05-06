@@ -34,6 +34,7 @@ import { validateEmail } from "../../utils/validations/email";
 import { validatePakistaniCNIC, validatePakistaniNTN } from "../../utils/validations/identity";
 import { formatPakistaniCNIC, stripNonDigits, stripNonAlphaNumeric } from "../../utils/formatters";
 import { checkServerHealth, checkFullConnectivity } from "../../utils/connectivity";
+import { saveBusinessJwt } from "../../utils/businessJwtStore";
 
 interface Currency {
   symbol: string;
@@ -346,7 +347,6 @@ export function RegisterView({ onBack }: { onBack: () => void }) {
         businessId = cloudData.data?._id;
 
         if (cloudData.businessJwt) {
-          const { saveBusinessJwt } = await import("../../utils/businessJwtStore");
           await saveBusinessJwt(cloudData.businessJwt);
         }
 

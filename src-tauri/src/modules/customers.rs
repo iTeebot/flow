@@ -11,6 +11,9 @@ pub struct Customer {
     pub address: Option<String>,
     pub city: Option<String>,
     pub state: Option<String>,
+    pub province: Option<String>,
+    pub registration_type: Option<String>,
+    pub metadata: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -22,6 +25,9 @@ pub struct CreateCustomerInput {
     pub address: Option<String>,
     pub city: Option<String>,
     pub state: Option<String>,
+    pub province: Option<String>,
+    pub registration_type: Option<String>,
+    pub metadata: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -33,6 +39,9 @@ pub struct UpdateCustomerInput {
     pub address: Option<String>,
     pub city: Option<String>,
     pub state: Option<String>,
+    pub province: Option<String>,
+    pub registration_type: Option<String>,
+    pub metadata: Option<serde_json::Value>,
 }
 
 #[tauri::command]
@@ -56,8 +65,10 @@ pub fn create_customer(app: tauri::AppHandle, input: CreateCustomerInput) -> Res
         return Err("Company profile not found".to_string());
     }
 
+    let metadata_str = input.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
+
     conn.execute(
-        "INSERT INTO customers (company_id, name, tax_registration_number, phone, address, city, state) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO customers (company_id, name, tax_registration_number, phone, address, city, state, province, registration_type, metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         (
             &input.company_id,
             &input.name,
@@ -66,6 +77,9 @@ pub fn create_customer(app: tauri::AppHandle, input: CreateCustomerInput) -> Res
             &input.address,
             &input.city,
             &input.state,
+            &input.province,
+            &input.registration_type,
+            &metadata_str,
         ),
     )
     .map_err(|e| format!("Failed to insert customer: {e}"))?;
@@ -80,6 +94,9 @@ pub fn create_customer(app: tauri::AppHandle, input: CreateCustomerInput) -> Res
         address: input.address,
         city: input.city,
         state: input.state,
+        province: input.province,
+        registration_type: input.registration_type,
+        metadata: input.metadata,
     })
 }
 
@@ -92,7 +109,7 @@ pub fn list_customers(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Cust
     let conn = db::open_connection(&app)?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, company_id, name, phone, address, tax_registration_number, city, state
+            "SELECT id, company_id, name, phone, address, tax_registration_number, city, state, province, registration_type, metadata
              FROM customers
              WHERE company_id = ?1 AND deleted_at IS NULL
              ORDER BY id DESC",
@@ -110,6 +127,9 @@ pub fn list_customers(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Cust
                 tax_registration_number: row.get(5)?,
                 city: row.get(6)?,
                 state: row.get(7)?,
+                province: row.get(8)?,
+                registration_type: row.get(9)?,
+                metadata: row.get::<_, Option<String>>(10)?.and_then(|s| serde_json::from_str(&s).ok()),
             })
         })
         .map_err(|e| format!("Failed to fetch customers: {e}"))?;
@@ -131,10 +151,11 @@ pub fn update_customer(app: tauri::AppHandle, input: UpdateCustomerInput) -> Res
     }
 
     let conn = db::open_connection(&app)?;
+    let metadata_str = input.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
     
     conn.execute(
-        "UPDATE customers SET name = ?1, tax_registration_number = ?2, phone = ?3, address = ?4, city = ?5, state = ?6 WHERE id = ?7",
-        (&input.name, &input.tax_registration_number, &input.phone, &input.address, &input.city, &input.state, input.id),
+        "UPDATE customers SET name = ?1, tax_registration_number = ?2, phone = ?3, address = ?4, city = ?5, state = ?6, province = ?7, registration_type = ?8, metadata = ?9 WHERE id = ?10",
+        (&input.name, &input.tax_registration_number, &input.phone, &input.address, &input.city, &input.state, &input.province, &input.registration_type, &metadata_str, input.id),
     )
     .map_err(|e| format!("Failed to update customer: {e}"))?;
 
@@ -155,6 +176,9 @@ pub fn update_customer(app: tauri::AppHandle, input: UpdateCustomerInput) -> Res
         address: input.address,
         city: input.city,
         state: input.state,
+        province: input.province,
+        registration_type: input.registration_type,
+        metadata: input.metadata,
     })
 }
 

@@ -50,18 +50,18 @@ export function LandingPage() {
       downloads: [
         {
           name: "AppImage",
-          url: "/releases/linux/teebot-flow_0.0.5_amd64.AppImage",
-          size: "~76.6 MB"
+          url: "https://drive.google.com/file/d/1hTLXOyAadl6AondEJJzemZBGQb9Ez2Rx/view?usp=sharing",
+          size: "~75.2 MB"
         },
         {
           name: "Debian Package",
-          url: "/releases/linux/teebot-flow_0.0.5_amd64.deb",
-          size: "~6.5 MB"
+          url: "https://drive.google.com/file/d/1PkrkqO-bUrvlZBH_YWedsDbHcWruoKmQ/view?usp=sharing",
+          size: "~4.7 MB"
         },
         {
           name: "RPM Package",
-          url: "/releases/linux/teebot-flow_0.0.5_x86_64.rpm",
-          size: "~6.5 MB"
+          url: "https://drive.google.com/file/d/1Yby7hzLJB9AKjYzfwbjtNY746h9s5-8S/view?usp=sharing",
+          size: "~4.7 MB"
         }
       ]
     },

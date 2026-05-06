@@ -33,6 +33,8 @@ const CreateDeliveryChallanModule = lazy(() => import("./modules/deliveryChallan
 const InventoryModule = lazy(() => import("./modules/inventory/InventoryModule").then(m => ({ default: m.InventoryModule })));
 const CustomersModule = lazy(() => import("./modules/customers/CustomersModule").then(m => ({ default: m.CustomersModule })));
 const InvoicesModule = lazy(() => import("./modules/invoices/InvoicesModule").then(m => ({ default: m.InvoicesModule })));
+const CreateInvoiceModule = lazy(() => import("./modules/invoices/CreateInvoiceModule").then(m => ({ default: m.CreateInvoiceModule })));
+const InvoiceDetailsModule = lazy(() => import("./modules/invoices/InvoiceDetailsModule").then(m => ({ default: m.InvoiceDetailsModule })));
 const QuotationsModule = lazy(() => import("./modules/quotations/QuotationsModule").then(m => ({ default: m.QuotationsModule })));
 const CreateQuotationModule = lazy(() => import("./modules/quotations/CreateQuotationModule").then(m => ({ default: m.CreateQuotationModule })));
 const ProfileModule = lazy(() => import("./modules/profile/ProfileModule").then(m => ({ default: m.ProfileModule })));
@@ -369,6 +371,9 @@ function AppContent() {
                 <Route path="/app/customers" element={<CustomersModule />} />
                 {/* <Route path="/app/reports" element={<ReportsModule />} /> */}
                 <Route path="/app/invoices" element={<InvoicesModule />} />
+                <Route path="/app/invoices/create" element={<CreateInvoiceModule />} />
+                <Route path="/app/invoices/view/:id" element={<InvoiceDetailsModule />} />
+                <Route path="/app/invoices/edit/:id" element={<CreateInvoiceModule />} />
                 <Route path="/app/profile" element={<ProfileModule />} />
                 {user?.role === 'admin' && (
                   <>
