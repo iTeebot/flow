@@ -35,12 +35,12 @@ export function LandingPage() {
         {
           name: "Installer (EXE)",
           url: "https://drive.google.com/file/d/1u1Ew3cTunbZpWyTphzXf704B9LjsY-AD/view?usp=sharing",
-          size: "4.1 MB"
+          size: "12.1 MB"
         },
         {
           name: "MSI Package",
           url: "https://drive.google.com/file/d/1hO3VqE5bCyFDMhscXD07C0ghflGAEA9n/view?usp=sharing",
-          size: "5.3 MB"
+          size: "13.1 MB"
         }
       ]
     },

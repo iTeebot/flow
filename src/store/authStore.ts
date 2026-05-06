@@ -4,7 +4,6 @@ import { loadRecoveryKey } from "../utils/recoveryKeyStore";
 import { saveBusinessJwt, clearBusinessJwt, loadBusinessJwt } from "../utils/businessJwtStore";
 import { checkFullConnectivity } from "../utils/connectivity";
 import { uploadBackup } from "../utils/cloudSync";
-import { readFile } from "@tauri-apps/plugin-fs";
 
 export interface User {
   id: number;
@@ -235,6 +234,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           
           // Try to upload backup to cloud
           try {
+            const { readFile } = await import("@tauri-apps/plugin-fs");
             const fileData = await readFile(backupInfo.backup_path || "");
             const backupBlob = new Blob([fileData], { type: "application/octet-stream" });
             

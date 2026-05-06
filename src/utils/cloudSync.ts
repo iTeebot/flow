@@ -5,7 +5,7 @@ import { checkFullConnectivity } from './connectivity';
 import { loadBusinessJwt, clearBusinessJwt } from './businessJwtStore';
 import { gunzipSync, gzipSync } from 'fflate';
 import { getApiUrl } from './apiConfig';
-import { readFile } from '@tauri-apps/plugin-fs';
+
 
 const API_BASE_URL = getApiUrl();
 
@@ -150,6 +150,7 @@ export const performInitialBackup = async (secretKey: string) => {
     const backupPath = backupInfo.backup_path;
 
     // 2. Read the file from disk using Tauri fs plugin
+    const { readFile } = await import('@tauri-apps/plugin-fs');
     const fileData = await readFile(backupPath);
     const backupBlob = new Blob([fileData], { type: 'application/octet-stream' });
 

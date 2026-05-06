@@ -1,8 +1,8 @@
 [package]
 name = "teebot-flow"
 version = "0.0.5"
-description = "A Tauri App"
-authors = ["you"]
+description = "Teebot Flow - Business Management Suite"
+authors = ["Teebot"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
