@@ -2,10 +2,12 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from "path";
+import obfuscator from 'vite-plugin-javascript-obfuscator';
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const isProduction = mode === 'production';
   
   // Detect if building for Tauri desktop
   const isTauri = process.env.TAURI_ENV_PLATFORM || env.IS_TAURI === 'true' || mode === 'tauri';
@@ -15,7 +17,44 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-    ],
+      isProduction ? obfuscator({
+        options: {
+          compact: true,
+          controlFlowFlattening: true,
+          controlFlowFlatteningThreshold: 0.75,
+          deadCodeInjection: true,
+          deadCodeInjectionThreshold: 0.4,
+          debugProtection: true,
+          debugProtectionInterval: 4000,
+          disableConsoleOutput: true,
+          identifierNamesGenerator: 'hexadecimal',
+          log: false,
+          numbersToExpressions: true,
+          renameGlobals: false,
+          selfDefending: true,
+          splitStrings: true,
+          splitStringsChunkLength: 10,
+          stringArray: true,
+          stringArrayCallsTransform: true,
+          stringArrayCallsTransformThreshold: 0.75,
+          stringArrayEncoding: ['base64'],
+          stringArrayIndexesType: ['hexadecimal-number'],
+          stringArrayIndexShift: true,
+          stringArrayRotate: true,
+          stringArrayShuffle: true,
+          stringArrayWrappersCount: 2,
+          stringArrayWrappersChainedCalls: true,
+          stringArrayWrappersParametersMaxCount: 4,
+          stringArrayWrappersType: 'function',
+          stringArrayThreshold: 0.75,
+          transformObjectKeys: true,
+          unicodeEscapeSequence: false
+        },
+        include: [/\.(js|ts|tsx|jsx)$/],
+        exclude: [/node_modules/],
+        apply: 'build',
+      }) : null,
+    ].filter(Boolean),
 
     // Inject compile-time constant so app code can reliably detect Tauri vs Web
     define: {
@@ -58,17 +97,30 @@ export default defineConfig(({ mode }) => {
           main: resolve(__dirname, 'index.html'),
         },
         output: {
-          manualChunks: {
-            'vendor': ['react', 'react-dom', 'react-router-dom', 'zustand'],
-            'pdf': ['jspdf'],
-            'ui': ['recharts', 'lucide-react']
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('zustand') || id.includes('router') || id.includes('scheduler')) {
+                return 'vendor-core';
+              }
+              if (id.includes('recharts') || id.includes('lucide') || id.includes('d3')) {
+                return 'vendor-ui';
+              }
+              if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('purify') || id.includes('fflate')) {
+                return 'vendor-lib';
+              }
+              return 'vendor-misc';
+            }
+            if (id.includes('/src/modules/')) {
+              const moduleName = id.split('/src/modules/')[1].split('/')[0];
+              return `module-${moduleName.toLowerCase()}`;
+            }
           }
         }
       },
-      chunkSizeWarningLimit: 1000
+      chunkSizeWarningLimit: 2000
     },
     esbuild: {
-      drop: mode === 'production' ? ['console', 'debugger'] : [],
+      drop: isProduction ? ['console', 'debugger'] : [],
     }
   };
 });
