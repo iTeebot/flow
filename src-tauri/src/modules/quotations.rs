@@ -190,7 +190,7 @@ pub fn list_quotations(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Quo
                 COALESCE(SUM(qi.amount), 0) as total_amount, q.valid_until
             FROM quotations q
             JOIN customers c ON q.customer_id = c.id
-            LEFT JOIN quotation_items qi ON q.id = qi.quote_id
+            LEFT JOIN quotation_items qi ON q.id = qi.quote_id AND qi.deleted_at IS NULL
             WHERE q.company_id = ?1 AND q.deleted_at IS NULL
             GROUP BY q.id, q.quote_number, q.customer_id, q.company_id, q.notes, q.status, q.created_at, c.name, c.address, c.phone, q.valid_until
             ORDER BY q.created_at DESC

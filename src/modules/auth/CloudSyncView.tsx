@@ -27,7 +27,6 @@ import { getLanguageDirection, getForwardIcon } from "../../utils/layout";
 import { stripNonAlphaNumeric, stripNonDigits } from "../../utils/formatters";
 import { saveRecoveryKey } from "../../utils/recoveryKeyStore";
 import { saveBusinessJwt } from "../../utils/businessJwtStore";
-import { FullscreenLoader } from "../../components/ui/FullscreenLoader";
 import { invoke } from "../../lib/api";
 import { isTauri } from "../../lib/platform";
 

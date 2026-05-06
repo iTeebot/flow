@@ -583,44 +583,4 @@ fn generate_invoice_number(tx: &rusqlite::Transaction) -> Result<String, String>
     Ok(format!("INV-{:05}", count + 1))
 }
 
-#[tauri::command]
-pub fn delete_invoice(app: tauri::AppHandle, invoice_id: i64) -> Result<(), String> {
-    if invoice_id <= 0 {
-        return Err("Invalid invoice ID".to_string());
-    }
-    let mut conn = db::open_connection(&app)?;
-    let tx = conn.transaction().map_err(|e| format!("Failed to start transaction: {e}"))?;
-    
-    let exists: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM invoices WHERE id = ?1 AND deleted_at IS NULL)", [invoice_id], |r| r.get(0))
-        .map_err(|e| format!("Failed to check invoice: {e}"))?;
-    if !exists { return Err("Invoice not found".to_string()); }
 
-    tx.execute("UPDATE invoice_items SET deleted_at = datetime('now') WHERE invoice_id = ?1", [invoice_id])
-        .map_err(|e| format!("Failed to delete invoice items: {e}"))?;
-    tx.execute("UPDATE invoices SET deleted_at = datetime('now') WHERE id = ?1", [invoice_id])
-        .map_err(|e| format!("Failed to delete invoice: {e}"))?;
-        
-    tx.commit().map_err(|e| format!("Failed to commit deletion: {e}"))?;
-    Ok(())
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UpdateInvoiceInput {
-    pub invoice_id: i64,
-    pub status: String,
-    pub notes: Option<String>,
-}
-
-#[tauri::command]
-pub fn update_invoice(
-    app: tauri::AppHandle,
-    input: UpdateInvoiceInput,
-) -> Result<(), String> {
-    let conn = db::open_connection(&app)?;
-    conn.execute(
-        "UPDATE invoices SET status = ?1, notes = ?2, updated_at = datetime('now') WHERE id = ?3 AND deleted_at IS NULL",
-        params![input.status, input.notes, input.invoice_id],
-    )
-    .map_err(|e| format!("Failed to update invoice: {e}"))?;
-    Ok(())
-}
