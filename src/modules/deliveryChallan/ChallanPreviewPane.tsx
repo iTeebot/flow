@@ -168,23 +168,31 @@ export function ChallanPreviewPane({
         <table className="w-full border-collapse text-sm" style={{ tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: "5%" }} />
-            <col style={{ width: "55%" }} />
-            <col style={{ width: "20%" }} />
+            <col style={{ width: "35%" }} />
+            <col style={{ width: "15%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "15%" }} />
             <col style={{ width: "20%" }} />
           </colgroup>
           <thead>
             <tr className="bg-slate-800 text-white">
-              <th className="py-2.5 px-3 text-[10px] font-black uppercase tracking-widest text-left border border-slate-700">
+              <th className="py-2.5 px-2 text-[9px] font-black uppercase tracking-widest text-left border border-slate-700">
                 #
               </th>
-              <th className="py-2.5 px-3 text-[10px] font-black uppercase tracking-widest text-left border border-slate-700">
+              <th className="py-2.5 px-2 text-[9px] font-black uppercase tracking-widest text-left border border-slate-700">
                 Product / Description
               </th>
-              <th className="py-2.5 px-3 text-[10px] font-black uppercase tracking-widest text-left border border-slate-700">
+              <th className="py-2.5 px-2 text-[9px] font-black uppercase tracking-widest text-left border border-slate-700">
                 SKU / Code
               </th>
-              <th className="py-2.5 px-3 text-[10px] font-black uppercase tracking-widest text-center border border-slate-700">
+              <th className="py-2.5 px-2 text-[9px] font-black uppercase tracking-widest text-center border border-slate-700">
                 Qty
+              </th>
+              <th className="py-2.5 px-2 text-[9px] font-black uppercase tracking-widest text-right border border-slate-700">
+                Rate
+              </th>
+              <th className="py-2.5 px-2 text-[9px] font-black uppercase tracking-widest text-right border border-slate-700">
+                Amount
               </th>
             </tr>
           </thead>
@@ -195,17 +203,23 @@ export function ChallanPreviewPane({
                 key={item.product_id}
                 className={`group ${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-blue-50/40 transition-colors`}
               >
-                <td className="py-2.5 px-3 text-gray-500 text-xs font-medium border border-gray-200 align-middle">
+                <td className="py-2.5 px-2 text-gray-500 text-xs font-medium border border-gray-200 align-middle">
                   {idx + 1}
                 </td>
-                <td className="py-2.5 px-3 border border-gray-200 align-middle">
-                  <span className="font-semibold text-gray-900 text-xs">{item.product.name}</span>
+                <td className="py-2.5 px-2 border border-gray-200 align-middle">
+                  <span className="font-semibold text-gray-900 text-xs truncate block">{item.product.name}</span>
                 </td>
-                <td className="py-2.5 px-3 border border-gray-200 align-middle">
-                  <span className="font-mono text-xs text-gray-500">{item.product.sku}</span>
+                <td className="py-2.5 px-2 border border-gray-200 align-middle">
+                  <span className="font-mono text-[10px] text-gray-500">{item.product.sku}</span>
                 </td>
-                <td className="py-2.5 px-3 border border-gray-200 text-center align-middle">
+                <td className="py-2.5 px-2 border border-gray-200 text-center align-middle">
                   <span className="font-bold text-gray-900 text-sm">{item.quantity}</span>
+                </td>
+                <td className="py-2.5 px-2 border border-gray-200 text-right align-middle">
+                  <span className="text-gray-500 text-[10px]">{(item.product.price || 0).toLocaleString()}</span>
+                </td>
+                <td className="py-2.5 px-2 border border-gray-200 text-right align-middle">
+                  <span className="font-bold text-gray-900 text-xs">{(item.quantity * (item.product.price || 0)).toLocaleString()}</span>
                 </td>
               </tr>
             ))}
@@ -213,10 +227,12 @@ export function ChallanPreviewPane({
             {/* Empty filler rows */}
             {Array.from({ length: emptyRowCount }).map((_, i) => (
               <tr key={`empty-${i}`} className={`${(items.length + i) % 2 === 0 ? "bg-white" : "bg-gray-50"}`}>
-                <td className="py-2.5 px-3 border border-gray-200 text-gray-300 text-xs">{items.length + i + 1}</td>
-                <td className="py-2.5 px-3 border border-gray-200 text-gray-200 text-xs">—</td>
-                <td className="py-2.5 px-3 border border-gray-200 text-gray-200 text-xs">—</td>
-                <td className="py-2.5 px-3 border border-gray-200"></td>
+                <td className="py-2.5 px-2 border border-gray-200 text-gray-300 text-xs">{items.length + i + 1}</td>
+                <td className="py-2.5 px-2 border border-gray-200 text-gray-200 text-xs">—</td>
+                <td className="py-2.5 px-2 border border-gray-200 text-gray-200 text-xs">—</td>
+                <td className="py-2.5 px-2 border border-gray-200"></td>
+                <td className="py-2.5 px-2 border border-gray-200"></td>
+                <td className="py-2.5 px-2 border border-gray-200"></td>
               </tr>
             ))}
           </tbody>
@@ -246,15 +262,16 @@ export function ChallanPreviewPane({
       </div>
 
       {/* ── SUMMARY BAR ────────────────────────────────────────── */}
-      <div className="mx-8 mb-6 grid grid-cols-3 gap-4 border border-gray-200 rounded-lg overflow-hidden">
-        <div className="bg-slate-800 text-white px-5 py-3 col-span-2 flex items-center justify-end">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
-            Total Quantity Dispatched
-          </span>
+      <div className="mx-8 mb-6 border border-gray-200 rounded-lg overflow-hidden grid grid-cols-2">
+        <div className="bg-slate-800 text-white px-5 py-3 flex items-center justify-between border-r border-slate-700">
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total Quantity</span>
+          <span className="text-lg font-black">{totalQty} <span className="text-[10px] text-slate-400 font-normal">units</span></span>
         </div>
-        <div className="bg-slate-700 text-white px-5 py-3 flex items-center justify-center">
-          <span className="text-xl font-black">{totalQty}</span>
-          <span className="text-xs text-slate-300 ml-1.5 mt-0.5">units</span>
+        <div className="bg-slate-800 text-white px-5 py-3 flex items-center justify-between">
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Grand Total</span>
+          <span className="text-xl font-black text-blue-400">
+            {items.reduce((sum, i) => sum + (i.quantity * (i.product.price || 0)), 0).toLocaleString()}
+          </span>
         </div>
       </div>
 

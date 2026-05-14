@@ -56,6 +56,8 @@ function buildChallanHtml(
         <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;font-weight:600;color:#111827;">${item.product_name}</td>
         <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;font-family:monospace;color:#6b7280;">${item.product_sku}</td>
         <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:12px;font-weight:700;color:#111827;text-align:center;">${item.quantity}</td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;color:#6b7280;text-align:right;">${(item.rate || 0).toLocaleString()}</td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;font-weight:700;color:#111827;text-align:right;">${(item.amount || 0).toLocaleString()}</td>
       </tr>`
     )
     .join("");
@@ -67,6 +69,8 @@ function buildChallanHtml(
         <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;color:#d1d5db;">${challan.items.length + i + 1}</td>
         <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;color:#e5e7eb;">—</td>
         <td style="padding:7px 10px;border:1px solid #e5e7eb;font-size:11px;color:#e5e7eb;">—</td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;"></td>
+        <td style="padding:7px 10px;border:1px solid #e5e7eb;"></td>
         <td style="padding:7px 10px;border:1px solid #e5e7eb;"></td>
       </tr>`
     )
@@ -94,6 +98,7 @@ function buildChallanHtml(
     .replace("{{ITEM_ROWS}}", itemRows)
     .replace("{{EMPTY_ROWS}}", emptyRows)
     .replace("{{TOTAL_QTY}}", String(totalQty))
+    .replace("{{TOTAL_AMOUNT}}", (challan.total_amount || 0).toLocaleString())
     .replace("{{APP_VERSION}}", APP_VERSION);
 }
 
@@ -293,9 +298,16 @@ export async function downloadDeliveryChallanPdf(
 
   // ── Table ────────────────────────────────────────────────────
   y = 210;
-  const colWidths = [40, 245, 130, 100]; // Total 515
+  const colWidths = [30, 180, 75, 50, 80, 100]; // Total 515
   const tableRight = pageWidth - margin;
-  const colX = [margin, margin + colWidths[0], margin + colWidths[0] + colWidths[1], margin + colWidths[0] + colWidths[1] + colWidths[2]];
+  const colX = [
+    margin, 
+    margin + colWidths[0], 
+    margin + colWidths[0] + colWidths[1], 
+    margin + colWidths[0] + colWidths[1] + colWidths[2],
+    margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3],
+    margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] + colWidths[4]
+  ];
   const rowH = 26;
 
   // Header row
@@ -304,10 +316,12 @@ export async function downloadDeliveryChallanPdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(255, 255, 255);
-  const headers = ["#", "PRODUCT / DESCRIPTION", "SKU / CODE", "QTY"];
+  const headers = ["#", "PRODUCT / DESCRIPTION", "SKU", "QTY", "RATE", "AMOUNT"];
   headers.forEach((h, i) => {
     if (i === 3) {
       doc.text(h, colX[i] + colWidths[i] / 2, y + 17, { align: "center" });
+    } else if (i >= 4) {
+      doc.text(h, colX[i] + colWidths[i] - 10, y + 17, { align: "right" });
     } else {
       doc.text(h, colX[i] + 10, y + 17);
     }
@@ -315,12 +329,14 @@ export async function downloadDeliveryChallanPdf(
   y += rowH;
 
   // Item rows + empty rows
-  const allItems: Array<{ num: number; name: string; sku: string; qty: string | number; isEmpty: boolean }> = [
+  const allItems: Array<{ num: number; name: string; sku: string; qty: string | number; rate: string | number; amount: string | number; isEmpty: boolean }> = [
     ...challan.items.map((item, idx) => ({
       num: idx + 1,
       name: item.product_name,
       sku: item.product_sku,
       qty: item.quantity,
+      rate: (item.rate || 0).toLocaleString(),
+      amount: (item.amount || 0).toLocaleString(),
       isEmpty: false,
     })),
     ...Array.from({ length: Math.max(0, MIN_ROWS - challan.items.length) }).map((_, i) => ({
@@ -328,6 +344,8 @@ export async function downloadDeliveryChallanPdf(
       name: "—",
       sku: "—",
       qty: "",
+      rate: "",
+      amount: "",
       isEmpty: true,
     })),
   ];
@@ -359,13 +377,17 @@ export async function downloadDeliveryChallanPdf(
     }
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    doc.text(String(row.num), colX[0] + 10, y + 18);
-    doc.text(row.name, colX[1] + 10, y + 18);
-    doc.text(row.sku, colX[2] + 10, y + 18);
+    doc.setFontSize(10); // slightly smaller to fit
+    doc.text(String(row.num), colX[0] + 5, y + 18);
+    doc.text(row.name, colX[1] + 5, y + 18);
+    doc.text(row.sku, colX[2] + 5, y + 18);
     if (row.qty !== "") {
       doc.setFont("helvetica", "bold");
       doc.text(String(row.qty), colX[3] + colWidths[3] / 2, y + 18, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.text(String(row.rate), colX[4] + colWidths[4] - 5, y + 18, { align: "right" });
+      doc.setFont("helvetica", "bold");
+      doc.text(String(row.amount), colX[5] + colWidths[5] - 5, y + 18, { align: "right" });
     }
     y += rowH;
   }
@@ -373,22 +395,32 @@ export async function downloadDeliveryChallanPdf(
   // ── Summary bar ──────────────────────────────────────────────
   y += 16;
   const totalQty = challan.items.reduce((s, i) => s + i.quantity, 0);
+  const totalAmt = challan.total_amount || 0;
+  
   const summaryW = tableRight - margin;
-  const labelW = summaryW - 120;
-
+  
+  // Qty box
   doc.setFillColor(30, 41, 59);
-  doc.roundedRect(margin, y, labelW, 40, 4, 4, "F");
+  doc.roundedRect(margin, y, 200, 40, 4, 4, "F");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(148, 163, 184);
-  doc.text("TOTAL QUANTITY DISPATCHED", margin + labelW - 16, y + 24, { align: "right" });
-
-  doc.setFillColor(51, 65, 85);
-  doc.roundedRect(margin + labelW + 6, y, 114, 40, 4, 4, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(24);
+  doc.text("TOTAL QUANTITY", margin + 10, y + 24);
+  doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
-  doc.text(String(totalQty), margin + labelW + 63, y + 28, { align: "center" });
+  doc.text(String(totalQty), margin + 190, y + 28, { align: "right" });
+
+  // Amount box
+  const amtX = margin + 210;
+  doc.setFillColor(51, 65, 85);
+  doc.roundedRect(amtX, y, summaryW - 210, 40, 4, 4, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(148, 163, 184);
+  doc.text("GRAND TOTAL", amtX + 10, y + 24);
+  doc.setFontSize(20);
+  doc.setTextColor(255, 255, 255);
+  doc.text(totalAmt.toLocaleString(), tableRight - 15, y + 28, { align: "right" });
 
   // ── Signature section ────────────────────────────────────────
   y += 64;

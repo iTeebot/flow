@@ -67,7 +67,8 @@ export function DeliveryChallanModule() {
   const handleDownloadPdf = async (challan: DeliveryChallan, fields: ChallanCustomField[] = []) => {
     setDownloadingId(challan.id);
     try {
-      const savedPath = await downloadDeliveryChallanPdf(challan, fields);
+      const customFields = fields.length > 0 ? fields : (challan.metadata?.customFields || []);
+      const savedPath = await downloadDeliveryChallanPdf(challan, customFields);
       if (savedPath === "browser-download") {
         addToast("Document has been downloaded to your browser.", "info");
       } else {
@@ -124,7 +125,8 @@ export function DeliveryChallanModule() {
 
   const handlePrint = (challan: DeliveryChallan, fields: ChallanCustomField[] = []) => {
     try {
-      printDeliveryChallan(challan, fields);
+      const customFields = fields.length > 0 ? fields : (challan.metadata?.customFields || []);
+      printDeliveryChallan(challan, customFields);
     } catch (err) {
       addToast(err instanceof Error ? err.message : "Failed to open print view", "error");
     }
@@ -157,13 +159,13 @@ export function DeliveryChallanModule() {
       loading={false}
       action={{
         label: t('common:add', 'Add'),
-        onClick: () => navigate("/app/delivery-challan/create")
+        onClick: () => navigate("/app/delivery-challan/create"),
       }}
-      listIcon={<FileText className="h-5 w-5" />}
+      listIcon={<FileText className="h-6 w-6 text-primary" />}
       listTitle={t('history_records')}
       count={filteredChallans.length}
       filterBar={
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 w-full">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 w-full">
           <div className="md:col-span-2">
             <Input
               value={searchTerm}
@@ -173,7 +175,6 @@ export function DeliveryChallanModule() {
               }}
               placeholder={t('search_placeholder')}
               leftIcon={<Search className="h-4 w-4" />}
-              className="py-2"
             />
           </div>
 
@@ -189,7 +190,6 @@ export function DeliveryChallanModule() {
               { label: t('last7'), value: "last7" },
               { label: t('last30'), value: "last30" }
             ]}
-            className="py-2"
           />
         </div>
       }
@@ -230,14 +230,14 @@ export function DeliveryChallanModule() {
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={handleSort}
-        emptyIcon={<FileText className="h-10 w-10 text-text-muted/30" />}
+        emptyIcon={<FileText className="h-12 w-12 text-primary/20" />}
         emptyMessage={t('no_challans')}
         columns={[
           {
             header: t('dc_number'),
             sortKey: "dc_number",
             accessor: (challan) => (
-              <span className="font-mono text-sm font-bold text-primary bg-primary/5 px-2 py-1 rounded border border-primary/10 tracking-tight">
+              <span className="font-mono text-[10px] font-black text-primary bg-primary/10 px-3 py-1 rounded-full border border-primary/20 tracking-widest shadow-sm">
                 {challan.dc_number}
               </span>
             )
@@ -246,14 +246,19 @@ export function DeliveryChallanModule() {
             header: t('customer'),
             sortKey: "customer",
             accessor: (challan) => (
-              <div className="font-semibold text-text-primary">{challan.customer_name}</div>
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-surface border border-border/40 flex items-center justify-center text-[10px] font-black text-text-muted uppercase">
+                  {challan.customer_name.substring(0, 2)}
+                </div>
+                <div className="font-bold text-text-primary group-hover:text-primary transition-colors">{challan.customer_name}</div>
+              </div>
             )
           },
           {
             header: t('items'),
             sortKey: "items_count",
             accessor: (challan) => (
-              <span className="text-sm text-text-muted bg-surface px-2 py-0.5 rounded-full border border-border">
+              <span className="text-[10px] font-black text-text-muted bg-surface/60 px-3 py-1 rounded-full border border-border/50 uppercase tracking-wider">
                 {challan.items.length} unit{challan.items.length !== 1 ? 's' : ''}
               </span>
             )
@@ -262,9 +267,20 @@ export function DeliveryChallanModule() {
             header: t('created_at'),
             sortKey: "date",
             accessor: (challan) => (
-              <div className="text-sm text-text-muted flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-success/60"></span>
+              <div className="text-[11px] text-text-muted/80 font-bold flex items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-success/40 shadow-[0_0_8px_rgba(16,185,129,0.3)]"></div>
                 {new Date(challan.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+              </div>
+            )
+          },
+          {
+            header: "Total Amount",
+            sortKey: "amount",
+            accessor: (challan) => (
+              <div className="text-right">
+                <span className="font-black text-primary text-sm tracking-tighter">
+                  {(challan.total_amount || 0).toLocaleString()}
+                </span>
               </div>
             )
           }

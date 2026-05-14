@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Settings2, Package, Users, ArrowLeft, Minus, Trash2, Hash, CheckCircle2, Maximize2, Minimize2, Eye } from "lucide-react";
+import { 
+  Plus, Settings2, Package, Users, ArrowLeft, Minus, Trash2, 
+  CheckCircle2, Maximize2, Eye, Printer, X 
+} from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { createDeliveryChallan, updateDeliveryChallan } from "./api";
 import { listCustomers, type Customer } from "../customers/api";
 import { listProducts, type Product } from "../inventory/api";
 import { useAuthStore } from "../../store/authStore";
-import { type ChallanCustomField, buildPreviewHtml } from "../reports/pdf";
+import { type ChallanCustomField, buildPreviewHtml, printDeliveryChallan } from "../reports/pdf";
 import { useToastStore } from "../../store/toastStore";
 import { Button } from "../../components/ui/Button";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
@@ -13,12 +16,13 @@ import { useTranslation } from "react-i18next";
 import { CreateProductModal } from "../../components/modals/CreateProductModal";
 import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
 import { useUiStore } from "../../store/uiStore";
-import { X } from "lucide-react";
 
 type ChallanItem = {
   product_id: number;
   product: Product;
   quantity: number;
+  rate: number;
+  amount: number;
 };
 
 export function CreateDeliveryChallanModule() {
@@ -27,6 +31,7 @@ export function CreateDeliveryChallanModule() {
   const location = useLocation();
   const editingChallan = (location.state as any)?.challan as import('./api').DeliveryChallan | undefined;
   const isEditMode = !!editingChallan;
+  
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const { addToast } = useToastStore();
@@ -38,14 +43,12 @@ export function CreateDeliveryChallanModule() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [previewExpanded, setPreviewExpanded] = useState(false);
-  // Persist custom field labels in localStorage
+  
   const CUSTOM_FIELDS_KEY = 'teebot_challan_custom_fields';
   const [customFields, setCustomFields] = useState<ChallanCustomField[]>(() => {
-    // 1. Try to load from editing challan first
     if (editingChallan?.metadata?.customFields) {
       return editingChallan.metadata.customFields;
     }
-    // 2. Fallback to localStorage labels
     try {
       const saved = localStorage.getItem(CUSTOM_FIELDS_KEY);
       if (saved) {
@@ -57,13 +60,11 @@ export function CreateDeliveryChallanModule() {
   });
   const [newFieldLabel, setNewFieldLabel] = useState("");
 
-  // Save custom field labels whenever they change
   useEffect(() => {
     const labels = customFields.map(f => f.label);
     localStorage.setItem(CUSTOM_FIELDS_KEY, JSON.stringify(labels));
   }, [customFields]);
 
-  // Prefill is handled inside loadData to ensure product objects are fully hydrated
   useEffect(() => {
     if (editingChallan && editingChallan.metadata?.customFields) {
       setCustomFields(editingChallan.metadata.customFields);
@@ -92,19 +93,22 @@ export function CreateDeliveryChallanModule() {
       setCustomers(custs);
       setProducts(prods);
 
-      // If editing, try to enrich pre-filled items with actual product data (like stock_qty)
       if (editingChallan) {
         setChallanItems(
           editingChallan.items.map(i => {
             const actualProduct = prods.find(p => p.id === i.product_id);
+            const rate = i.rate || actualProduct?.price || 0;
             return {
               product_id: i.product_id,
               quantity: i.quantity,
+              rate: rate,
+              amount: i.amount || (i.quantity * rate),
               product: actualProduct || ({
                 id: i.product_id,
                 name: i.product_name,
                 sku: i.product_sku,
-                stock_qty: i.quantity, // fallback
+                stock_qty: i.quantity,
+                price: rate
               } as Product),
             };
           })
@@ -121,21 +125,16 @@ export function CreateDeliveryChallanModule() {
 
   const handleQuickAddCustomerSuccess = (customer?: Customer) => {
     loadData();
-    if (customer) {
-      setSelectedCustomer(customer);
-    }
+    if (customer) setSelectedCustomer(customer);
   };
 
   const handleQuickAddProductSuccess = (product?: Product) => {
     loadData();
-    if (product) {
-      setSelectedProduct(product);
-    }
+    if (product) setSelectedProduct(product);
   };
 
   const handleAddItem = () => {
     if (!selectedProduct) return;
-
     const qtyToAdd = Number(quantity);
     if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
       addToast("Please enter a valid quantity.", "error");
@@ -143,32 +142,30 @@ export function CreateDeliveryChallanModule() {
     }
 
     const existingItem = challanItems.find(item => item.product_id === selectedProduct.id);
-    const currentListQty = existingItem ? existingItem.quantity : 0;
-    const totalNewQty = currentListQty + qtyToAdd;
-
-    if (totalNewQty > selectedProduct.stock_qty) {
-      addToast(
-        `Insufficient stock for "${selectedProduct.name}". Available: ${selectedProduct.stock_qty}, Current list: ${currentListQty}, Requested: ${qtyToAdd}`, "error"
-      );
-      return;
-    }
-
     if (existingItem) {
       setChallanItems(items =>
-        items.map(item =>
-          item.product_id === selectedProduct.id
-            ? { ...item, quantity: totalNewQty }
-            : item
-        )
+        items.map(item => {
+          if (item.product_id === selectedProduct.id) {
+            const newQty = item.quantity + qtyToAdd;
+            return { 
+              ...item, 
+              quantity: newQty,
+              amount: Number((newQty * item.rate).toFixed(2))
+            };
+          }
+          return item;
+        })
       );
     } else {
+      const rate = selectedProduct.price || 0;
       setChallanItems(items => [...items, {
         product_id: selectedProduct.id,
         product: selectedProduct,
         quantity: qtyToAdd,
+        rate: rate,
+        amount: Number((qtyToAdd * rate).toFixed(2))
       }]);
     }
-
     setSelectedProduct(null);
     setQuantity(1);
   };
@@ -177,12 +174,12 @@ export function CreateDeliveryChallanModule() {
     setChallanItems(items =>
       items.map(item => {
         if (item.product_id !== productId) return item;
-        let newQty = item.quantity + delta;
-        if (newQty < 1) newQty = 1;
-        if (item.product.stock_qty && newQty > item.product.stock_qty) {
-          newQty = item.product.stock_qty;
-        }
-        return { ...item, quantity: newQty };
+        const newQty = Math.max(1, item.quantity + delta);
+        return { 
+          ...item, 
+          quantity: newQty,
+          amount: Number((newQty * item.rate).toFixed(2))
+        };
       })
     );
   };
@@ -192,10 +189,11 @@ export function CreateDeliveryChallanModule() {
     setChallanItems(items =>
       items.map(item => {
         if (item.product_id !== productId) return item;
-        if (item.product.stock_qty && newQty > item.product.stock_qty) {
-          newQty = item.product.stock_qty;
-        }
-        return { ...item, quantity: newQty };
+        return { 
+          ...item, 
+          quantity: newQty,
+          amount: Number((newQty * item.rate).toFixed(2))
+        };
       })
     );
   };
@@ -216,26 +214,22 @@ export function CreateDeliveryChallanModule() {
         items: challanItems.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity,
+          rate: item.rate,
+          amount: item.amount
         })),
-        metadata: {
-          customFields
-        }
+        metadata: { customFields }
       };
 
       if (isEditMode && editingChallan) {
-        await updateDeliveryChallan({
-          ...payload,
-          id: editingChallan.id,
-        });
+        await updateDeliveryChallan({ ...payload, id: editingChallan.id });
         addToast("Delivery Challan updated successfully", "success");
       } else {
         await createDeliveryChallan(payload);
         addToast("Delivery Challan created successfully", "success");
       }
-
       navigate("/app/delivery-challan");
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to save delivery challan", "error");
+      addToast(err instanceof Error ? err.message : "Failed to save", "error");
     } finally {
       setSubmitting(false);
       setLoading(false);
@@ -257,25 +251,19 @@ export function CreateDeliveryChallanModule() {
     setCustomFields(prev => prev.filter(f => f.id !== id));
   };
 
-  const getAvailableProducts = () => {
-    const usedProductIds = challanItems.map(item => item.product_id);
-    return products.filter(product => !usedProductIds.includes(product.id) && product.stock_qty > 0);
-  };
-
   const totalQuantity = challanItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = challanItems.reduce((sum, item) => sum + item.amount, 0);
   const totalUniqueItems = challanItems.length;
   const isFormReady = !!selectedCustomer && challanItems.length > 0;
 
-  // Step completion state
   const customerSelected = !!selectedCustomer;
   const itemsAdded = challanItems.length > 0;
 
-  // ── Live Preview HTML (reactive, recalculates on every form change) ──
   const previewHtml = useMemo(() => {
     if (!selectedCustomer) return null;
-    const tempChallan = {
+    return buildPreviewHtml({
       id: 0,
-      dc_number: "DRAFT",
+      dc_number: isEditMode ? (editingChallan?.dc_number || "DRAFT") : "DRAFT",
       customer_id: selectedCustomer.id,
       customer_name: selectedCustomer.name,
       created_at: new Date().toISOString(),
@@ -285,14 +273,14 @@ export function CreateDeliveryChallanModule() {
         product_id: item.product_id,
         product_name: item.product.name,
         product_sku: item.product.sku,
-        quantity: item.quantity
+        quantity: item.quantity,
+        rate: item.rate,
+        amount: item.amount
       })),
-      total_amount: 0
-    };
-    return buildPreviewHtml(tempChallan as any, customFields);
-  }, [selectedCustomer, challanItems, customFields]);
+      total_amount: totalAmount
+    } as any, customFields);
+  }, [selectedCustomer, challanItems, customFields, totalAmount, isEditMode, editingChallan]);
 
-  // Loading is now handled globally via useUiStore.setLoading
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-500">
       {/* ── HEADER ── */}
@@ -300,7 +288,7 @@ export function CreateDeliveryChallanModule() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/app/delivery-challan")}
-            className="h-10 w-10 rounded-xl bg-surface border border-border flex items-center justify-center hover:bg-surface/80 hover:border-primary/20 transition-all active:scale-95"
+            className="h-10 w-10 rounded-xl bg-surface border border-border flex items-center justify-center hover:bg-surface/80 hover:border-primary/20 transition-all"
           >
             <ArrowLeft className="h-4 w-4 text-text-muted" />
           </button>
@@ -309,309 +297,203 @@ export function CreateDeliveryChallanModule() {
               {isEditMode ? t('edit_title', 'Edit Challan') : t('new_title')}
             </h1>
             <p className="text-xs text-text-muted mt-0.5">
-              {isEditMode
-                ? t('edit_subtitle', 'Adjust custom fields, line items, then print or download')
-                : t('new_subtitle')}
+              {isEditMode ? 'Adjust items and fields, then save or print' : 'Create a new delivery challan for your customer'}
             </p>
           </div>
         </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (!selectedCustomer) return;
+              const docData = {
+                id: 0,
+                dc_number: isEditMode ? (editingChallan?.dc_number || "DRAFT") : "DRAFT",
+                customer_id: selectedCustomer.id,
+                customer_name: selectedCustomer.name,
+                created_at: new Date().toISOString(),
+                items: challanItems.map((item, idx) => ({
+                  id: idx,
+                  dc_id: 0,
+                  product_id: item.product_id,
+                  product_name: item.product.name,
+                  product_sku: item.product.sku,
+                  quantity: item.quantity,
+                  rate: item.rate,
+                  amount: item.amount
+                })),
+                total_amount: totalAmount
+              };
+              printDeliveryChallan(docData as any, customFields);
+            }}
+            disabled={!isFormReady}
+            className="h-10 px-4 text-xs font-bold"
+            leftIcon={<Printer className="h-3.5 w-3.5" />}
+          >
+            Print Document
+          </Button>
+          <Button
+            onClick={handleSaveChallan}
+            disabled={!isFormReady || submitting}
+            isLoading={submitting}
+            className="h-10 px-6 text-xs font-bold shadow-lg shadow-primary/20"
+            leftIcon={<CheckCircle2 className="h-3.5 w-3.5" />}
+          >
+            {isEditMode ? 'Save Changes' : 'Confirm & Create'}
+          </Button>
+        </div>
       </div>
 
-      {/* ── MAIN CONTENT: Form Left | Preview Right ── */}
+      {/* ── MAIN CONTENT ── */}
       <div className="flex-1 overflow-hidden rounded-2xl border border-border bg-card shadow-sm flex min-h-0">
-
-        {/* ═══ LEFT: Form Panel ═══ */}
-        <div className="flex-1 min-w-[380px] border-r border-border flex flex-col min-h-0">
+        
+        {/* LEFT: FORM */}
+        <div className="flex-1 min-w-[380px] border-r border-border flex flex-col min-h-0 form-panel">
           <div className="flex-1 overflow-y-auto">
-
-            {/* ── Step 1: Custom Fields (Optional) ── */}
+            {/* Step 1: Fields */}
             <div className="p-5 border-b border-border">
               <div className="flex items-center gap-3 mb-4">
-                <div className="h-7 w-7 rounded-full flex items-center justify-center text-xs font-black bg-surface border border-border text-text-muted">
-                  <Settings2 className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-text-primary">{t('custom_fields')}</h3>
-                  <p className="text-[10px] text-text-muted">PO numbers, references, notes (optional)</p>
-                </div>
+                <Settings2 className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-bold text-text-primary">Custom Fields</h3>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-3">
                 <input
                   type="text"
                   value={newFieldLabel}
                   onChange={(e) => setNewFieldLabel(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddCustomField())}
-                  placeholder={t('cf_placeholder')}
-                  className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                  placeholder="PO #, Reference..."
+                  className="flex-1 text-xs"
                 />
-                <button
-                  type="button"
-                  onClick={handleAddCustomField}
-                  disabled={!newFieldLabel.trim()}
-                  className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-30 hover:bg-primary/90 active:scale-95 transition-all"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
+                <Button onClick={handleAddCustomField} size="sm"><Plus className="h-4 w-4" /></Button>
               </div>
-              {customFields.length > 0 && (
-                <div className="mt-3 space-y-2">
-                  {customFields.map(f => (
-                    <div key={f.id} className="flex items-center gap-2 bg-background rounded-xl border border-border px-3 py-2 group hover:border-primary/20 transition-all">
-                      <Hash className="h-3 w-3 text-text-muted/30 shrink-0" />
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider shrink-0 w-20 truncate">{f.label}</span>
-                      <input
-                        type="text"
-                        value={f.value}
-                        onChange={(e) => handleUpdateCustomField(f.id, e.target.value)}
-                        placeholder={t('value_placeholder')}
-                        className="flex-1 bg-transparent text-xs outline-none text-text-primary placeholder:text-text-muted/30 font-medium"
-                      />
-                      <button onClick={() => handleRemoveCustomField(f.id)} className="text-text-muted/30 hover:text-error transition-colors shrink-0 opacity-0 group-hover:opacity-100">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
+              {customFields.map(f => (
+                <div key={f.id} className="flex items-center gap-2 mb-2 bg-surface/30 p-2 rounded-lg">
+                  <span className="text-[10px] font-bold w-16 truncate opacity-60">{f.label}</span>
+                  <input
+                    type="text"
+                    value={f.value}
+                    onChange={(e) => handleUpdateCustomField(f.id, e.target.value)}
+                    className="flex-1 text-xs bg-transparent border-0 p-0 focus:ring-0"
+                  />
+                  <button onClick={() => handleRemoveCustomField(f.id)} className="text-error/40 hover:text-error"><X className="h-3.5 w-3.5" /></button>
                 </div>
-              )}
+              ))}
             </div>
 
-            {/* ── Step 2: Customer ── */}
+            {/* Step 2: Customer */}
             <div className="p-5 border-b border-border">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${customerSelected ? 'bg-success text-white' : 'bg-surface border border-border text-text-muted'}`}>
-                  {customerSelected ? <CheckCircle2 className="h-4 w-4" /> : '2'}
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-text-primary">{t('customer')}</h3>
-                  <p className="text-[10px] text-text-muted">Select who you're delivering to</p>
-                </div>
+                <Users className={`h-4 w-4 ${customerSelected ? 'text-success' : 'text-primary'}`} />
+                <h3 className="text-sm font-bold text-text-primary">Customer</h3>
               </div>
               <SearchableSelect
-                placeholder={t('choose_customer')}
                 options={[
-                  { label: t('register_customer'), value: "ADD_NEW" },
-                  ...customers.map(c => ({ label: c.name, value: c.id, description: c.phone, icon: <Users className="h-4 w-4" /> }))
+                  { label: "+ Add New Customer", value: "ADD_NEW" },
+                  ...customers.map(c => ({ label: c.name, value: c.id }))
                 ]}
                 value={selectedCustomer?.id || null}
                 onChange={(val) => {
                   if (val === "ADD_NEW") { setShowCustomerModal(true); return; }
-                  setSelectedCustomer(customers.find(c => c.id === parseInt(val)) || null);
+                  setSelectedCustomer(customers.find(c => c.id === Number(val)) || null);
                 }}
               />
-              {selectedCustomer && (
-                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-success/5 border border-success/20">
-                  <Users className="h-3.5 w-3.5 text-success" />
-                  <span className="text-xs font-bold text-success">{selectedCustomer.name}</span>
-                  <button onClick={() => setSelectedCustomer(null)} className="ml-auto text-success/50 hover:text-success transition-colors">
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              )}
             </div>
 
-            {/* ── Step 3: Add Products ── */}
+            {/* Step 3: Items */}
             <div className="p-5 border-b border-border">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${itemsAdded ? 'bg-success text-white' : 'bg-surface border border-border text-text-muted'}`}>
-                  {itemsAdded ? <CheckCircle2 className="h-4 w-4" /> : '3'}
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-text-primary">{t('add_line_item')}</h3>
-                  <p className="text-[10px] text-text-muted">Choose products and set quantities</p>
-                </div>
+                <Package className={`h-4 w-4 ${itemsAdded ? 'text-success' : 'text-primary'}`} />
+                <h3 className="text-sm font-bold text-text-primary">Line Items</h3>
               </div>
               <SearchableSelect
-                placeholder={t('choose_product')}
                 options={[
-                  { label: t('register_product'), value: "ADD_NEW" },
-                  ...getAvailableProducts().map(p => ({
-                    label: p.name,
-                    value: p.id,
-                    description: `SKU: ${p.sku} · Stock: ${p.stock_qty}`,
-                    icon: <Package className="h-4 w-4" />
-                  }))
+                  { label: "+ Add New Product", value: "ADD_NEW" },
+                  ...products.map(p => ({ label: p.name, value: p.id, description: `Stock: ${p.stock_qty}` }))
                 ]}
                 value={selectedProduct?.id || null}
                 onChange={(val) => {
                   if (val === "ADD_NEW") { setShowProductModal(true); return; }
-                  setSelectedProduct(products.find(p => p.id === parseInt(val)) || null);
+                  setSelectedProduct(products.find(p => p.id === Number(val)) || null);
                 }}
               />
-
-              {/* Quantity + Add inline */}
               {selectedProduct && (
-                <div className="mt-3 flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
-                  <div className="flex items-center gap-0 border border-border rounded-xl overflow-hidden bg-background">
-                    <button
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="h-10 w-10 flex items-center justify-center text-text-muted hover:bg-surface transition-colors border-r border-border"
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </button>
-                    <input
-                      type="number"
-                      value={quantity}
-                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                      min="1"
-                      className="w-14 h-10 text-center text-sm font-bold bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <button
-                      onClick={() => setQuantity(quantity + 1)}
-                      className="h-10 w-10 flex items-center justify-center text-text-muted hover:bg-surface transition-colors border-l border-border"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <Button
-                    onClick={handleAddItem}
-                    className="flex-1 h-10"
-                    leftIcon={<Plus className="h-4 w-4" />}
-                  >
-                    {t('add_to_challan')}
-                  </Button>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    className="w-20 text-xs text-center"
+                  />
+                  <Button onClick={handleAddItem} className="flex-1" size="sm">Add Item</Button>
                 </div>
               )}
 
-              {selectedProduct && (
-                <div className="mt-2 text-[10px] text-text-muted font-semibold px-1">
-                  Available stock: <span className="text-primary font-black">{selectedProduct.stock_qty}</span> units · SKU: <span className="font-mono">{selectedProduct.sku}</span>
-                </div>
-              )}
-
-              {/* Inline items list */}
-              {challanItems.length > 0 && (
-                <div className="mt-4 space-y-1.5">
-                  {challanItems.map((item, index) => (
-                    <div key={item.product_id} className="group flex items-center gap-3 px-3 py-2 rounded-xl bg-background border border-border hover:border-primary/20 transition-all">
-                      <span className="text-[9px] font-black text-text-muted/30 w-4 text-center tabular-nums">{index + 1}</span>
-                      <Package className="h-3.5 w-3.5 text-primary/60 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-xs text-text-primary truncate">{item.product.name}</div>
+              <div className="mt-4 space-y-2">
+                {challanItems.map(item => (
+                  <div key={item.product_id} className="group flex items-center gap-3 p-3 bg-surface rounded-xl border border-border">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-xs truncate">{item.product.name}</div>
+                      <div className="text-[10px] text-text-muted mt-0.5">
+                        Rate: <span className="text-primary font-bold">{item.rate}</span> | 
+                        Total: <span className="text-text-primary font-bold">{item.amount.toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center gap-0 border border-border rounded-lg overflow-hidden bg-surface/30 shrink-0">
-                        <button
-                          onClick={() => handleUpdateItemQty(item.product_id, -1)}
-                          className="h-7 w-7 flex items-center justify-center text-text-muted hover:bg-surface hover:text-text-primary transition-colors"
-                        >
-                          <Minus className="h-2.5 w-2.5" />
-                        </button>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={item.quantity}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value);
-                            if (isNaN(val)) return;
-                            handleSetItemQty(item.product_id, val);
-                          }}
-                          className="h-7 w-24 text-center text-[11px] font-black text-text-primary border-x border-border tabular-nums bg-transparent outline-none"
-                        />
-                        <button
-                          onClick={() => handleUpdateItemQty(item.product_id, 1)}
-                          className="h-7 w-7 flex items-center justify-center text-text-muted hover:bg-surface hover:text-text-primary transition-colors"
-                        >
-                          <Plus className="h-2.5 w-2.5" />
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveItem(item.product_id)}
-                        className="h-7 w-7 rounded-lg flex items-center justify-center text-text-muted/20 hover:text-error hover:bg-error/5 transition-all opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div className="flex items-center gap-0 border border-border rounded-lg overflow-hidden bg-background">
+                      <button onClick={() => handleUpdateItemQty(item.product_id, -1)} className="h-6 w-6 flex items-center justify-center border-r border-border hover:bg-surface"><Minus className="h-2.5 w-2.5" /></button>
+                      <input 
+                        value={item.quantity} 
+                        onChange={e => handleSetItemQty(item.product_id, Number(e.target.value))}
+                        className="w-10 h-6 text-center text-[10px] font-black border-0 bg-transparent focus:ring-0"
+                      />
+                      <button onClick={() => handleUpdateItemQty(item.product_id, 1)} className="h-6 w-6 flex items-center justify-center border-l border-border hover:bg-surface"><Plus className="h-2.5 w-2.5" /></button>
+                    </div>
+                    <button onClick={() => handleRemoveItem(item.product_id)} className="text-error/30 hover:text-error opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* ── Bottom Action Bar ── */}
-          <div className="border-t border-border bg-surface/30 px-5 py-4 shrink-0">
-            {challanItems.length > 0 && (
-              <div className="flex items-center gap-4 mb-3">
-                <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-background border border-border">
-                  <Package className="h-3 w-3 text-text-muted" />
-                  <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Products</span>
-                  <span className="text-xs font-black text-text-primary tabular-nums">{totalUniqueItems}</span>
-                </div>
-                <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-primary/5 border border-primary/20">
-                  <Hash className="h-3 w-3 text-primary" />
-                  <span className="text-[9px] font-bold text-primary uppercase tracking-wider">Total Qty</span>
-                  <span className="text-xs font-black text-primary tabular-nums">{totalQuantity}</span>
-                </div>
+          {/* BOTTOM SUMMARY */}
+          <div className="p-4 border-t border-border bg-surface/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col"><span className="text-[9px] font-bold opacity-40 uppercase">Unique</span><span className="text-xs font-black">{totalUniqueItems}</span></div>
+                <div className="flex flex-col"><span className="text-[9px] font-bold opacity-40 uppercase">Quantity</span><span className="text-xs font-black">{totalQuantity}</span></div>
               </div>
-            )}
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={handleSaveChallan}
-                disabled={!isFormReady || submitting}
-                isLoading={submitting}
-                className="flex-1"
-                leftIcon={<CheckCircle2 className="h-4 w-4" />}
-              >
-                {isEditMode ? t('common:save', 'Save Changes') : t('confirm_btn')}
-              </Button>
-              <Button
-                onClick={() => navigate("/app/delivery-challan")}
-                variant="ghost"
-                size="sm"
-              >
-                {t('common:cancel', 'Cancel')}
-              </Button>
+              <div className="text-right">
+                <span className="text-[9px] font-black uppercase opacity-40 block mb-0.5 tracking-wider">Grand Total</span>
+                <span className="text-lg font-black text-primary tabular-nums tracking-tighter">{totalAmount.toLocaleString()}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ═══ RIGHT: Live Preview (iframe) ═══ */}
-        <div className={`${previewExpanded ? 'flex-1' : 'w-[400px]'} shrink-0 bg-[#f1f5f9] dark:bg-[#0d1117] overflow-hidden flex flex-col min-h-0 transition-all duration-300`}>
-          {/* Preview header */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-white/5 shrink-0">
+        {/* RIGHT: PREVIEW */}
+        <div className={`shrink-0 bg-[#f1f5f9] dark:bg-[#0d1117] flex flex-col min-h-0 transition-all duration-300 challan-preview-container ${previewExpanded ? 'flex-1' : 'w-[500px]'}`}>
+          <div className="px-4 py-2 border-b border-border/50 bg-white/5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Eye className="h-3.5 w-3.5 text-text-muted/50" />
-              <span className="text-[10px] font-bold text-text-muted/50 uppercase tracking-wider">Live Preview</span>
+              <Eye className="h-3 w-3 opacity-40" />
+              <span className="text-[10px] font-black uppercase opacity-40">Live Preview</span>
             </div>
-            <button
-              onClick={() => setPreviewExpanded(!previewExpanded)}
-              className="h-7 w-7 rounded-lg flex items-center justify-center text-text-muted/40 hover:text-text-primary hover:bg-surface/50 transition-all"
-              title={previewExpanded ? 'Minimize preview' : 'Maximize preview'}
-            >
-              {previewExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-            </button>
+            <button onClick={() => setPreviewExpanded(!previewExpanded)} className="p-1 hover:bg-surface rounded-md"><Maximize2 className="h-3.5 w-3.5 opacity-40" /></button>
           </div>
-          {previewHtml ? (
-            <iframe
-              srcDoc={previewHtml}
-              title="Live Preview"
-              className="flex-1 w-full border-0"
-              sandbox="allow-same-origin"
-            />
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
-              <div className="h-16 w-16 rounded-2xl bg-surface/50 dark:bg-surface/20 border-2 border-dashed border-border flex items-center justify-center mb-4">
-                <Package className="h-7 w-7 text-text-muted/15" />
+          <div className="flex-1 bg-white relative">
+            {previewHtml ? (
+              <iframe srcDoc={previewHtml} title="Preview" className="absolute inset-0 w-full h-full border-0" />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center opacity-10">
+                <Package className="h-12 w-12 mb-2" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Awaiting Data</span>
               </div>
-              <p className="text-sm font-bold text-text-muted/40 mb-1">Live Preview</p>
-              <p className="text-[11px] text-text-muted/25 font-medium max-w-[200px]">Select a customer and add items to see the challan preview here</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      <CreateCustomerModal
-        isOpen={showCustomerModal}
-        onClose={() => setShowCustomerModal(false)}
-        onSuccess={handleQuickAddCustomerSuccess}
-        companyId={currentCompanyId}
-      />
-
-      <CreateProductModal
-        isOpen={showProductModal}
-        onClose={() => setShowProductModal(false)}
-        onSuccess={handleQuickAddProductSuccess}
-        companyId={currentCompanyId}
-        existingProducts={products}
-      />
+      <CreateCustomerModal isOpen={showCustomerModal} onClose={() => setShowCustomerModal(false)} onSuccess={handleQuickAddCustomerSuccess} companyId={currentCompanyId} />
+      <CreateProductModal isOpen={showProductModal} onClose={() => setShowProductModal(false)} onSuccess={handleQuickAddProductSuccess} companyId={currentCompanyId} existingProducts={products} />
     </div>
   );
 }

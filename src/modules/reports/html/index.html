@@ -22,12 +22,13 @@
       background: #f1f5f9; 
       color: #111827; 
       -webkit-font-smoothing: antialiased;
-      padding: 12px;
+      padding: 0;
       margin: 0;
+      overflow-x: hidden;
     }
     #challan { 
       width: 100%;
-      margin: 0 auto; 
+      margin: 0; 
       display: flex; 
       flex-direction: column;
       background: white;
@@ -69,13 +70,13 @@
     /* Layout */
     .header {
       background: linear-gradient(135deg, #1e293b, #334155);
-      padding: 32px 40px;
+      padding: 24px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     .meta-grid {
-      padding: 32px 40px;
+      padding: 24px 24px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 32px;
@@ -83,7 +84,7 @@
       background: #f9fafb;
     }
     .table-container {
-      padding: 32px 40px 0;
+      padding: 24px 24px 0;
     }
     .table {
       width: 100%;
@@ -93,7 +94,7 @@
     .table th {
       background: #1e293b;
       color: white;
-      padding: 12px 16px;
+      padding: 10px 8px;
       font-size: 10px;
       font-weight: 900;
       text-transform: uppercase;
@@ -102,12 +103,12 @@
       text-align: left;
     }
     .table td {
-      padding: 12px 16px;
+      padding: 10px 8px;
       border: 1px solid #e5e7eb;
-      font-size: 12px;
+      font-size: 11px;
     }
     .summary-bar {
-      margin: 24px 40px;
+      margin: 20px 24px;
       border: 1px solid #e5e7eb;
       border-radius: 8px;
       overflow: hidden;
@@ -115,7 +116,7 @@
       grid-template-columns: 1fr auto;
     }
     .signatures {
-      margin: 0 40px 32px;
+      margin: 0 24px 24px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 48px;
@@ -124,7 +125,7 @@
       margin-top: auto;
       background: #f9fafb;
       border-top: 1px solid #e5e7eb;
-      padding: 16px 40px;
+      padding: 12px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -165,10 +166,12 @@
   <div class="table-container">
     <table class="table">
       <colgroup>
-        <col style="width: 8%;" />
-        <col style="width: 52%;" />
-        <col style="width: 25%;" />
+        <col style="width: 5%;" />
+        <col style="width: 35%;" />
         <col style="width: 15%;" />
+        <col style="width: 10%;" />
+        <col style="width: 15%;" />
+        <col style="width: 20%;" />
       </colgroup>
       <thead>
         <tr>
@@ -176,6 +179,8 @@
           <th>Product / Description</th>
           <th>SKU / Code</th>
           <th style="text-align: center;">Qty</th>
+          <th style="text-align: right;">Rate</th>
+          <th style="text-align: right;">Amount</th>
         </tr>
       </thead>
       <tbody>
@@ -187,12 +192,18 @@
 
   <!-- SUMMARY BAR -->
   <div class="summary-bar">
-    <div style="background: #1e293b; padding: 16px 24px; display: flex; align-items: center; justify-content: flex-end;">
-      <span style="font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8;">Total Quantity Dispatched</span>
+    <div style="background: #1e293b; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <span style="font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; display: block; margin-bottom: 2px;">Total Quantity</span>
+        <span style="font-size: 18px; font-weight: 900; color: white;">{{TOTAL_QTY}} <span style="font-size: 11px; color: #94a3b8; font-weight: 400;">units</span></span>
+      </div>
+      <div style="text-align: right;">
+        <span style="font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; display: block; margin-bottom: 2px;">Grand Total</span>
+        <span style="font-size: 24px; font-weight: 900; color: white;">{{TOTAL_AMOUNT}}</span>
+      </div>
     </div>
-    <div style="background: #334155; padding: 16px 32px; display: flex; align-items: center; gap: 8px;">
-      <span style="font-size: 24px; font-weight: 900; color: white;">{{TOTAL_QTY}}</span>
-      <span style="font-size: 12px; color: #94a3b8; margin-top: 4px;">units</span>
+    <div style="background: #334155; padding: 16px 24px; display: flex; align-items: center; justify-content: center;">
+      <span style="font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; color: #94a3b8;">Document Summary</span>
     </div>
   </div>
 
