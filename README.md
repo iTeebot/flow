@@ -35,24 +35,24 @@ Below is the high-level overview of how Teebot Flow interacts with the local sys
 
 ```mermaid
 flowchart TD
-    A[User (Admin / Staff)] --> B[React Frontend UI]
-    B --> C[Tauri Invoke Bridge]
-    C --> D[Rust Backend Commands]
+    A["User (Admin / Staff)"] --> B["React Frontend UI"]
+    B --> C["Tauri Invoke Bridge"]
+    C --> D["Rust Backend Commands"]
 
-    D --> D1[Validation Layer]
-    D --> D2[Business Logic Layer]
+    D --> D1["Validation Layer"]
+    D --> D2["Business Logic Layer"]
 
-    D1 --> E[(SQLite Database)]
+    D1 --> E[("SQLite Database")]
     D2 --> E
 
-    D --> F[File System Storage]
-    D --> G[PDF / Report Generator]
+    D --> F["File System Storage"]
+    D --> G["PDF / Report Generator"]
 
     E --> D
     F --> D
     G --> B
 
-    B --> H[State Management<br/>Zustand]
+    B --> H["State Management<br/>Zustand"]
     H --> B
 ```
 
@@ -207,4 +207,4 @@ npm run tauri build
 -   **Security**: Validate all inputs at the Rust layer, even if validated in the frontend.
 
 ---
-© 2026 Teebot Flow. All rights reserved.
+© 2026 Teebot Flow. All rights reserved.
