@@ -2,7 +2,7 @@ use crate::db;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
@@ -292,28 +292,71 @@ pub fn restore_database(
 
     let is_sqlite = file_data.len() >= 16 && &file_data[0..16] == b"SQLite format 3\0";
 
-    if let Some(key) = encryption_key {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data directory: {e}"))?;
+    let temp_db_path = app_data_dir.join("teebot-flow-restore.tmp");
+
+    let restored_bytes = if let Some(key) = encryption_key {
         // User provided a key, attempt decryption
         let decrypted_data = crate::modules::security::decrypt_and_decompress(&file_data, &key)?;
 
         if decrypted_data.len() >= 16 && &decrypted_data[0..16] == b"SQLite format 3\0" {
-            fs::write(&target_path, decrypted_data)
-                .map_err(|e| format!("Failed to write restored database: {e}"))?;
+            decrypted_data
         } else {
             return Err("Invalid Recovery Key or corrupted backup.".to_string());
         }
     } else {
         // No key provided
         if is_sqlite {
-            fs::write(&target_path, file_data)
-                .map_err(|e| format!("Failed to restore database: {e}"))?;
+            file_data
         } else {
             return Err(
                 "This backup appears to be encrypted. Please provide your Recovery Key."
                     .to_string(),
             );
         }
+    };
+
+    fs::write(&temp_db_path, &restored_bytes)
+        .map_err(|e| format!("Failed to write temporary database: {e}"))?;
+
+    let validate = || -> Result<(), String> {
+        let conn = rusqlite::Connection::open(&temp_db_path)
+            .map_err(|e| format!("Failed to open restored database: {e}"))?;
+
+        let integrity: String = conn
+            .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+            .map_err(|e| format!("Failed to run integrity check: {e}"))?;
+        if integrity != "ok" {
+            return Err(format!("Database integrity check failed: {integrity}"));
+        }
+
+        let schema_check: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('users', 'company_profiles')",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Database schema query failed: {e}"))?;
+        if schema_check < 2 {
+            return Err("Database is missing required tables (users/company_profiles).".to_string());
+        }
+
+        Ok(())
+    };
+
+    if let Err(err) = validate() {
+        let _ = fs::remove_file(&temp_db_path);
+        return Err(err);
     }
+
+    fs::rename(&temp_db_path, &target_path)
+        .map_err(|e| {
+            let _ = fs::remove_file(&temp_db_path);
+            format!("Failed to replace live database: {e}")
+        })?;
 
     Ok(())
 }

@@ -37,6 +37,57 @@ export const getDownloadLink = (version: string, filename: string) => {
   return `${GITHUB_RELEASES_URL}/download/v${version}/${filename}`;
 };
 
+const ASSET_NAMES = {
+  windows: {
+    exe: (version: string) => `Teebot-Flow_${version}_x64-setup.exe`,
+    msi: (version: string) => `Teebot-Flow_${version}_x64_en-US.msi`,
+  },
+  linux: {
+    appImage: (version: string) => `teebot-flow_${version}_amd64.AppImage`,
+    deb: (version: string) => `teebot-flow_${version}_amd64.deb`,
+  },
+  macOS: {
+    aarch64: (version: string) => `Teebot-Flow_${version}_aarch64.dmg`,
+    x64: (version: string) => `Teebot-Flow_${version}_x64.dmg`,
+  },
+};
+
+const getMacArch = (): "aarch64" | "x64" | null => {
+  if (typeof window === "undefined") return null;
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  
+  if (userAgent.includes("arm64") || userAgent.includes("aarch64")) {
+    return "aarch64";
+  }
+  if (userAgent.includes("intel") || userAgent.includes("x64") || userAgent.includes("x86_64")) {
+    return "x64";
+  }
+  
+  try {
+    const canvas = document.createElement("canvas");
+    const gl = (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
+    if (gl) {
+      const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+      if (debugInfo) {
+        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).toLowerCase();
+        if (
+          renderer.includes("apple") ||
+          renderer.includes("m1") ||
+          renderer.includes("m2") ||
+          renderer.includes("m3") ||
+          renderer.includes("m4")
+        ) {
+          return "aarch64";
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore fallback
+  }
+  
+  return null;
+};
+
 /**
  * Get all available downloads for each platform from GitHub Releases.
  */
@@ -44,21 +95,21 @@ export const getReleaseDownloads = (version: string) => ({
   Windows: [
     {
       name: "Installer (EXE)",
-      url: getDownloadLink(version, `Teebot-Flow_${version}_x64-setup.exe`),
+      url: getDownloadLink(version, ASSET_NAMES.windows.exe(version)),
     },
     {
       name: "MSI Package",
-      url: getDownloadLink(version, `Teebot-Flow_${version}_x64_en-US.msi`),
+      url: getDownloadLink(version, ASSET_NAMES.windows.msi(version)),
     },
   ],
   Linux: [
     {
       name: "AppImage",
-      url: getDownloadLink(version, `teebot-flow_${version}_amd64.AppImage`),
+      url: getDownloadLink(version, ASSET_NAMES.linux.appImage(version)),
     },
     {
       name: "Debian Package (.deb)",
-      url: getDownloadLink(version, `teebot-flow_${version}_amd64.deb`),
+      url: getDownloadLink(version, ASSET_NAMES.linux.deb(version)),
     },
     {
       name: "Snap Store",
@@ -68,11 +119,11 @@ export const getReleaseDownloads = (version: string) => ({
   macOS: [
     {
       name: "DMG (Apple Silicon)",
-      url: getDownloadLink(version, `Teebot-Flow_${version}_aarch64.dmg`),
+      url: getDownloadLink(version, ASSET_NAMES.macOS.aarch64(version)),
     },
     {
       name: "DMG (Intel)",
-      url: getDownloadLink(version, `Teebot-Flow_${version}_x64.dmg`),
+      url: getDownloadLink(version, ASSET_NAMES.macOS.x64(version)),
     },
   ],
 });
@@ -83,17 +134,30 @@ export const getBestDownloadForOS = (os: string, version: string) => {
     case "Windows":
       return {
         label: "Download for Windows",
-        url: getDownloadLink(version, `Teebot-Flow_${version}_x64-setup.exe`),
+        url: getDownloadLink(version, ASSET_NAMES.windows.exe(version)),
       };
-    case "macOS":
+    case "macOS": {
+      const arch = getMacArch();
+      if (arch === "aarch64") {
+        return {
+          label: "Download for macOS",
+          url: getDownloadLink(version, ASSET_NAMES.macOS.aarch64(version)),
+        };
+      } else if (arch === "x64") {
+        return {
+          label: "Download for macOS",
+          url: getDownloadLink(version, ASSET_NAMES.macOS.x64(version)),
+        };
+      }
       return {
-        label: "Download for macOS",
-        url: getDownloadLink(version, `Teebot-Flow_${version}_aarch64.dmg`),
+        label: "View All Downloads",
+        url: tagUrl,
       };
+    }
     case "Linux":
       return {
         label: "Download for Linux (.deb)",
-        url: getDownloadLink(version, `teebot-flow_${version}_amd64.deb`),
+        url: getDownloadLink(version, ASSET_NAMES.linux.deb(version)),
       };
     default:
       return {

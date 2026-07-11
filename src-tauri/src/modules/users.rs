@@ -93,7 +93,7 @@ pub fn delete_user(app: AppHandle, user_id: i64) -> Result<(), String> {
             [user_id],
             |row| row.get(0),
         )
-        .unwrap_or(0);
+        .map_err(|e| format!("Database error during root administrator check: {e}"))?;
 
     if count > 0 {
         return Err("Cannot delete the root administrator.".to_string());

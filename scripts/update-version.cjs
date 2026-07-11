@@ -7,6 +7,12 @@ if (!version) {
   process.exit(1);
 }
 
+const semverRegex = /^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$/;
+if (!semverRegex.test(version)) {
+  console.error(`Error: Invalid version format '${version}'. Must be a valid semver (e.g. 1.0.0 or 1.0.0-alpha.1).`);
+  process.exit(1);
+}
+
 const rootDir = path.resolve(__dirname, '..');
 
 // 1. Update src/lib/version.ts
