@@ -120,6 +120,18 @@ export default defineConfig(({ mode }) => {
         input: {
           main: resolve(__dirname, 'index.html'),
         },
+        output: {
+          manualChunks(id: string) {
+            // Pin self-contained PDF libs into a dedicated chunk so they are
+            // not invalidated by app changes. recharts/d3 share internal
+            // sub-packages across the graph, so they are left to Rollup's
+            // default splitting to avoid circular-chunk warnings.
+            if (id.includes('node_modules/jspdf') ||
+                id.includes('node_modules/html2canvas')) {
+              return 'vendor-pdf';
+            }
+          },
+        },
       },
       chunkSizeWarningLimit: 2000
     },
