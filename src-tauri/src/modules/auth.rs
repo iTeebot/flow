@@ -281,12 +281,18 @@ pub fn reset_database(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+static RESTORE_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[tauri::command]
 pub fn restore_database(
     app: AppHandle,
     path: String,
     encryption_key: Option<String>,
 ) -> Result<(), String> {
+    let _lock = RESTORE_MUTEX
+        .lock()
+        .map_err(|e| format!("Failed to acquire restore lock: {e}"))?;
+
     let target_path = db::resolve_db_path(&app)?;
     let file_data = fs::read(&path).map_err(|e| format!("Failed to read backup file: {e}"))?;
 
@@ -296,7 +302,6 @@ pub fn restore_database(
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to resolve app data directory: {e}"))?;
-    let temp_db_path = app_data_dir.join("teebot-flow-restore.tmp");
 
     let restored_bytes = if let Some(key) = encryption_key {
         // User provided a key, attempt decryption
@@ -319,8 +324,42 @@ pub fn restore_database(
         }
     };
 
-    fs::write(&temp_db_path, &restored_bytes)
-        .map_err(|e| format!("Failed to write temporary database: {e}"))?;
+    let mut temp_db_path;
+    let mut file;
+    let mut attempts = 0;
+    loop {
+        let rand_val = rand::random::<u64>();
+        let temp_filename = format!("teebot-flow-restore-{:016x}.tmp", rand_val);
+        temp_db_path = app_data_dir.join(temp_filename);
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_db_path)
+        {
+            Ok(f) => {
+                file = f;
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                attempts += 1;
+                if attempts > 100 {
+                    return Err(
+                        "Failed to find a unique temporary filename after 100 attempts."
+                            .to_string(),
+                    );
+                }
+                continue;
+            }
+            Err(e) => return Err(format!("Failed to create temporary file: {e}")),
+        }
+    }
+
+    use std::io::Write;
+    file.write_all(&restored_bytes).map_err(|e| {
+        let _ = fs::remove_file(&temp_db_path);
+        format!("Failed to write temporary database: {e}")
+    })?;
+    drop(file);
 
     let validate = || -> Result<(), String> {
         let conn = rusqlite::Connection::open(&temp_db_path)
