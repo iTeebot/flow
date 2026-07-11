@@ -150,7 +150,10 @@ pub fn list_company_profiles(app: tauri::AppHandle) -> Result<Vec<CompanyProfile
 }
 
 #[tauri::command]
-pub fn get_company_profile(app: tauri::AppHandle, company_id: i64) -> Result<CompanyProfile, String> {
+pub fn get_company_profile(
+    app: tauri::AppHandle,
+    company_id: i64,
+) -> Result<CompanyProfile, String> {
     if company_id <= 0 {
         return Err("Invalid company profile id".to_string());
     }

@@ -1,11 +1,11 @@
 use crate::db;
+use crate::modules::security;
 use chrono::Utc;
 use rusqlite::params;
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
-use crate::modules::security;
 
 #[derive(Debug, Serialize)]
 pub struct BackupInfo {
@@ -38,14 +38,18 @@ pub fn get_backup_info(app: tauri::AppHandle) -> Result<BackupInfo, String> {
 }
 
 #[tauri::command]
-pub fn create_backup(app: tauri::AppHandle, encryption_key: Option<String>) -> Result<BackupInfo, String> {
+pub fn create_backup(
+    app: tauri::AppHandle,
+    encryption_key: Option<String>,
+) -> Result<BackupInfo, String> {
     let db_path = db::resolve_db_path(&app)?;
     let app_data_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to resolve app data directory: {e}"))?;
     let backup_dir = app_data_dir.join("backups");
-    fs::create_dir_all(&backup_dir).map_err(|e| format!("Failed to create backup directory: {e}"))?;
+    fs::create_dir_all(&backup_dir)
+        .map_err(|e| format!("Failed to create backup directory: {e}"))?;
 
     let timestamp = Utc::now().format("%Y%m%d-%H%M%S").to_string();
     let file_name = format!("teebot-flow-backup-{timestamp}.tbf");
@@ -54,9 +58,11 @@ pub fn create_backup(app: tauri::AppHandle, encryption_key: Option<String>) -> R
     if let Some(key) = encryption_key {
         let db_data = fs::read(&db_path).map_err(|e| format!("Failed to read database: {e}"))?;
         let encrypted_data = security::compress_and_encrypt(&db_data, &key)?;
-        fs::write(&backup_path, encrypted_data).map_err(|e| format!("Failed to write encrypted backup: {e}"))?;
+        fs::write(&backup_path, encrypted_data)
+            .map_err(|e| format!("Failed to write encrypted backup: {e}"))?;
     } else {
-        fs::copy(&db_path, &backup_path).map_err(|e| format!("Failed to create database backup: {e}"))?;
+        fs::copy(&db_path, &backup_path)
+            .map_err(|e| format!("Failed to create database backup: {e}"))?;
     }
 
     let last_backup_at = Utc::now().to_rfc3339();
@@ -81,13 +87,18 @@ pub fn create_backup(app: tauri::AppHandle, encryption_key: Option<String>) -> R
 }
 
 #[tauri::command]
-pub fn export_backup(app: tauri::AppHandle, path: String, encryption_key: Option<String>) -> Result<(), String> {
+pub fn export_backup(
+    app: tauri::AppHandle,
+    path: String,
+    encryption_key: Option<String>,
+) -> Result<(), String> {
     let db_path = db::resolve_db_path(&app)?;
-    
+
     if let Some(key) = encryption_key {
         let db_data = fs::read(&db_path).map_err(|e| format!("Failed to read database: {e}"))?;
         let encrypted_data = security::compress_and_encrypt(&db_data, &key)?;
-        fs::write(&path, encrypted_data).map_err(|e| format!("Failed to write encrypted backup: {e}"))?;
+        fs::write(&path, encrypted_data)
+            .map_err(|e| format!("Failed to write encrypted backup: {e}"))?;
     } else {
         fs::copy(&db_path, &path).map_err(|e| format!("Failed to export backup: {e}"))?;
     }

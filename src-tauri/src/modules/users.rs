@@ -1,8 +1,8 @@
 use crate::db;
+use bcrypt::{hash, DEFAULT_COST};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
-use bcrypt::{hash, DEFAULT_COST};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
@@ -71,7 +71,7 @@ pub fn create_user(app: AppHandle, input: CreateUserInput) -> Result<User, Strin
     .map_err(|e| e.to_string())?;
 
     let user_id = conn.last_insert_rowid();
-    
+
     Ok(User {
         id: user_id,
         username: input.username,
@@ -85,13 +85,15 @@ pub fn create_user(app: AppHandle, input: CreateUserInput) -> Result<User, Strin
 #[tauri::command]
 pub fn delete_user(app: AppHandle, user_id: i64) -> Result<(), String> {
     let conn = db::open_connection(&app)?;
-    
+
     // Prevent deleting the root admin (owner of the company profile)
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM company_profiles WHERE user_id = ?1",
-        [user_id],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM company_profiles WHERE user_id = ?1",
+            [user_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("Database error during root administrator check: {e}"))?;
 
     if count > 0 {
         return Err("Cannot delete the root administrator.".to_string());
@@ -110,7 +112,7 @@ pub fn list_user_sessions(app: AppHandle) -> Result<Vec<UserSession>, String> {
             "SELECT us.id, us.user_id, u.username, us.time_in, us.time_out 
              FROM user_sessions us
              JOIN users u ON us.user_id = u.id
-             ORDER BY us.time_in DESC"
+             ORDER BY us.time_in DESC",
         )
         .map_err(|e| e.to_string())?;
 

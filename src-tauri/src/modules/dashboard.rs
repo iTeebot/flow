@@ -2,6 +2,7 @@ use crate::db;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct KPI {
     pub total_products: i64,
     pub total_customers: i64,
@@ -39,7 +40,10 @@ pub struct DashboardSummary {
 }
 
 #[tauri::command]
-pub fn get_dashboard_summary(app: tauri::AppHandle, company_id: i64) -> Result<DashboardSummary, String> {
+pub fn get_dashboard_summary(
+    app: tauri::AppHandle,
+    company_id: i64,
+) -> Result<DashboardSummary, String> {
     if company_id <= 0 {
         return Err("Company profile is required".to_string());
     }
@@ -104,7 +108,9 @@ pub fn get_dashboard_summary(app: tauri::AppHandle, company_id: i64) -> Result<D
     let sales_trend: Vec<SalesTrendPoint> = stmt
         .query_map([company_id], |row| {
             Ok(SalesTrendPoint {
-                date: row.get::<_, Option<String>>(0)?.unwrap_or_else(|| "Unknown".to_string()),
+                date: row
+                    .get::<_, Option<String>>(0)?
+                    .unwrap_or_else(|| "Unknown".to_string()),
                 amount: row.get(1)?,
             })
         })
@@ -150,20 +156,19 @@ pub fn get_dashboard_summary(app: tauri::AppHandle, company_id: i64) -> Result<D
         )
         .map_err(|e| format!("Failed to prepare activity query: {e}"))?;
 
-    let rows = stmt.query_map([company_id], |row| {
-        Ok(ActivityItem {
-            id: row.get(0)?,
-            activity_type: row.get(1)?,
-            description: row.get(2)?,
-            created_at: row.get(3)?,
+    let rows = stmt
+        .query_map([company_id], |row| {
+            Ok(ActivityItem {
+                id: row.get(0)?,
+                activity_type: row.get(1)?,
+                description: row.get(2)?,
+                created_at: row.get(3)?,
+            })
         })
-    })
-    .map_err(|e| format!("Failed to fetch activity: {e}"))?;
+        .map_err(|e| format!("Failed to fetch activity: {e}"))?;
 
-    for row in rows {
-        if let Ok(item) = row {
-            activity.push(item);
-        }
+    for item in rows.flatten() {
+        activity.push(item);
     }
 
     // Sort activity by date (newest first) and take top 5

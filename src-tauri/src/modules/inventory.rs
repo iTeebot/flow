@@ -78,7 +78,10 @@ pub fn create_product(app: tauri::AppHandle, input: CreateProductInput) -> Resul
         return Err("Company profile not found".to_string());
     }
 
-    let metadata_str = input.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
+    let metadata_str = input
+        .metadata
+        .as_ref()
+        .map(|m| serde_json::to_string(m).unwrap());
 
     conn.execute(
         "INSERT INTO products (company_id, name, description, sku, stock_qty, price, hs_code, uom, metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -98,9 +101,13 @@ pub fn create_product(app: tauri::AppHandle, input: CreateProductInput) -> Resul
 
     let id = conn.last_insert_rowid();
     let created_at: String = conn
-        .query_row("SELECT created_at FROM products WHERE id = ?1", [id], |row| row.get(0))
+        .query_row(
+            "SELECT created_at FROM products WHERE id = ?1",
+            [id],
+            |row| row.get(0),
+        )
         .unwrap_or_default();
-    
+
     Ok(Product {
         id,
         company_id: input.company_id,
@@ -178,9 +185,12 @@ pub fn update_product(app: tauri::AppHandle, input: UpdateProductInput) -> Resul
     }
 
     let conn = db::open_connection(&app)?;
-    
-    let metadata_str = input.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
-    
+
+    let metadata_str = input
+        .metadata
+        .as_ref()
+        .map(|m| serde_json::to_string(m).unwrap());
+
     conn.execute(
         "UPDATE products SET name = ?1, description = ?2, sku = ?3, stock_qty = ?4, price = ?5, hs_code = ?6, uom = ?7, metadata = ?8 WHERE id = ?9",
         (&input.name, &input.description, &input.sku, input.stock_qty, input.price, &input.hs_code, &input.uom, &metadata_str, input.id),
@@ -217,7 +227,7 @@ pub fn delete_product(app: tauri::AppHandle, product_id: i64) -> Result<String, 
     }
 
     let conn = db::open_connection(&app)?;
-    
+
     conn.execute(
         "UPDATE products SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?1",
         [product_id],
@@ -228,6 +238,7 @@ pub fn delete_product(app: tauri::AppHandle, product_id: i64) -> Result<String, 
 }
 
 #[tauri::command]
+#[allow(clippy::type_complexity)]
 pub fn adjust_stock(app: tauri::AppHandle, input: AdjustStockInput) -> Result<Product, String> {
     if input.product_id <= 0 {
         return Err("Invalid product ID".to_string());

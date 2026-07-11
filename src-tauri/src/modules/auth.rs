@@ -1,8 +1,8 @@
 use crate::db;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
 use std::fs;
+use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct User {
@@ -62,11 +62,13 @@ pub fn register(app: AppHandle, input: RegisterInput) -> Result<LoginResponse, S
     }
 
     let mut conn = db::open_connection(&app)?;
-    let tx = conn.transaction().map_err(|e| format!("Failed to start transaction: {e}"))?;
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Failed to start transaction: {e}"))?;
 
     // Hash password
-    let hashed = hash(input.password, DEFAULT_COST)
-        .map_err(|e| format!("Failed to hash password: {e}"))?;
+    let hashed =
+        hash(input.password, DEFAULT_COST).map_err(|e| format!("Failed to hash password: {e}"))?;
 
     // Create user
     tx.execute(
@@ -88,8 +90,8 @@ pub fn register(app: AppHandle, input: RegisterInput) -> Result<LoginResponse, S
             currency, website
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
         (
-            &input.company_name, 
-            &input.full_name, 
+            &input.company_name,
+            &input.full_name,
             &user_id,
             &input.email,
             &input.phone,
@@ -102,14 +104,15 @@ pub fn register(app: AppHandle, input: RegisterInput) -> Result<LoginResponse, S
             &input.sales_tax_number,
             &input.business_type,
             &currency_val,
-            &input.website
+            &input.website,
         ),
     )
     .map_err(|e| format!("Failed to create company profile: {e}"))?;
 
     let company_id = tx.last_insert_rowid();
 
-    tx.commit().map_err(|e| format!("Failed to commit transaction: {e}"))?;
+    tx.commit()
+        .map_err(|e| format!("Failed to commit transaction: {e}"))?;
 
     Ok(LoginResponse {
         user: User {
@@ -127,20 +130,35 @@ pub fn register(app: AppHandle, input: RegisterInput) -> Result<LoginResponse, S
 #[tauri::command]
 pub fn login(app: AppHandle, username: String, password: String) -> Result<LoginResponse, String> {
     let conn = db::open_connection(&app)?;
-    
+
     // Authenticate via username OR tax_registration_number (NTN/EIN) for backward compatibility
-    let (id, password_hash, full_name, role, actual_username): (i64, String, Option<String>, String, String) = conn
+    let (id, password_hash, full_name, role, actual_username): (
+        i64,
+        String,
+        Option<String>,
+        String,
+        String,
+    ) = conn
         .query_row(
             "SELECT u.id, u.password_hash, u.full_name, u.role, u.username 
              FROM users u
              LEFT JOIN company_profiles cp ON cp.user_id = u.id
              WHERE u.username = ?1 OR cp.tax_registration_number = ?1",
             [&username],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
         )
         .map_err(|_| "Invalid credentials".to_string())?;
 
-    let valid = verify(password, &password_hash).map_err(|e| format!("Error verifying password: {e}"))?;
+    let valid =
+        verify(password, &password_hash).map_err(|e| format!("Error verifying password: {e}"))?;
 
     if !valid {
         return Err("Invalid credentials".to_string());
@@ -156,11 +174,9 @@ pub fn login(app: AppHandle, username: String, password: String) -> Result<Login
         .map_err(|e| format!("Failed to fetch company: {e}"))?;
 
     // Log the session
-    conn.execute(
-        "INSERT INTO user_sessions (user_id) VALUES (?1)",
-        [id],
-    ).map_err(|e| format!("Failed to log session: {e}"))?;
-    
+    conn.execute("INSERT INTO user_sessions (user_id) VALUES (?1)", [id])
+        .map_err(|e| format!("Failed to log session: {e}"))?;
+
     let session_id = conn.last_insert_rowid();
 
     Ok(LoginResponse {
@@ -182,14 +198,15 @@ pub fn logout_session(app: AppHandle, session_id: i64) -> Result<(), String> {
     conn.execute(
         "UPDATE user_sessions SET time_out = CURRENT_TIMESTAMP WHERE id = ?1",
         [session_id],
-    ).map_err(|e| format!("Failed to end session: {e}"))?;
+    )
+    .map_err(|e| format!("Failed to end session: {e}"))?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn validate_session(app: AppHandle, user_id: i64) -> Result<LoginResponse, String> {
     let conn = db::open_connection(&app)?;
-    
+
     let (username, full_name, role): (String, Option<String>, String) = conn
         .query_row(
             "SELECT username, full_name, role FROM users WHERE id = ?1",
@@ -264,30 +281,122 @@ pub fn reset_database(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+static RESTORE_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[tauri::command]
-pub fn restore_database(app: AppHandle, path: String, encryption_key: Option<String>) -> Result<(), String> {
+pub fn restore_database(
+    app: AppHandle,
+    path: String,
+    encryption_key: Option<String>,
+) -> Result<(), String> {
+    let _lock = RESTORE_MUTEX
+        .lock()
+        .map_err(|e| format!("Failed to acquire restore lock: {e}"))?;
+
     let target_path = db::resolve_db_path(&app)?;
     let file_data = fs::read(&path).map_err(|e| format!("Failed to read backup file: {e}"))?;
 
     let is_sqlite = file_data.len() >= 16 && &file_data[0..16] == b"SQLite format 3\0";
 
-    if let Some(key) = encryption_key {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data directory: {e}"))?;
+
+    let restored_bytes = if let Some(key) = encryption_key {
         // User provided a key, attempt decryption
         let decrypted_data = crate::modules::security::decrypt_and_decompress(&file_data, &key)?;
-        
+
         if decrypted_data.len() >= 16 && &decrypted_data[0..16] == b"SQLite format 3\0" {
-            fs::write(&target_path, decrypted_data).map_err(|e| format!("Failed to write restored database: {e}"))?;
+            decrypted_data
         } else {
             return Err("Invalid Recovery Key or corrupted backup.".to_string());
         }
     } else {
         // No key provided
         if is_sqlite {
-            fs::write(&target_path, file_data).map_err(|e| format!("Failed to restore database: {e}"))?;
+            file_data
         } else {
-            return Err("This backup appears to be encrypted. Please provide your Recovery Key.".to_string());
+            return Err(
+                "This backup appears to be encrypted. Please provide your Recovery Key."
+                    .to_string(),
+            );
+        }
+    };
+
+    let mut temp_db_path;
+    let mut file;
+    let mut attempts = 0;
+    loop {
+        let rand_val = rand::random::<u64>();
+        let temp_filename = format!("teebot-flow-restore-{:016x}.tmp", rand_val);
+        temp_db_path = app_data_dir.join(temp_filename);
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_db_path)
+        {
+            Ok(f) => {
+                file = f;
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                attempts += 1;
+                if attempts > 100 {
+                    return Err(
+                        "Failed to find a unique temporary filename after 100 attempts."
+                            .to_string(),
+                    );
+                }
+                continue;
+            }
+            Err(e) => return Err(format!("Failed to create temporary file: {e}")),
         }
     }
-    
+
+    use std::io::Write;
+    file.write_all(&restored_bytes).map_err(|e| {
+        let _ = fs::remove_file(&temp_db_path);
+        format!("Failed to write temporary database: {e}")
+    })?;
+    drop(file);
+
+    let validate = || -> Result<(), String> {
+        let conn = rusqlite::Connection::open(&temp_db_path)
+            .map_err(|e| format!("Failed to open restored database: {e}"))?;
+
+        let integrity: String = conn
+            .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+            .map_err(|e| format!("Failed to run integrity check: {e}"))?;
+        if integrity != "ok" {
+            return Err(format!("Database integrity check failed: {integrity}"));
+        }
+
+        let schema_check: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('users', 'company_profiles')",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Database schema query failed: {e}"))?;
+        if schema_check < 2 {
+            return Err(
+                "Database is missing required tables (users/company_profiles).".to_string(),
+            );
+        }
+
+        Ok(())
+    };
+
+    if let Err(err) = validate() {
+        let _ = fs::remove_file(&temp_db_path);
+        return Err(err);
+    }
+
+    fs::rename(&temp_db_path, &target_path).map_err(|e| {
+        let _ = fs::remove_file(&temp_db_path);
+        format!("Failed to replace live database: {e}")
+    })?;
+
     Ok(())
 }

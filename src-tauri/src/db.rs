@@ -19,7 +19,10 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
 
     // Self-heal: If the database is corrupted (e.g. overwritten by an encrypted file without decryption),
     // we must do a real disk read to detect it. PRAGMAs do not trigger disk reads.
-    if conn.query_row("SELECT COUNT(*) FROM sqlite_master", [], |_| Ok(())).is_err() {
+    if conn
+        .query_row("SELECT COUNT(*) FROM sqlite_master", [], |_| Ok(()))
+        .is_err()
+    {
         drop(conn); // Must release the SQLite file lock before deleting!
         let db_path = resolve_db_path(app)?;
         let _ = std::fs::remove_file(&db_path);
@@ -295,20 +298,90 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
         "external_id",
         "TEXT NOT NULL DEFAULT (lower(hex(randomblob(16))))",
     )?;
-    ensure_column(&conn, "company_profiles", "sync_status", "TEXT NOT NULL DEFAULT 'local_only'")?;
-    ensure_column(&conn, "products", "sync_status", "TEXT NOT NULL DEFAULT 'local_only'")?;
-    ensure_column(&conn, "customers", "sync_status", "TEXT NOT NULL DEFAULT 'local_only'")?;
-    ensure_column(&conn, "delivery_challans", "sync_status", "TEXT NOT NULL DEFAULT 'local_only'")?;
-    ensure_column(&conn, "dc_items", "sync_status", "TEXT NOT NULL DEFAULT 'local_only'")?;
-    ensure_column(&conn, "invoices", "sync_status", "TEXT NOT NULL DEFAULT 'local_only'")?;
-    ensure_column(&conn, "invoice_items", "sync_status", "TEXT NOT NULL DEFAULT 'local_only'")?;
-    ensure_column(&conn, "company_profiles", "sync_version", "INTEGER NOT NULL DEFAULT 1")?;
-    ensure_column(&conn, "products", "sync_version", "INTEGER NOT NULL DEFAULT 1")?;
-    ensure_column(&conn, "customers", "sync_version", "INTEGER NOT NULL DEFAULT 1")?;
-    ensure_column(&conn, "delivery_challans", "sync_version", "INTEGER NOT NULL DEFAULT 1")?;
-    ensure_column(&conn, "dc_items", "sync_version", "INTEGER NOT NULL DEFAULT 1")?;
-    ensure_column(&conn, "invoices", "sync_version", "INTEGER NOT NULL DEFAULT 1")?;
-    ensure_column(&conn, "invoice_items", "sync_version", "INTEGER NOT NULL DEFAULT 1")?;
+    ensure_column(
+        &conn,
+        "company_profiles",
+        "sync_status",
+        "TEXT NOT NULL DEFAULT 'local_only'",
+    )?;
+    ensure_column(
+        &conn,
+        "products",
+        "sync_status",
+        "TEXT NOT NULL DEFAULT 'local_only'",
+    )?;
+    ensure_column(
+        &conn,
+        "customers",
+        "sync_status",
+        "TEXT NOT NULL DEFAULT 'local_only'",
+    )?;
+    ensure_column(
+        &conn,
+        "delivery_challans",
+        "sync_status",
+        "TEXT NOT NULL DEFAULT 'local_only'",
+    )?;
+    ensure_column(
+        &conn,
+        "dc_items",
+        "sync_status",
+        "TEXT NOT NULL DEFAULT 'local_only'",
+    )?;
+    ensure_column(
+        &conn,
+        "invoices",
+        "sync_status",
+        "TEXT NOT NULL DEFAULT 'local_only'",
+    )?;
+    ensure_column(
+        &conn,
+        "invoice_items",
+        "sync_status",
+        "TEXT NOT NULL DEFAULT 'local_only'",
+    )?;
+    ensure_column(
+        &conn,
+        "company_profiles",
+        "sync_version",
+        "INTEGER NOT NULL DEFAULT 1",
+    )?;
+    ensure_column(
+        &conn,
+        "products",
+        "sync_version",
+        "INTEGER NOT NULL DEFAULT 1",
+    )?;
+    ensure_column(
+        &conn,
+        "customers",
+        "sync_version",
+        "INTEGER NOT NULL DEFAULT 1",
+    )?;
+    ensure_column(
+        &conn,
+        "delivery_challans",
+        "sync_version",
+        "INTEGER NOT NULL DEFAULT 1",
+    )?;
+    ensure_column(
+        &conn,
+        "dc_items",
+        "sync_version",
+        "INTEGER NOT NULL DEFAULT 1",
+    )?;
+    ensure_column(
+        &conn,
+        "invoices",
+        "sync_version",
+        "INTEGER NOT NULL DEFAULT 1",
+    )?;
+    ensure_column(
+        &conn,
+        "invoice_items",
+        "sync_version",
+        "INTEGER NOT NULL DEFAULT 1",
+    )?;
     ensure_column(&conn, "company_profiles", "last_synced_at", "TEXT")?;
     ensure_column(&conn, "products", "last_synced_at", "TEXT")?;
     ensure_column(&conn, "customers", "last_synced_at", "TEXT")?;
@@ -323,9 +396,24 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     ensure_column(&conn, "dc_items", "deleted_at", "TEXT")?;
     ensure_column(&conn, "invoices", "deleted_at", "TEXT")?;
     ensure_column(&conn, "invoice_items", "deleted_at", "TEXT")?;
-    ensure_column(&conn, "dc_items", "created_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")?;
-    ensure_column(&conn, "invoices", "created_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")?;
-    ensure_column(&conn, "invoice_items", "created_at", "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP")?;
+    ensure_column(
+        &conn,
+        "dc_items",
+        "created_at",
+        "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    )?;
+    ensure_column(
+        &conn,
+        "invoices",
+        "created_at",
+        "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    )?;
+    ensure_column(
+        &conn,
+        "invoice_items",
+        "created_at",
+        "TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    )?;
 
     // Detailed Invoice Schema Migration
     ensure_column(&conn, "invoices", "invoice_type", "TEXT")?;
@@ -342,9 +430,19 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     ensure_column(&conn, "invoice_items", "hs_code", "TEXT")?;
     ensure_column(&conn, "invoice_items", "uom", "TEXT")?;
     ensure_column(&conn, "invoice_items", "value_sales_excluding_st", "REAL")?;
-    ensure_column(&conn, "invoice_items", "fixed_notified_value_or_retail_price", "REAL")?;
+    ensure_column(
+        &conn,
+        "invoice_items",
+        "fixed_notified_value_or_retail_price",
+        "REAL",
+    )?;
     ensure_column(&conn, "invoice_items", "sales_tax_applicable", "REAL")?;
-    ensure_column(&conn, "invoice_items", "sales_tax_withheld_at_source", "REAL")?;
+    ensure_column(
+        &conn,
+        "invoice_items",
+        "sales_tax_withheld_at_source",
+        "REAL",
+    )?;
     ensure_column(&conn, "invoice_items", "extra_tax", "REAL")?;
     ensure_column(&conn, "invoice_items", "further_tax", "REAL")?;
     ensure_column(&conn, "invoice_items", "sro_schedule_no", "TEXT")?;
@@ -352,7 +450,7 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
     ensure_column(&conn, "invoice_items", "discount", "REAL")?;
     ensure_column(&conn, "invoice_items", "sale_type", "TEXT")?;
     ensure_column(&conn, "invoice_items", "sro_item_serial_no", "TEXT")?;
-    
+
     // Extensibility: JSON metadata for future-proofing across ALL major tables
     ensure_column(&conn, "customers", "metadata", "TEXT")?;
     ensure_column(&conn, "products", "metadata", "TEXT")?;
@@ -363,11 +461,13 @@ pub fn init_db(app: &tauri::AppHandle) -> Result<(), String> {
 
     // Backward Compatibility: Migrate legacy 'rate' to 'unit_price' if rate exists
     // We check if 'rate' column exists before trying to migrate
-    let has_rate: bool = conn.query_row(
-        "SELECT COUNT(*) FROM pragma_table_info('invoice_items') WHERE name='rate'",
-        [],
-        |row| Ok(row.get::<_, i64>(0)? > 0)
-    ).unwrap_or(false);
+    let has_rate: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('invoice_items') WHERE name='rate'",
+            [],
+            |row| Ok(row.get::<_, i64>(0)? > 0),
+        )
+        .unwrap_or(false);
 
     if has_rate {
         let _ = conn.execute(
@@ -437,7 +537,12 @@ pub fn resolve_db_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir.join(DB_FILE_NAME))
 }
 
-fn ensure_column(conn: &Connection, table_name: &str, column_name: &str, column_type: &str) -> Result<(), String> {
+fn ensure_column(
+    conn: &Connection,
+    table_name: &str,
+    column_name: &str,
+    column_type: &str,
+) -> Result<(), String> {
     let mut stmt = conn
         .prepare(&format!("PRAGMA table_info({table_name})"))
         .map_err(|e| format!("Failed to inspect table {table_name}: {e}"))?;
@@ -447,7 +552,9 @@ fn ensure_column(conn: &Connection, table_name: &str, column_name: &str, column_
         .map_err(|e| format!("Failed to read table info for {table_name}: {e}"))?;
 
     for col in columns {
-        if col.map_err(|e| format!("Failed to map table column for {table_name}: {e}"))? == column_name {
+        if col.map_err(|e| format!("Failed to map table column for {table_name}: {e}"))?
+            == column_name
+        {
             return Ok(());
         }
     }
