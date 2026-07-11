@@ -3,12 +3,14 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from "path";
 import JavaScriptObfuscator from 'javascript-obfuscator';
+import type { ObfuscatorOptions } from 'javascript-obfuscator';
+import type { RenderedChunk } from 'rollup';
 
-function obfuscateChunksPlugin(options: any) {
+function obfuscateChunksPlugin(options: ObfuscatorOptions) {
   return {
     name: 'obfuscate-chunks',
     apply: 'build' as const,
-    renderChunk(code: string, chunk: any) {
+    renderChunk(code: string, chunk: RenderedChunk) {
       if (!chunk.fileName.endsWith('.js')) {
         return null;
       }
