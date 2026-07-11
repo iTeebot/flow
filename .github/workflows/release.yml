@@ -203,7 +203,6 @@ jobs:
           sudo snap install lxd
           sudo lxd init --auto
           sudo usermod -aG lxd "$USER"
-          newgrp lxd
 
       - name: Build Debian Package via Tauri
         run: pnpm tauri build --bundles deb
@@ -220,7 +219,7 @@ jobs:
           echo "Staged $DEB_FILE → build/teebot-flow.deb"
 
       - name: Build Snap from Debian Package
-        run: snapcraft pack --use-lxd
+        run: sg lxd -c "snapcraft pack --use-lxd"
 
       - name: Upload Snap to GitHub Release
         env:
