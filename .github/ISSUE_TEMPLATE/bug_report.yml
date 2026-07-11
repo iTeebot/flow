@@ -10,7 +10,7 @@ body:
     attributes:
       label: Summary
       description: Short description of the bug
-      placeholder: Example: Delivery challan creation fails for archived customers
+      placeholder: "Example: Delivery challan creation fails for archived customers"
     validations:
       required: true
   - type: textarea

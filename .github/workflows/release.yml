@@ -220,14 +220,15 @@ jobs:
       - name: Upload Snap to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           SNAP_FILE=$(find . -maxdepth 1 -name "*.snap" | head -1)
           if [ -z "$SNAP_FILE" ]; then
             echo "Warning: no .snap file found, skipping GitHub Release upload"
             exit 0
           fi
-          echo "Uploading $SNAP_FILE to GitHub Release ${{ github.ref_name }}..."
-          gh release upload "${{ github.ref_name }}" "$SNAP_FILE" --clobber || \
+          echo "Uploading $SNAP_FILE to GitHub Release $RELEASE_TAG..."
+          gh release upload "$RELEASE_TAG" "$SNAP_FILE" --clobber || \
             echo "Release may not exist yet (created by desktop job). Snap will be uploaded by Snap Store step."
 
       - name: Publish Snap to Snap Store

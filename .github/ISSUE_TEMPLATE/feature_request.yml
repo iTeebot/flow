@@ -9,7 +9,7 @@ body:
     id: summary
     attributes:
       label: Feature summary
-      placeholder: Example: Add bulk invoice export
+      placeholder: "Example: Add bulk invoice export"
     validations:
       required: true
   - type: textarea

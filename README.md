@@ -189,12 +189,18 @@ teebot-flow/
 
 ### Prerequisites
 -   [Node.js](https://nodejs.org/) (LTS recommended)
+-   [pnpm](https://pnpm.io/) – enabled via [Corepack](https://nodejs.org/api/corepack.html) (see below)
 -   [Rust](https://www.rust-lang.org/tools/install)
 -   Tauri Dependencies (refer to [Tauri Setup Guide](https://tauri.app/v1/guides/getting-started/prerequisites))
 
 ### Installation
 1. Clone the repository.
-2. Install dependencies:
+2. Enable pnpm through Corepack (ships with Node.js ≥ 16.13):
+   ```bash
+   corepack enable
+   corepack prepare          # installs the pnpm version pinned in package.json (currently 10.33.2)
+   ```
+3. Install dependencies:
    ```bash
    pnpm install
    ```
