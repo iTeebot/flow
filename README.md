@@ -2,6 +2,18 @@
 
 **Teebot Flow** is a high-performance, professional Desktop ERP solution designed for modern business operations. Built with a focus on speed, reliability, and ease of use, it leverages the power of **Tauri** and **Rust** to provide a secure, offline-first desktop experience.
 
+Teebot Flow is now open for public collaboration. The project is released under **AGPL-3.0**, and contributions, issue reports, and pull requests are welcome.
+
+---
+
+## 🤝 Open Source & Contribution
+
+- **License**: [LICENSE](LICENSE)
+- **Contributing guide**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Code of conduct**: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- **Security policy**: [SECURITY.md](SECURITY.md)
+- **Documentation index**: [docs/README.md](docs/README.md)
+
 ---
 
 ## 🚀 Key Features
@@ -179,22 +191,23 @@ teebot-flow/
 -   Tauri Dependencies (refer to [Tauri Setup Guide](https://tauri.app/v1/guides/getting-started/prerequisites))
 
 ### Installation
-1.  Clone the repository.
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   pnpm install
+   ```
 
 ### Run Locally
 Launch the application in development mode:
 ```bash
-npm run tauri dev
+pnpm dev:desktop
 ```
 
 ### Build
-Generate the production binary:
+Generate the web build or production desktop binary:
 ```bash
-npm run tauri build
+pnpm build
+pnpm build:desktop
 ```
 
 ---
@@ -207,4 +220,4 @@ npm run tauri build
 -   **Security**: Validate all inputs at the Rust layer, even if validated in the frontend.
 
 ---
-© 2026 Teebot Flow. All rights reserved.
+© 2026 Teebot Flow. Licensed under AGPL-3.0.

@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an idea for Teebot Flow
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature.
+  - type: input
+    id: summary
+    attributes:
+      label: Feature summary
+      placeholder: Example: Add bulk invoice export
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

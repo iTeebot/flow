@@ -57,3 +57,15 @@ if (fs.existsSync(cargoTomlPath)) {
 } else {
   console.warn(`Warning: Cargo.toml not found at ${cargoTomlPath}`);
 }
+
+// 5. Update snap/snapcraft.yaml
+const snapcraftPath = path.join(rootDir, 'snap/snapcraft.yaml');
+if (fs.existsSync(snapcraftPath)) {
+  let snapContent = fs.readFileSync(snapcraftPath, 'utf8');
+  snapContent = snapContent.replace(/^version: '.*'/m, `version: '${version}'`);
+  fs.writeFileSync(snapcraftPath, snapContent, 'utf8');
+  console.log(`Updated ${snapcraftPath} to version: ${version}`);
+} else {
+  console.warn(`Warning: snapcraft.yaml not found at ${snapcraftPath}`);
+}
+

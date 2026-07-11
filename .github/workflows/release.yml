@@ -175,13 +175,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
-          cache: 'pnpm'
 
       - name: Update Version Code
         shell: bash
         run: |
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
-            echo "Error: GITHUB_REF_NAME '$GITHUB_REF_NAME' is not a valid semver version tag."
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: GITHUB_REF_NAME '$GITHUB_REF_NAME' is not a stable vMAJOR.MINOR.PATCH tag. Skipping snap release."
             exit 1
           fi
           VERSION=${GITHUB_REF_NAME#v}
@@ -193,36 +192,54 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          cache: true
+          cache: false
 
       - name: Install system dependencies (Linux)
         uses: ./.github/actions/install-dependencies
 
       - name: Install snapcraft
-        run: |
-          sudo snap install snapcraft --classic
+        run: sudo snap install snapcraft --classic
 
-      - name: Build and Package Snap
-        uses: tauri-apps/tauri-action@v2
+      - name: Build Debian Package via Tauri
+        run: pnpm tauri build --bundles deb
+
+      - name: Stage deb for Snapcraft
+        run: |
+          mkdir -p build
+          DEB_FILE=$(find src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
+          if [ -z "$DEB_FILE" ]; then
+            echo "Error: no .deb file found after tauri build"
+            exit 1
+          fi
+          cp "$DEB_FILE" build/teebot-flow.deb
+          echo "Staged $DEB_FILE → build/teebot-flow.deb"
+
+      - name: Build Snap from Debian Package
+        run: snapcraft --destructive-mode
+
+      - name: Upload Snap to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Teebot Flow v__VERSION__'
-          releaseBody: 'Release v__VERSION__ of Teebot Flow.'
-          releaseDraft: true
-          prerelease: false
-          args: '--bundles snap'
+        run: |
+          SNAP_FILE=$(find . -maxdepth 1 -name "*.snap" | head -1)
+          if [ -z "$SNAP_FILE" ]; then
+            echo "Warning: no .snap file found, skipping GitHub Release upload"
+            exit 0
+          fi
+          echo "Uploading $SNAP_FILE to GitHub Release ${{ github.ref_name }}..."
+          gh release upload "${{ github.ref_name }}" "$SNAP_FILE" --clobber || \
+            echo "Release may not exist yet (created by desktop job). Snap will be uploaded by Snap Store step."
 
       - name: Publish Snap to Snap Store
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
-          # tauri-action writes the snap into src-tauri/target/release/bundle/snap/
-          SNAP_FILE=$(find src-tauri/target/release/bundle/snap -name "*.snap" | head -1)
+          # snapcraft --destructive-mode produces the .snap in the project root
+          SNAP_FILE=$(find . -maxdepth 1 -name "*.snap" | head -1)
           if [ -z "$SNAP_FILE" ]; then
             echo "Error: no .snap file found after build"
             exit 1
           fi
           echo "Uploading $SNAP_FILE to Snap Store (stable channel)..."
           snapcraft upload "$SNAP_FILE" --release=stable
+

@@ -1,0 +1,39 @@
+name: teebot-flow
+base: core22
+version: '0.0.5'
+summary: Local-first ERP desktop app for business management
+description: |
+  Teebot Flow is a high-performance, professional Desktop ERP solution
+  designed for modern business operations. Built with Tauri and Rust,
+  it provides a secure, offline-first desktop experience for inventory,
+  invoices, delivery challans, and customer management.
+
+grade: stable
+confinement: strict
+
+architectures:
+  - build-on: amd64
+
+apps:
+  teebot-flow:
+    command: usr/bin/teebot-flow
+    desktop: usr/share/applications/teebot-flow.desktop
+    extensions: [gnome]
+    plugs:
+      - home
+      - network
+      - network-bind
+      - browser-support
+      - opengl
+      - x11
+      - wayland
+      - desktop
+      - desktop-legacy
+      - gsettings
+      - mount-observe
+
+parts:
+  teebot-flow:
+    plugin: dump
+    source: build/teebot-flow.deb
+    source-type: deb
