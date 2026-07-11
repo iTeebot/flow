@@ -114,7 +114,6 @@ pub struct UpdateInvoiceInput {
     pub items: Vec<DetailedInvoiceItemInput>,
 }
 
-
 #[derive(Debug, Serialize)]
 pub struct InvoiceResult {
     pub id: i64,
@@ -151,7 +150,13 @@ pub fn create_invoice_from_challan(
     tx.execute(
         "INSERT INTO invoices (invoice_number, dc_id, customer_id, company_id, status, notes)
          VALUES (?1, ?2, ?3, ?4, 'issued', ?5)",
-        params![invoice_number, dc_id, customer_id, input.company_id, input.notes],
+        params![
+            invoice_number,
+            dc_id,
+            customer_id,
+            input.company_id,
+            input.notes
+        ],
     )
     .map_err(|e| format!("Failed to create invoice: {e}"))?;
     let invoice_id = tx.last_insert_rowid();
@@ -175,7 +180,8 @@ pub fn create_invoice_from_challan(
             .map_err(|e| format!("Failed to read challan items: {e}"))?;
 
         for row in rows {
-            let (product_id, quantity, rate) = row.map_err(|e| format!("Failed to map challan item: {e}"))?;
+            let (product_id, quantity, rate) =
+                row.map_err(|e| format!("Failed to map challan item: {e}"))?;
             let description: String = tx
                 .query_row(
                     "SELECT name FROM products WHERE id = ?1",
@@ -183,11 +189,11 @@ pub fn create_invoice_from_challan(
                     |r| r.get(0),
                 )
                 .map_err(|e| format!("Failed to read product name: {e}"))?;
-            let amount = quantity as f64 * rate;
+            let amount = quantity * rate;
             tx.execute(
                 "INSERT INTO invoice_items (invoice_id, product_id, description, quantity, unit_price, rate, amount)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                params![invoice_id, product_id, description, quantity as f64, rate, rate, amount],
+                params![invoice_id, product_id, description, quantity, rate, rate, amount],
             )
             .map_err(|e| format!("Failed to create invoice item: {e}"))?;
         }
@@ -307,19 +313,31 @@ pub fn create_detailed_invoice(
         VALUES (?1, ?2, ?3, 'issued', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
         "#,
         params![
-            invoice_number, input.customer_id, input.company_id, input.notes,
-            input.invoice_type, input.invoice_date, input.seller_ntn_cnic, input.seller_province,
-            input.buyer_ntn_cnic, input.buyer_province, input.buyer_registration_type, input.invoice_ref_no,
+            invoice_number,
+            input.customer_id,
+            input.company_id,
+            input.notes,
+            input.invoice_type,
+            input.invoice_date,
+            input.seller_ntn_cnic,
+            input.seller_province,
+            input.buyer_ntn_cnic,
+            input.buyer_province,
+            input.buyer_registration_type,
+            input.invoice_ref_no,
             metadata_str
         ],
     )
     .map_err(|e| format!("Failed to create detailed invoice: {e}"))?;
-    
+
     let invoice_id = tx.last_insert_rowid();
 
     for item in input.items {
         let amount = item.quantity * item.unit_price;
-        let item_metadata = item.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
+        let item_metadata = item
+            .metadata
+            .as_ref()
+            .map(|m| serde_json::to_string(m).unwrap());
 
         tx.execute(
             r#"
@@ -420,10 +438,7 @@ pub fn get_invoice(app: tauri::AppHandle, invoice_id: i64) -> Result<Invoice, St
 }
 
 #[tauri::command]
-pub fn update_invoice(
-    app: tauri::AppHandle,
-    input: UpdateInvoiceInput,
-) -> Result<(), String> {
+pub fn update_invoice(app: tauri::AppHandle, input: UpdateInvoiceInput) -> Result<(), String> {
     let mut conn = db::open_connection(&app)?;
     let tx = conn
         .transaction()
@@ -445,10 +460,17 @@ pub fn update_invoice(
         WHERE id = ?11 AND deleted_at IS NULL
         "#,
         params![
-            input.customer_id, input.invoice_type, input.invoice_date,
-            input.seller_ntn_cnic, input.seller_province,
-            input.buyer_ntn_cnic, input.buyer_province, input.buyer_registration_type,
-            input.invoice_ref_no, input.notes, input.id
+            input.customer_id,
+            input.invoice_type,
+            input.invoice_date,
+            input.seller_ntn_cnic,
+            input.seller_province,
+            input.buyer_ntn_cnic,
+            input.buyer_province,
+            input.buyer_registration_type,
+            input.invoice_ref_no,
+            input.notes,
+            input.id
         ],
     )
     .map_err(|e| format!("Failed to update invoice: {e}"))?;
@@ -463,7 +485,10 @@ pub fn update_invoice(
     // Insert new items
     for item in input.items {
         let amount = item.quantity * item.unit_price;
-        let item_metadata = item.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
+        let item_metadata = item
+            .metadata
+            .as_ref()
+            .map(|m| serde_json::to_string(m).unwrap());
 
         tx.execute(
             r#"
@@ -500,7 +525,7 @@ pub fn delete_invoice(app: tauri::AppHandle, invoice_id: i64) -> Result<(), Stri
     }
 
     let conn = db::open_connection(&app)?;
-    
+
     // Soft delete the invoice
     conn.execute(
         "UPDATE invoices SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?1 AND deleted_at IS NULL",
@@ -518,10 +543,10 @@ pub fn delete_invoice(app: tauri::AppHandle, invoice_id: i64) -> Result<(), Stri
     Ok(())
 }
 
-
-
-
-fn get_invoice_items(conn: &rusqlite::Connection, invoice_id: i64) -> Result<Vec<InvoiceItem>, String> {
+fn get_invoice_items(
+    conn: &rusqlite::Connection,
+    invoice_id: i64,
+) -> Result<Vec<InvoiceItem>, String> {
     let mut stmt = conn
         .prepare(
             r#"
@@ -537,7 +562,7 @@ fn get_invoice_items(conn: &rusqlite::Connection, invoice_id: i64) -> Result<Vec
             "#,
         )
         .map_err(|e| format!("Failed to prepare invoice items query: {e}"))?;
-    
+
     let rows = stmt
         .query_map([invoice_id], |row| {
             let metadata_str: Option<String> = row.get(20)?;
@@ -568,7 +593,7 @@ fn get_invoice_items(conn: &rusqlite::Connection, invoice_id: i64) -> Result<Vec
             })
         })
         .map_err(|e| format!("Failed to fetch invoice items: {e}"))?;
-    
+
     let mut items = Vec::new();
     for row in rows {
         items.push(row.map_err(|e| format!("Failed to map invoice item row: {e}"))?);
@@ -582,5 +607,3 @@ fn generate_invoice_number(tx: &rusqlite::Transaction) -> Result<String, String>
         .map_err(|e| format!("Failed to generate invoice number: {e}"))?;
     Ok(format!("INV-{:05}", count + 1))
 }
-
-

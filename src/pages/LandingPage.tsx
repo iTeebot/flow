@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { getAppInfo, type AppInfo } from "../modules/info/api";
 import { APP_VERSION } from "../lib/version";
-import { detectOS, getBestDownloadForOS } from "../lib/platform";
+import { detectOS, getBestDownloadForOS, getReleaseDownloads, GITHUB_RELEASES_URL, SNAP_STORE_URL } from "../lib/platform";
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -12,7 +12,8 @@ export function LandingPage() {
   const [info, setInfo] = useState<AppInfo | null>(null);
 
   const userOS = detectOS();
-  const smartDownload = getBestDownloadForOS(userOS);
+  const smartDownload = getBestDownloadForOS(userOS, APP_VERSION);
+  const platformDownloads = getReleaseDownloads(APP_VERSION);
 
   useEffect(() => {
     // Try to fetch app info (may fail on web, which is fine)
@@ -31,51 +32,18 @@ export function LandingPage() {
     {
       os: "Windows",
       icon: <img src="/windows_logo.png" alt="Windows" className="w-12 h-12 object-contain" />,
-      downloads: [
-        {
-          name: "Installer (EXE)",
-          url: "https://drive.google.com/file/d/1u1Ew3cTunbZpWyTphzXf704B9LjsY-AD/view?usp=sharing",
-          size: "12.1 MB"
-        },
-        {
-          name: "MSI Package",
-          url: "https://drive.google.com/file/d/1hO3VqE5bCyFDMhscXD07C0ghflGAEA9n/view?usp=sharing",
-          size: "13.1 MB"
-        }
-      ]
+      downloads: platformDownloads.Windows,
     },
     {
       os: "Linux",
       icon: <img src="/linux_logo.png" alt="Linux" className="w-12 h-12 object-contain" />,
-      downloads: [
-        {
-          name: "AppImage",
-          url: "https://drive.google.com/file/d/1hTLXOyAadl6AondEJJzemZBGQb9Ez2Rx/view?usp=sharing",
-          size: "~75.2 MB"
-        },
-        {
-          name: "Debian Package",
-          url: "https://drive.google.com/file/d/1PkrkqO-bUrvlZBH_YWedsDbHcWruoKmQ/view?usp=sharing",
-          size: "~4.7 MB"
-        },
-        {
-          name: "RPM Package",
-          url: "https://drive.google.com/file/d/1Yby7hzLJB9AKjYzfwbjtNY746h9s5-8S/view?usp=sharing",
-          size: "~4.7 MB"
-        }
-      ]
+      downloads: platformDownloads.Linux,
     },
     {
       os: "macOS",
       icon: <img src="/apple_logo.png" alt="macOS" className="w-12 h-12 object-contain" />,
-      downloads: [
-        {
-          name: "DMG (ARM64)",
-          url: "/releases/mac/teebot-flow_0.0.5_arm64.dmg",
-          size: "~5.8 MB"
-        }
-      ]
-    }
+      downloads: platformDownloads.macOS,
+    },
   ];
 
   return (
@@ -206,11 +174,10 @@ export function LandingPage() {
                       rel="noopener noreferrer"
                       className="block p-3 rounded-lg bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 transition"
                     >
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between">
                         <span className="font-semibold text-sm text-text-primary">{dl.name}</span>
                         <Download className="w-4 h-4 text-primary" />
                       </div>
-                      <span className="text-xs text-text-muted">{dl.size}</span>
                     </a>
                   ))}
                 </div>
@@ -302,6 +269,16 @@ export function LandingPage() {
               label: "Product Page",
               desc: "Official Teebot Flow landing page",
               url: "https://teebot-flow.iteebot.com",
+            },
+            {
+              label: "GitHub Releases",
+              desc: `All desktop downloads for v${APP_VERSION}`,
+              url: `${GITHUB_RELEASES_URL}/tag/v${APP_VERSION}`,
+            },
+            {
+              label: "Snap Store (Linux)",
+              desc: "Install via Ubuntu Software Center",
+              url: SNAP_STORE_URL,
             }
           ].map((link) => (
             <a

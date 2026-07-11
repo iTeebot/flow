@@ -2,6 +2,10 @@ declare global {
   const __IS_TAURI__: boolean | undefined;
 }
 
+export const GITHUB_REPO = "iTeebot/flow";
+export const GITHUB_RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases`;
+export const SNAP_STORE_URL = "https://snapcraft.io/teebot-flow";
+
 export const isTauri = () => {
   // Check for the existence of Tauri-injected internals at runtime.
   // This is the only way to reliably distinguish between a browser
@@ -25,27 +29,76 @@ export const detectOS = () => {
   return "Windows"; // Default fallback
 };
 
-export const getBestDownloadForOS = (os: string) => {
+/**
+ * Construct a direct GitHub Release download URL for a specific asset.
+ * Pattern: https://github.com/{owner}/{repo}/releases/download/v{version}/{filename}
+ */
+export const getDownloadLink = (version: string, filename: string) => {
+  return `${GITHUB_RELEASES_URL}/download/v${version}/${filename}`;
+};
+
+/**
+ * Get all available downloads for each platform from GitHub Releases.
+ */
+export const getReleaseDownloads = (version: string) => ({
+  Windows: [
+    {
+      name: "Installer (EXE)",
+      url: getDownloadLink(version, `Teebot-Flow_${version}_x64-setup.exe`),
+    },
+    {
+      name: "MSI Package",
+      url: getDownloadLink(version, `Teebot-Flow_${version}_x64_en-US.msi`),
+    },
+  ],
+  Linux: [
+    {
+      name: "AppImage",
+      url: getDownloadLink(version, `teebot-flow_${version}_amd64.AppImage`),
+    },
+    {
+      name: "Debian Package (.deb)",
+      url: getDownloadLink(version, `teebot-flow_${version}_amd64.deb`),
+    },
+    {
+      name: "Snap Store",
+      url: SNAP_STORE_URL,
+    },
+  ],
+  macOS: [
+    {
+      name: "DMG (Apple Silicon)",
+      url: getDownloadLink(version, `Teebot-Flow_${version}_aarch64.dmg`),
+    },
+    {
+      name: "DMG (Intel)",
+      url: getDownloadLink(version, `Teebot-Flow_${version}_x64.dmg`),
+    },
+  ],
+});
+
+export const getBestDownloadForOS = (os: string, version: string) => {
+  const tagUrl = `${GITHUB_RELEASES_URL}/tag/v${version}`;
   switch (os) {
     case "Windows":
       return {
         label: "Download for Windows",
-        url: "https://drive.google.com/file/d/1hPVT538Dm5HP9lItGpwfP8FGZnUrsXOp/view?usp=sharing"
+        url: getDownloadLink(version, `Teebot-Flow_${version}_x64-setup.exe`),
       };
     case "macOS":
       return {
         label: "Download for macOS",
-        url: "/releases/mac/teebot-flow_0.0.5_arm64.dmg"
+        url: getDownloadLink(version, `Teebot-Flow_${version}_aarch64.dmg`),
       };
     case "Linux":
       return {
         label: "Download for Linux (.deb)",
-        url: "https://drive.google.com/file/d/1PkrkqO-bUrvlZBH_YWedsDbHcWruoKmQ/view?usp=sharing"
+        url: getDownloadLink(version, `teebot-flow_${version}_amd64.deb`),
       };
     default:
       return {
-        label: "Download App",
-        url: "#downloads"
+        label: "View All Downloads",
+        url: tagUrl,
       };
   }
 };

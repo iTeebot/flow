@@ -126,7 +126,10 @@ pub fn create_delivery_challan(
     }
 
     let dc_number = generate_dc_number(&tx)?;
-    let metadata_str = input.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
+    let metadata_str = input
+        .metadata
+        .as_ref()
+        .map(|m| serde_json::to_string(m).unwrap());
 
     tx.execute(
         "INSERT INTO delivery_challans (dc_number, customer_id, company_id, metadata) VALUES (?1, ?2, ?3, ?4)",
@@ -167,7 +170,10 @@ pub fn create_delivery_challan(
 }
 
 #[tauri::command]
-pub fn list_delivery_challans(app: tauri::AppHandle, company_id: i64) -> Result<Vec<DeliveryChallan>, String> {
+pub fn list_delivery_challans(
+    app: tauri::AppHandle,
+    company_id: i64,
+) -> Result<Vec<DeliveryChallan>, String> {
     if company_id <= 0 {
         return Err("Company profile is required".to_string());
     }
@@ -196,11 +202,11 @@ pub fn list_delivery_challans(app: tauri::AppHandle, company_id: i64) -> Result<
             let metadata_str: Option<String> = row.get(6)?;
             let metadata = metadata_str.and_then(|s| serde_json::from_str(&s).ok());
             Ok((
-                row.get::<_, i64>(0)?, // id
-                row.get::<_, String>(1)?, // dc_number
-                row.get::<_, i64>(2)?, // customer_id
-                row.get::<_, String>(3)?, // created_at
-                row.get::<_, String>(4)?, // customer_name
+                row.get::<_, i64>(0)?,                        // id
+                row.get::<_, String>(1)?,                     // dc_number
+                row.get::<_, i64>(2)?,                        // customer_id
+                row.get::<_, String>(3)?,                     // created_at
+                row.get::<_, String>(4)?,                     // customer_name
                 row.get::<_, Option<f64>>(5)?.unwrap_or(0.0), // total_amount
                 metadata,
             ))
@@ -209,11 +215,19 @@ pub fn list_delivery_challans(app: tauri::AppHandle, company_id: i64) -> Result<
 
     let mut delivery_challans = Vec::new();
     for row_result in rows {
-        let (id, dc_number, customer_id, created_at, customer_name, total_amount, metadata): (i64, String, i64, String, String, f64, Option<serde_json::Value>) = row_result.map_err(|e| format!("Failed to map row: {e}"))?;
-        
+        let (id, dc_number, customer_id, created_at, customer_name, total_amount, metadata): (
+            i64,
+            String,
+            i64,
+            String,
+            String,
+            f64,
+            Option<serde_json::Value>,
+        ) = row_result.map_err(|e| format!("Failed to map row: {e}"))?;
+
         // Get items for this delivery challan
         let items = get_delivery_challan_items(&conn, id)?;
-        
+
         delivery_challans.push(DeliveryChallan {
             id,
             dc_number,
@@ -226,7 +240,7 @@ pub fn list_delivery_challans(app: tauri::AppHandle, company_id: i64) -> Result<
             metadata,
         });
     }
-    
+
     Ok(delivery_challans)
 }
 
@@ -263,7 +277,7 @@ pub fn get_delivery_challan(app: tauri::AppHandle, dc_id: i64) -> Result<Deliver
         .map_err(|_| "Delivery challan not found".to_string())?;
 
     let items = get_delivery_challan_items(&conn, id)?;
-    
+
     Ok(DeliveryChallan {
         id,
         dc_number,
@@ -277,7 +291,10 @@ pub fn get_delivery_challan(app: tauri::AppHandle, dc_id: i64) -> Result<Deliver
     })
 }
 
-fn get_delivery_challan_items(conn: &rusqlite::Connection, dc_id: i64) -> Result<Vec<DeliveryChallanItem>, String> {
+fn get_delivery_challan_items(
+    conn: &rusqlite::Connection,
+    dc_id: i64,
+) -> Result<Vec<DeliveryChallanItem>, String> {
     let mut stmt = conn
         .prepare(
             r#"
@@ -317,7 +334,9 @@ fn get_delivery_challan_items(conn: &rusqlite::Connection, dc_id: i64) -> Result
 
 fn generate_dc_number(tx: &rusqlite::Transaction) -> Result<String, String> {
     let count: i64 = tx
-        .query_row("SELECT COUNT(*) FROM delivery_challans", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM delivery_challans", [], |row| {
+            row.get(0)
+        })
         .map_err(|e| format!("Failed to generate challan number: {e}"))?;
 
     Ok(format!("DC-{:05}", count + 1))
@@ -360,7 +379,9 @@ pub fn update_delivery_challan(
 
     // 2. Restore stock for old items
     let mut stmt = tx
-        .prepare("SELECT product_id, quantity FROM dc_items WHERE dc_id = ?1 AND deleted_at IS NULL")
+        .prepare(
+            "SELECT product_id, quantity FROM dc_items WHERE dc_id = ?1 AND deleted_at IS NULL",
+        )
         .map_err(|e| format!("Failed to prepare old items query: {e}"))?;
     let old_items: Vec<(i64, f64)> = stmt
         .query_map([input.id], |row| Ok((row.get(0)?, row.get(1)?)))
@@ -385,7 +406,10 @@ pub fn update_delivery_challan(
     .map_err(|e| format!("Failed to clear old items: {e}"))?;
 
     // 4. Update header
-    let metadata_str = input.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
+    let metadata_str = input
+        .metadata
+        .as_ref()
+        .map(|m| serde_json::to_string(m).unwrap());
     tx.execute(
         "UPDATE delivery_challans SET customer_id = ?1, metadata = ?2 WHERE id = ?3",
         params![input.customer_id, metadata_str, input.id],
@@ -400,7 +424,12 @@ pub fn update_delivery_challan(
                 params![item.product_id, input.company_id],
                 |row| row.get(0),
             )
-            .map_err(|e| format!("Failed to get product rate for product {}: {e}", item.product_id))?;
+            .map_err(|e| {
+                format!(
+                    "Failed to get product rate for product {}: {e}",
+                    item.product_id
+                )
+            })?;
 
         tx.execute(
             "INSERT INTO dc_items (dc_id, product_id, quantity, rate) VALUES (?1, ?2, ?3, ?4)",
@@ -412,7 +441,12 @@ pub fn update_delivery_challan(
             "UPDATE products SET stock_qty = stock_qty - ?1 WHERE id = ?2",
             params![item.quantity, item.product_id],
         )
-        .map_err(|e| format!("Failed to update stock for product {}: {e}", item.product_id))?;
+        .map_err(|e| {
+            format!(
+                "Failed to update stock for product {}: {e}",
+                item.product_id
+            )
+        })?;
     }
 
     tx.commit()
@@ -434,9 +468,8 @@ pub fn save_delivery_challan_pdf(filename: String, base64_data: String) -> Resul
         .decode(base64_data)
         .map_err(|e| format!("Failed to decode PDF data: {e}"))?;
 
-    let mut output_path: PathBuf = dirs::download_dir().unwrap_or_else(|| {
-        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-    });
+    let mut output_path: PathBuf = dirs::download_dir()
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
     output_path.push(filename);
 
     fs::write(&output_path, bytes).map_err(|e| format!("Failed to save PDF file: {e}"))?;
@@ -470,7 +503,9 @@ pub fn delete_delivery_challan(app: tauri::AppHandle, dc_id: i64) -> Result<(), 
 
     // Restore stock for all items in this challan
     let mut stmt = tx
-        .prepare("SELECT product_id, quantity FROM dc_items WHERE dc_id = ?1 AND deleted_at IS NULL")
+        .prepare(
+            "SELECT product_id, quantity FROM dc_items WHERE dc_id = ?1 AND deleted_at IS NULL",
+        )
         .map_err(|e| format!("Failed to prepare items query: {e}"))?;
 
     let items: Vec<(i64, f64)> = stmt

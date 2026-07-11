@@ -39,11 +39,13 @@ pub fn get_admin_analytics(app: AppHandle, company_id: i64) -> Result<AdminAnaly
         |row| row.get(0),
     ).unwrap_or(0);
 
-    let total_actions_today: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM audit_logs WHERE DATE(created_at) = DATE('now', 'localtime')",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total_actions_today: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM audit_logs WHERE DATE(created_at) = DATE('now', 'localtime')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     Ok(AdminAnalytics {
         invoices_today,

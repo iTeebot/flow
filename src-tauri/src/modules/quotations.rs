@@ -86,7 +86,7 @@ pub fn create_quotation(
         .map_err(|e| format!("Failed to start transaction: {e}"))?;
 
     let quote_number = generate_quote_number(&tx)?;
-    
+
     let status = input.status.unwrap_or_else(|| "draft".to_string());
 
     tx.execute(
@@ -157,7 +157,7 @@ pub fn update_quotation(
     .map_err(|e| format!("Failed to delete existing quotation items: {e}"))?;
 
     for item in &input.items {
-        let amount = item.quantity as f64 * item.rate;
+        let amount = item.quantity * item.rate;
         tx.execute(
             "INSERT INTO quotation_items (quote_id, product_id, description, quantity, rate, amount) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![input.quote_id, item.product_id, item.description, item.quantity, item.rate, amount],
@@ -224,12 +224,16 @@ pub fn list_quotations(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Quo
         quote.items = get_quotation_items(&conn, quote.id)?;
         quotations.push(quote);
     }
-    
+
     Ok(quotations)
 }
 
 #[tauri::command]
-pub fn update_quotation_status(app: tauri::AppHandle, quote_id: i64, status: String) -> Result<(), String> {
+pub fn update_quotation_status(
+    app: tauri::AppHandle,
+    quote_id: i64,
+    status: String,
+) -> Result<(), String> {
     let conn = db::open_connection(&app)?;
     conn.execute(
         "UPDATE quotations SET status = ?1 WHERE id = ?2",
@@ -250,7 +254,10 @@ pub fn delete_quotation(app: tauri::AppHandle, quote_id: i64) -> Result<(), Stri
     Ok(())
 }
 
-fn get_quotation_items(conn: &rusqlite::Connection, quote_id: i64) -> Result<Vec<QuotationItem>, String> {
+fn get_quotation_items(
+    conn: &rusqlite::Connection,
+    quote_id: i64,
+) -> Result<Vec<QuotationItem>, String> {
     let mut stmt = conn
         .prepare(
             r#"
@@ -274,7 +281,9 @@ fn get_quotation_items(conn: &rusqlite::Connection, quote_id: i64) -> Result<Vec
                 quantity: row.get(3)?,
                 rate: row.get(4)?,
                 amount: row.get(5)?,
-                product_name: row.get::<_, Option<String>>(6)?.unwrap_or_else(|| row.get::<_, String>(2).unwrap_or_default()),
+                product_name: row
+                    .get::<_, Option<String>>(6)?
+                    .unwrap_or_else(|| row.get::<_, String>(2).unwrap_or_default()),
                 product_sku: row.get(7)?,
             })
         })

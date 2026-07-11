@@ -12,7 +12,7 @@ pub fn generate_recovery_key() -> String {
         .take(32)
         .map(char::from)
         .collect();
-    
+
     // Format it nicely for the user
     key.as_bytes()
         .chunks(4)
@@ -30,13 +30,12 @@ pub fn compress_and_encrypt(data: &[u8], key_str: &str) -> Result<Vec<u8>, Strin
     }
 
     // 2. Compress data
-    let compressed = zstd::encode_all(data, 3)
-        .map_err(|e| format!("Compression failed: {e}"))?;
+    let compressed = zstd::encode_all(data, 3).map_err(|e| format!("Compression failed: {e}"))?;
 
     // 3. Encrypt data
     let key = aes_gcm::Key::<Aes256Gcm>::from_slice(clean_key.as_bytes());
     let cipher = Aes256Gcm::new(key);
-    
+
     let nonce_bytes = rand::thread_rng().gen::<[u8; 12]>();
     let nonce = Nonce::from_slice(&nonce_bytes);
 
@@ -77,8 +76,49 @@ pub fn decrypt_and_decompress(package: &[u8], key_str: &str) -> Result<Vec<u8>, 
         .map_err(|_| "Decryption failed. Please check your recovery key.".to_string())?;
 
     // 4. Decompress
-    let original_data = zstd::decode_all(&compressed[..])
-        .map_err(|e| format!("Decompression failed: {e}"))?;
+    let original_data =
+        zstd::decode_all(&compressed[..]).map_err(|e| format!("Decompression failed: {e}"))?;
 
     Ok(original_data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_recovery_key_format() {
+        let key = generate_recovery_key();
+        // The key should be 32 alphanumeric chars + 7 hyphens = 39 chars
+        assert_eq!(key.len(), 39);
+        // It should contain hyphens every 4 characters
+        let parts: Vec<&str> = key.split('-').collect();
+        assert_eq!(parts.len(), 8);
+        for part in parts {
+            assert_eq!(part.len(), 4);
+        }
+    }
+
+    #[test]
+    fn test_compress_encrypt_decrypt_decompress() {
+        let key = generate_recovery_key();
+        let original_data = b"Hello, this is a secret message to test encryption and compression!";
+
+        let encrypted = compress_and_encrypt(original_data, &key).expect("Encryption failed");
+        let decrypted = decrypt_and_decompress(&encrypted, &key).expect("Decryption failed");
+
+        assert_eq!(original_data.to_vec(), decrypted);
+    }
+
+    #[test]
+    fn test_decrypt_invalid_key() {
+        let key1 = generate_recovery_key();
+        let key2 = generate_recovery_key();
+        let original_data = b"Top secret data";
+
+        let encrypted = compress_and_encrypt(original_data, &key1).expect("Encryption failed");
+        let decrypted = decrypt_and_decompress(&encrypted, &key2);
+
+        assert!(decrypted.is_err());
+    }
 }

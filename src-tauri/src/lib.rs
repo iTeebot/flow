@@ -14,8 +14,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
-            db::init_db(&app.handle())?;
-            
+            db::init_db(app.handle())?;
+
             // On Linux, the window icon often needs to be set explicitly
             #[cfg(target_os = "linux")]
             {

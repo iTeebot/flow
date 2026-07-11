@@ -45,7 +45,10 @@ pub struct UpdateCustomerInput {
 }
 
 #[tauri::command]
-pub fn create_customer(app: tauri::AppHandle, input: CreateCustomerInput) -> Result<Customer, String> {
+pub fn create_customer(
+    app: tauri::AppHandle,
+    input: CreateCustomerInput,
+) -> Result<Customer, String> {
     if input.company_id <= 0 {
         return Err("Company profile is required".to_string());
     }
@@ -65,7 +68,10 @@ pub fn create_customer(app: tauri::AppHandle, input: CreateCustomerInput) -> Res
         return Err("Company profile not found".to_string());
     }
 
-    let metadata_str = input.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
+    let metadata_str = input
+        .metadata
+        .as_ref()
+        .map(|m| serde_json::to_string(m).unwrap());
 
     conn.execute(
         "INSERT INTO customers (company_id, name, tax_registration_number, phone, address, city, state, province, registration_type, metadata) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
@@ -129,7 +135,9 @@ pub fn list_customers(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Cust
                 state: row.get(7)?,
                 province: row.get(8)?,
                 registration_type: row.get(9)?,
-                metadata: row.get::<_, Option<String>>(10)?.and_then(|s| serde_json::from_str(&s).ok()),
+                metadata: row
+                    .get::<_, Option<String>>(10)?
+                    .and_then(|s| serde_json::from_str(&s).ok()),
             })
         })
         .map_err(|e| format!("Failed to fetch customers: {e}"))?;
@@ -142,7 +150,10 @@ pub fn list_customers(app: tauri::AppHandle, company_id: i64) -> Result<Vec<Cust
 }
 
 #[tauri::command]
-pub fn update_customer(app: tauri::AppHandle, input: UpdateCustomerInput) -> Result<Customer, String> {
+pub fn update_customer(
+    app: tauri::AppHandle,
+    input: UpdateCustomerInput,
+) -> Result<Customer, String> {
     if input.id <= 0 {
         return Err("Invalid customer ID".to_string());
     }
@@ -151,8 +162,11 @@ pub fn update_customer(app: tauri::AppHandle, input: UpdateCustomerInput) -> Res
     }
 
     let conn = db::open_connection(&app)?;
-    let metadata_str = input.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap());
-    
+    let metadata_str = input
+        .metadata
+        .as_ref()
+        .map(|m| serde_json::to_string(m).unwrap());
+
     conn.execute(
         "UPDATE customers SET name = ?1, tax_registration_number = ?2, phone = ?3, address = ?4, city = ?5, state = ?6, province = ?7, registration_type = ?8, metadata = ?9 WHERE id = ?10",
         (&input.name, &input.tax_registration_number, &input.phone, &input.address, &input.city, &input.state, &input.province, &input.registration_type, &metadata_str, input.id),
@@ -189,7 +203,7 @@ pub fn delete_customer(app: tauri::AppHandle, customer_id: i64) -> Result<String
     }
 
     let conn = db::open_connection(&app)?;
-    
+
     conn.execute(
         "UPDATE customers SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?1",
         [customer_id],

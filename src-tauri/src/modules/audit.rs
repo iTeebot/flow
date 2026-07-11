@@ -37,12 +37,16 @@ pub struct AuditEntry {
 }
 
 #[tauri::command]
-pub fn list_audit_logs(app: AppHandle, entity_type: Option<String>, entity_id: Option<i64>) -> Result<Vec<AuditEntry>, String> {
+pub fn list_audit_logs(
+    app: AppHandle,
+    entity_type: Option<String>,
+    entity_id: Option<i64>,
+) -> Result<Vec<AuditEntry>, String> {
     let conn = db::open_connection(&app)?;
     let mut query = "SELECT al.id, al.user_id, u.username, al.action, al.entity_type, al.entity_id, al.changes, al.created_at 
                      FROM audit_logs al
                      JOIN users u ON al.user_id = u.id".to_string();
-    
+
     let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
     let mut conditions = Vec::new();
 
@@ -63,18 +67,20 @@ pub fn list_audit_logs(app: AppHandle, entity_type: Option<String>, entity_id: O
     query.push_str(" ORDER BY al.created_at DESC");
 
     let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(rusqlite::params_from_iter(params.iter()), |row| {
-        Ok(AuditEntry {
-            id: row.get(0)?,
-            user_id: row.get(1)?,
-            username: row.get(2)?,
-            action: row.get(3)?,
-            entity_type: row.get(4)?,
-            entity_id: row.get(5)?,
-            changes: row.get(6)?,
-            created_at: row.get(7)?,
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(params.iter()), |row| {
+            Ok(AuditEntry {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                username: row.get(2)?,
+                action: row.get(3)?,
+                entity_type: row.get(4)?,
+                entity_id: row.get(5)?,
+                changes: row.get(6)?,
+                created_at: row.get(7)?,
+            })
         })
-    }).map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string())?;
 
     let mut logs = Vec::new();
     for row in rows {
