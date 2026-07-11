@@ -52,15 +52,15 @@ export default defineConfig(({ mode }) => {
         controlFlowFlatteningThreshold: 0.75,
         deadCodeInjection: true,
         deadCodeInjectionThreshold: 0.4,
-        debugProtection: true,
+        debugProtection: false,
         debugProtectionInterval: 4000,
         disableConsoleOutput: true,
         identifierNamesGenerator: 'hexadecimal',
         log: false,
         numbersToExpressions: true,
         renameGlobals: false,
-        selfDefending: true,
-        splitStrings: true,
+        selfDefending: false,
+        splitStrings: false,
         splitStringsChunkLength: 10,
         stringArray: true,
         stringArrayCallsTransform: true,
@@ -120,26 +120,6 @@ export default defineConfig(({ mode }) => {
         input: {
           main: resolve(__dirname, 'index.html'),
         },
-        output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('zustand') || id.includes('router') || id.includes('scheduler')) {
-                return 'vendor-core';
-              }
-              if (id.includes('recharts') || id.includes('lucide') || id.includes('d3')) {
-                return 'vendor-ui';
-              }
-              if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('purify') || id.includes('fflate')) {
-                return 'vendor-lib';
-              }
-              return 'vendor-misc';
-            }
-            if (id.includes('/src/modules/')) {
-              const moduleName = id.split('/src/modules/')[1].split('/')[0];
-              return `module-${moduleName.toLowerCase()}`;
-            }
-          }
-        }
       },
       chunkSizeWarningLimit: 2000
     },
