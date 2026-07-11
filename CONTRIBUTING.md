@@ -2,7 +2,7 @@
 
 Thank you for your interest in improving Teebot Flow.
 
-This project is open source and licensed under the GNU Affero General Public License v3.0. By contributing, you agree that your work will be distributed under the same license.
+This project is open source and licensed under the GNU Affero General Public License v3.0. By contributing, you agree that your work will be distributed under the same license. This applies to the repository as a whole, including its existing commit history and all future contributions.
 
 ## Ways to contribute
 

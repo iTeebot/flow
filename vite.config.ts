@@ -40,13 +40,14 @@ export default defineConfig(({ mode }) => {
   
   // Detect if building for Tauri desktop
   const isTauri = process.env.TAURI_ENV_PLATFORM || env.IS_TAURI === 'true' || mode === 'tauri';
+  const shouldObfuscate = isProduction && isTauri;
   const host = process.env.TAURI_DEV_HOST || env.TAURI_DEV_HOST;
 
   return {
     plugins: [
       react(),
       tailwindcss(),
-      isProduction ? obfuscateChunksPlugin({
+      shouldObfuscate ? obfuscateChunksPlugin({
         compact: true,
         controlFlowFlattening: true,
         controlFlowFlatteningThreshold: 0.75,
@@ -122,6 +123,26 @@ export default defineConfig(({ mode }) => {
         },
         output: {
           manualChunks(id: string) {
+            // Split large app routes into smaller chunks for more reliable web loading.
+            if (id.includes('/src/modules/')) {
+              const modulePath = id.split('/src/modules/')[1] || '';
+              if (modulePath.startsWith('deliveryChallan/')) {
+                return 'delivery-challan';
+              }
+              if (modulePath.startsWith('invoices/')) {
+                return 'invoices';
+              }
+              if (modulePath.startsWith('quotations/')) {
+                return 'quotations';
+              }
+              if (modulePath.startsWith('settings/')) {
+                return 'settings';
+              }
+              if (modulePath.startsWith('dashboard/')) {
+                return 'dashboard';
+              }
+            }
+
             // Pin self-contained PDF libs into a dedicated chunk so they are
             // not invalidated by app changes. recharts/d3 share internal
             // sub-packages across the graph, so they are left to Rollup's

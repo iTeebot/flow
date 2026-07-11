@@ -4,6 +4,8 @@
 
 Teebot Flow is now open for public collaboration. The project is released under **AGPL-3.0**, and contributions, issue reports, and pull requests are welcome.
 
+This repository and its full commit history are covered by **AGPL-3.0**. That means the entire project, including all existing commits and any future contributions, is intended to remain under this license.
+
 ---
 
 ## 🤝 Open Source & Contribution
