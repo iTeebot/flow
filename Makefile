@@ -35,5 +35,5 @@ test:
 frontend-build:
 	@echo ""
 	@echo "--- [4/4] Installing Frontend Deps and Building ---"
-	pnpm install
+	pnpm install --frozen-lockfile
 	pnpm run build
