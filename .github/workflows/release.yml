@@ -82,12 +82,12 @@ jobs:
       matrix:
         include:
           # macOS Apple Silicon
-          - platform: 'macos-latest'
+          - platform: 'macos-14'
             target: 'aarch64-apple-darwin'
             args: '--target aarch64-apple-darwin'
 
           # macOS Intel
-          - platform: 'macos-latest'
+          - platform: 'macos-14'
             target: 'x86_64-apple-darwin'
             args: '--target x86_64-apple-darwin'
 
@@ -140,7 +140,7 @@ jobs:
         uses: ./.github/actions/install-dependencies
 
       - name: Build and Package Desktop App
-        uses: tauri-apps/tauri-action@v2
+        uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -197,8 +197,13 @@ jobs:
       - name: Install system dependencies (Linux)
         uses: ./.github/actions/install-dependencies
 
-      - name: Install snapcraft
-        run: sudo snap install snapcraft --classic
+      - name: Install snapcraft and LXD
+        run: |
+          sudo snap install snapcraft --classic
+          sudo snap install lxd
+          sudo lxd init --auto
+          sudo usermod -aG lxd "$USER"
+          newgrp lxd
 
       - name: Build Debian Package via Tauri
         run: pnpm tauri build --bundles deb
@@ -215,7 +220,7 @@ jobs:
           echo "Staged $DEB_FILE → build/teebot-flow.deb"
 
       - name: Build Snap from Debian Package
-        run: snapcraft --destructive-mode
+        run: snapcraft pack --use-lxd
 
       - name: Upload Snap to GitHub Release
         env:
@@ -235,7 +240,7 @@ jobs:
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         run: |
-          # snapcraft --destructive-mode produces the .snap in the project root
+          # snapcraft pack --use-lxd produces the .snap in the project root
           SNAP_FILE=$(find . -maxdepth 1 -name "*.snap" | head -1)
           if [ -z "$SNAP_FILE" ]; then
             echo "Error: no .snap file found after build"
