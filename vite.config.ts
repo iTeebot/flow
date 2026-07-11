@@ -40,27 +40,28 @@ export default defineConfig(({ mode }) => {
   
   // Detect if building for Tauri desktop
   const isTauri = process.env.TAURI_ENV_PLATFORM || env.IS_TAURI === 'true' || mode === 'tauri';
+  const shouldObfuscate = isProduction && isTauri;
   const host = process.env.TAURI_DEV_HOST || env.TAURI_DEV_HOST;
 
   return {
     plugins: [
       react(),
       tailwindcss(),
-      isProduction ? obfuscateChunksPlugin({
+      shouldObfuscate ? obfuscateChunksPlugin({
         compact: true,
         controlFlowFlattening: true,
         controlFlowFlatteningThreshold: 0.75,
         deadCodeInjection: true,
         deadCodeInjectionThreshold: 0.4,
-        debugProtection: true,
+        debugProtection: false,
         debugProtectionInterval: 4000,
         disableConsoleOutput: true,
         identifierNamesGenerator: 'hexadecimal',
         log: false,
         numbersToExpressions: true,
         renameGlobals: false,
-        selfDefending: true,
-        splitStrings: true,
+        selfDefending: false,
+        splitStrings: false,
         splitStringsChunkLength: 10,
         stringArray: true,
         stringArrayCallsTransform: true,
@@ -121,25 +122,37 @@ export default defineConfig(({ mode }) => {
           main: resolve(__dirname, 'index.html'),
         },
         output: {
-          manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('zustand') || id.includes('router') || id.includes('scheduler')) {
-                return 'vendor-core';
-              }
-              if (id.includes('recharts') || id.includes('lucide') || id.includes('d3')) {
-                return 'vendor-ui';
-              }
-              if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('purify') || id.includes('fflate')) {
-                return 'vendor-lib';
-              }
-              return 'vendor-misc';
-            }
+          manualChunks(id: string) {
+            // Split large app routes into smaller chunks for more reliable web loading.
             if (id.includes('/src/modules/')) {
-              const moduleName = id.split('/src/modules/')[1].split('/')[0];
-              return `module-${moduleName.toLowerCase()}`;
+              const modulePath = id.split('/src/modules/')[1] || '';
+              if (modulePath.startsWith('deliveryChallan/')) {
+                return 'delivery-challan';
+              }
+              if (modulePath.startsWith('invoices/')) {
+                return 'invoices';
+              }
+              if (modulePath.startsWith('quotations/')) {
+                return 'quotations';
+              }
+              if (modulePath.startsWith('settings/')) {
+                return 'settings';
+              }
+              if (modulePath.startsWith('dashboard/')) {
+                return 'dashboard';
+              }
             }
-          }
-        }
+
+            // Pin self-contained PDF libs into a dedicated chunk so they are
+            // not invalidated by app changes. recharts/d3 share internal
+            // sub-packages across the graph, so they are left to Rollup's
+            // default splitting to avoid circular-chunk warnings.
+            if (id.includes('node_modules/jspdf') ||
+                id.includes('node_modules/html2canvas')) {
+              return 'vendor-pdf';
+            }
+          },
+        },
       },
       chunkSizeWarningLimit: 2000
     },

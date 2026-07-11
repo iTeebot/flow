@@ -10,15 +10,20 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
-
-
 jobs:
+  # ---------------------------------------------------------------------------
+  # Web – Vercel production deploy
+  # ---------------------------------------------------------------------------
   deploy-web-release:
     name: Deploy Release Web App to Vercel
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -63,30 +68,44 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+  # ---------------------------------------------------------------------------
+  # Desktop – Windows, macOS, Linux (AppImage / deb / rpm)
+  # tauri.conf.json has targets:"all" so every platform gets its native formats.
+  # ---------------------------------------------------------------------------
   release-desktop:
-    name: Build Desktop Release
+    name: Build Desktop Release (${{ matrix.target }})
+    runs-on: ${{ matrix.platform }}
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            target: 'x86_64-apple-darwin'
-            args: '--target x86_64-apple-darwin'
+          # macOS Apple Silicon
           - platform: 'macos-latest'
             target: 'aarch64-apple-darwin'
             args: '--target aarch64-apple-darwin'
+
+          # macOS Intel
+          - platform: 'macos-latest'
+            target: 'x86_64-apple-darwin'
+            args: '--target x86_64-apple-darwin'
+
+          # Linux – AppImage, deb, rpm (all via targets:"all" in tauri.conf.json)
           - platform: 'ubuntu-22.04'
             target: 'x86_64-unknown-linux-gnu'
             args: ''
+
+          # Windows – NSIS installer (nsis config in tauri.conf.json)
           - platform: 'windows-latest'
             target: 'x86_64-pc-windows-msvc'
             args: ''
-    runs-on: ${{ matrix.platform }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -131,3 +150,97 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  # ---------------------------------------------------------------------------
+  # Linux Snap – separate job because snapcraft needs its own environment.
+  # Ubuntu 22.04 runners ship snapd but the snap daemon is not socket-active
+  # in the CI sandbox; snapcraft uses its own LXD / multipass build backend
+  # which is why this runs on ubuntu-22.04 with snapcraft installed manually.
+  # ---------------------------------------------------------------------------
+  release-linux-snap:
+    name: Build Desktop Release (Linux snap)
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Update Version Code
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: GITHUB_REF_NAME '$GITHUB_REF_NAME' is not a stable vMAJOR.MINOR.PATCH tag. Skipping snap release."
+            exit 1
+          fi
+          VERSION=${GITHUB_REF_NAME#v}
+          node scripts/update-version.cjs "$VERSION"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+
+      - name: Install system dependencies (Linux)
+        uses: ./.github/actions/install-dependencies
+
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+
+      - name: Build Debian Package via Tauri
+        run: pnpm tauri build --bundles deb
+
+      - name: Stage deb for Snapcraft
+        run: |
+          mkdir -p build
+          DEB_FILE=$(find src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
+          if [ -z "$DEB_FILE" ]; then
+            echo "Error: no .deb file found after tauri build"
+            exit 1
+          fi
+          cp "$DEB_FILE" build/teebot-flow.deb
+          echo "Staged $DEB_FILE → build/teebot-flow.deb"
+
+      - name: Build Snap from Debian Package
+        run: snapcraft --destructive-mode
+
+      - name: Upload Snap to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          SNAP_FILE=$(find . -maxdepth 1 -name "*.snap" | head -1)
+          if [ -z "$SNAP_FILE" ]; then
+            echo "Warning: no .snap file found, skipping GitHub Release upload"
+            exit 0
+          fi
+          echo "Uploading $SNAP_FILE to GitHub Release $RELEASE_TAG..."
+          gh release upload "$RELEASE_TAG" "$SNAP_FILE" --clobber || \
+            echo "Release may not exist yet (created by desktop job). Snap will be uploaded by Snap Store step."
+
+      - name: Publish Snap to Snap Store
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          # snapcraft --destructive-mode produces the .snap in the project root
+          SNAP_FILE=$(find . -maxdepth 1 -name "*.snap" | head -1)
+          if [ -z "$SNAP_FILE" ]; then
+            echo "Error: no .snap file found after build"
+            exit 1
+          fi
+          echo "Uploading $SNAP_FILE to Snap Store (stable channel)..."
+          snapcraft upload "$SNAP_FILE" --release=stable
+

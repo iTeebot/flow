@@ -24,7 +24,10 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https: data:; connect-src 'self' https://api.afmsolution.tech ipc: tauri: http://tauri.localhost; font-src 'self' data:;",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$TEMP/*", "$APPDATA/*"]
+        "scope": [
+          "$TEMP/*",
+          "$APPDATA/*"
+        ]
       }
     }
   },
@@ -33,7 +36,9 @@
     "targets": "all",
     "fileAssociations": [
       {
-        "ext": ["tbf"],
+        "ext": [
+          "tbf"
+        ],
         "name": "Teebot Flow Backup",
         "description": "Backup file for Teebot Flow workspace",
         "role": "Editor"
