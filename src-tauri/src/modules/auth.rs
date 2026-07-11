@@ -341,7 +341,9 @@ pub fn restore_database(
             )
             .map_err(|e| format!("Database schema query failed: {e}"))?;
         if schema_check < 2 {
-            return Err("Database is missing required tables (users/company_profiles).".to_string());
+            return Err(
+                "Database is missing required tables (users/company_profiles).".to_string(),
+            );
         }
 
         Ok(())
@@ -352,11 +354,10 @@ pub fn restore_database(
         return Err(err);
     }
 
-    fs::rename(&temp_db_path, &target_path)
-        .map_err(|e| {
-            let _ = fs::remove_file(&temp_db_path);
-            format!("Failed to replace live database: {e}")
-        })?;
+    fs::rename(&temp_db_path, &target_path).map_err(|e| {
+        let _ = fs::remove_file(&temp_db_path);
+        format!("Failed to replace live database: {e}")
+    })?;
 
     Ok(())
 }
