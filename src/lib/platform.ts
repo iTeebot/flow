@@ -135,6 +135,35 @@ export const getReleaseDownloads = (version: string) => ({
   ],
 });
 
+const detectLinuxDistro = (): "debian" | "redhat" | "generic" => {
+  if (typeof window === "undefined") return "generic";
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  
+  if (
+    userAgent.includes("ubuntu") ||
+    userAgent.includes("debian") ||
+    userAgent.includes("mint") ||
+    userAgent.includes("pop!_os") ||
+    userAgent.includes("elementary")
+  ) {
+    return "debian";
+  }
+  
+  if (
+    userAgent.includes("fedora") ||
+    userAgent.includes("red hat") ||
+    userAgent.includes("redhat") ||
+    userAgent.includes("centos") ||
+    userAgent.includes("suse") ||
+    userAgent.includes("rocky") ||
+    userAgent.includes("alma")
+  ) {
+    return "redhat";
+  }
+  
+  return "generic";
+};
+
 export const getBestDownloadForOS = (os: string, version: string) => {
   const tagUrl = `${GITHUB_RELEASES_URL}/tag/v${version}`;
   switch (os) {
@@ -161,11 +190,19 @@ export const getBestDownloadForOS = (os: string, version: string) => {
         url: tagUrl,
       };
     }
-    case "Linux":
+    case "Linux": {
+      const distro = detectLinuxDistro();
+      if (distro === "redhat") {
+        return {
+          label: "Download for Linux (.rpm)",
+          url: getDownloadLink(version, ASSET_NAMES.linux.rpm(version)),
+        };
+      }
       return {
         label: "Download for Linux (.deb)",
         url: getDownloadLink(version, ASSET_NAMES.linux.deb(version)),
       };
+    }
     default:
       return {
         label: "View All Downloads",
