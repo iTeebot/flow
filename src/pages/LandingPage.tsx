@@ -166,20 +166,39 @@ export function LandingPage() {
                 <div className="mb-4">{platform.icon}</div>
                 <h4 className="text-2xl font-bold mb-4">{platform.os}</h4>
                 <div className="space-y-2">
-                  {platform.downloads.map((dl) => (
-                    <a
-                      key={dl.name}
-                      href={dl.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block p-3 rounded-lg bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 transition"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm text-text-primary">{dl.name}</span>
-                        <Download className="w-4 h-4 text-primary" />
-                      </div>
-                    </a>
-                  ))}
+                  {platform.downloads.map((dl) => {
+                    if (dl.name === "Snap Store") {
+                      return (
+                        <a
+                          key={dl.name}
+                          href={dl.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block mt-2 hover:opacity-90 transition-opacity"
+                        >
+                          <img
+                            alt="Get it from the Snap Store"
+                            src="https://snapcraft.io/en/dark/install.svg"
+                            className="h-10 w-auto"
+                          />
+                        </a>
+                      );
+                    }
+                    return (
+                      <a
+                        key={dl.name}
+                        href={dl.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-3 rounded-lg bg-surface border border-border hover:border-primary/50 hover:bg-primary/5 transition"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm text-text-primary">{dl.name}</span>
+                          <Download className="w-4 h-4 text-primary" />
+                        </div>
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             ))}
