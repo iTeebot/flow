@@ -35,5 +35,4 @@ apps:
 parts:
   teebot-flow:
     plugin: dump
-    source: build/teebot-flow.deb
-    source-type: deb
+    source: build/extracted

@@ -211,14 +211,29 @@ jobs:
 
       - name: Stage deb for Snapcraft
         run: |
-          mkdir -p build
+          mkdir -p build/extracted
           DEB_FILE=$(find src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
           if [ -z "$DEB_FILE" ]; then
             echo "Error: no .deb file found after tauri build"
             exit 1
           fi
-          cp "$DEB_FILE" build/teebot-flow.deb
-          echo "Staged $DEB_FILE → build/teebot-flow.deb"
+          echo "Found deb: $DEB_FILE"
+          echo "=== Deb contents ==="
+          dpkg -c "$DEB_FILE"
+          # Extract into build/extracted (snapcraft.yaml sources from here)
+          dpkg -x "$DEB_FILE" build/extracted
+          # Normalize the desktop file to the name snapcraft.yaml expects,
+          # regardless of how Tauri named it (e.g. "Teebot Flow.desktop").
+          DESKTOP=$(find build/extracted/usr/share/applications -name "*.desktop" 2>/dev/null | head -1)
+          if [ -z "$DESKTOP" ]; then
+            echo "Error: no .desktop file found inside deb"
+            exit 1
+          fi
+          echo "Found desktop: $DESKTOP"
+          if [ "$DESKTOP" != "build/extracted/usr/share/applications/teebot-flow.desktop" ]; then
+            mv "$DESKTOP" build/extracted/usr/share/applications/teebot-flow.desktop
+            echo "Renamed → build/extracted/usr/share/applications/teebot-flow.desktop"
+          fi
 
       - name: Build Snap from Debian Package
         run: sg lxd -c "snapcraft pack --use-lxd"
