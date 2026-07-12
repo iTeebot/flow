@@ -45,7 +45,7 @@ const ASSET_NAMES = {
   linux: {
     appImage: (version: string) => `Teebot Flow_${version}_amd64.AppImage`,
     deb: (version: string) => `Teebot Flow_${version}_amd64.deb`,
-    rpm: (version: string) => `Teebot.Flow-${version}-1.x86_64.rpm`,
+    rpm: (version: string) => `teebot-flow-${version}-1.x86_64.rpm`,
   },
   macOS: {
     aarch64: (version: string) => `Teebot.Flow_${version}_aarch64.dmg`,
@@ -53,10 +53,34 @@ const ASSET_NAMES = {
   },
 };
 
+// Cache the computed Mac architecture for the duration of the browser session
+let cachedMacArch: "aarch64" | "x64" | null | undefined = undefined;
+
 const getMacArch = (): "aarch64" | "x64" | null => {
-  if (typeof window === "undefined") return null;
-  
-  // 1. Try WebGL detection first (highly accurate for Apple Silicon GPUs, bypassing masked user-agent strings)
+  if (cachedMacArch !== undefined) {
+    return cachedMacArch;
+  }
+
+  if (typeof window === "undefined") {
+    cachedMacArch = null;
+    return null;
+  }
+
+  const userAgent = window.navigator.userAgent.toLowerCase();
+
+  // 1. Check for explicit, trustworthy architecture signals in the User Agent.
+  // We do NOT check for generic/spoofed/reduced "intel" or "mac os x" UA strings.
+  if (userAgent.includes("arm64") || userAgent.includes("aarch64")) {
+    cachedMacArch = "aarch64";
+    return "aarch64";
+  }
+  if (userAgent.includes("x86_64") || userAgent.includes("amd64") || userAgent.includes("x64")) {
+    cachedMacArch = "x64";
+    return "x64";
+  }
+
+  // 2. Perform WebGL check to detect potential GPU/vendor masking or generic software rendering.
+  // We fail closed: we do NOT infer CPU architecture from generic GPU/vendor names or generic Intel strings.
   try {
     const canvas = document.createElement("canvas");
     const gl = (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
@@ -64,14 +88,25 @@ const getMacArch = (): "aarch64" | "x64" | null => {
       const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
       if (debugInfo) {
         const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).toLowerCase();
-        if (
-          renderer.includes("apple") ||
-          renderer.includes("m1") ||
-          renderer.includes("m2") ||
-          renderer.includes("m3") ||
-          renderer.includes("m4")
-        ) {
-          return "aarch64";
+        
+        // Detect masked, generic, or software renderers
+        const isMaskedOrGeneric =
+          !renderer ||
+          renderer.includes("swiftshader") ||
+          renderer.includes("software") ||
+          renderer.includes("generic") ||
+          renderer.includes("angle") ||
+          renderer.includes("unmasked") ||
+          renderer.includes("stub") ||
+          renderer.includes("null") ||
+          renderer.includes("google") ||
+          renderer.includes("mozilla") ||
+          renderer.includes("webkit");
+
+        if (isMaskedOrGeneric) {
+          // Fail closed when WebGL renderer details are masked or generic
+          cachedMacArch = null;
+          return null;
         }
       }
     }
@@ -79,15 +114,8 @@ const getMacArch = (): "aarch64" | "x64" | null => {
     // Proceed to fallback
   }
 
-  // 2. Fallback to User Agent checks
-  const userAgent = window.navigator.userAgent.toLowerCase();
-  if (userAgent.includes("arm64") || userAgent.includes("aarch64")) {
-    return "aarch64";
-  }
-  if (userAgent.includes("intel") || userAgent.includes("x64") || userAgent.includes("x86_64")) {
-    return "x64";
-  }
-  
+  // If no explicit, trustworthy architecture signal is found, fail closed and return null
+  cachedMacArch = null;
   return null;
 };
 
