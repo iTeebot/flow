@@ -68,7 +68,7 @@ const getMacArch = (): "aarch64" | "x64" | null => {
 
   const userAgent = window.navigator.userAgent.toLowerCase();
 
-  // 1. Check for explicit, trustworthy architecture signals in the User Agent.
+  // Check for explicit, trustworthy architecture signals in the User Agent.
   // We do NOT check for generic/spoofed/reduced "intel" or "mac os x" UA strings.
   if (userAgent.includes("arm64") || userAgent.includes("aarch64")) {
     cachedMacArch = "aarch64";
@@ -77,41 +77,6 @@ const getMacArch = (): "aarch64" | "x64" | null => {
   if (userAgent.includes("x86_64") || userAgent.includes("amd64") || userAgent.includes("x64")) {
     cachedMacArch = "x64";
     return "x64";
-  }
-
-  // 2. Perform WebGL check to detect potential GPU/vendor masking or generic software rendering.
-  // We fail closed: we do NOT infer CPU architecture from generic GPU/vendor names or generic Intel strings.
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
-    if (gl) {
-      const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
-      if (debugInfo) {
-        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).toLowerCase();
-        
-        // Detect masked, generic, or software renderers
-        const isMaskedOrGeneric =
-          !renderer ||
-          renderer.includes("swiftshader") ||
-          renderer.includes("software") ||
-          renderer.includes("generic") ||
-          renderer.includes("angle") ||
-          renderer.includes("unmasked") ||
-          renderer.includes("stub") ||
-          renderer.includes("null") ||
-          renderer.includes("google") ||
-          renderer.includes("mozilla") ||
-          renderer.includes("webkit");
-
-        if (isMaskedOrGeneric) {
-          // Fail closed when WebGL renderer details are masked or generic
-          cachedMacArch = null;
-          return null;
-        }
-      }
-    }
-  } catch (e) {
-    // Proceed to fallback
   }
 
   // If no explicit, trustworthy architecture signal is found, fail closed and return null
@@ -226,9 +191,16 @@ export const getBestDownloadForOS = (os: string, version: string) => {
           url: getDownloadLink(version, ASSET_NAMES.linux.rpm(version)),
         };
       }
+      if (distro === "debian") {
+        return {
+          label: "Download for Linux (.deb)",
+          url: getDownloadLink(version, ASSET_NAMES.linux.deb(version)),
+        };
+      }
+      // Safe generic Linux fallback (AppImage) that does not assume a package format
       return {
-        label: "Download for Linux (.deb)",
-        url: getDownloadLink(version, ASSET_NAMES.linux.deb(version)),
+        label: "Download for Linux (AppImage)",
+        url: getDownloadLink(version, ASSET_NAMES.linux.appImage(version)),
       };
     }
     default:
