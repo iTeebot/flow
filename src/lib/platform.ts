@@ -39,16 +39,16 @@ export const getDownloadLink = (version: string, filename: string) => {
 
 const ASSET_NAMES = {
   windows: {
-    exe: (version: string) => `Teebot-Flow_${version}_x64-setup.exe`,
-    msi: (version: string) => `Teebot-Flow_${version}_x64_en-US.msi`,
+    exe: (version: string) => `Teebot.Flow_${version}_x64-setup.exe`,
+    msi: (version: string) => `Teebot.Flow_${version}_x64_en-US.msi`,
   },
   linux: {
-    appImage: (version: string) => `teebot-flow_${version}_amd64.AppImage`,
-    deb: (version: string) => `teebot-flow_${version}_amd64.deb`,
+    appImage: (version: string) => `Teebot Flow_${version}_amd64.AppImage`,
+    deb: (version: string) => `Teebot Flow_${version}_amd64.deb`,
   },
   macOS: {
-    aarch64: (version: string) => `Teebot-Flow_${version}_aarch64.dmg`,
-    x64: (version: string) => `Teebot-Flow_${version}_x64.dmg`,
+    aarch64: (version: string) => `Teebot.Flow_${version}_aarch64.dmg`,
+    x64: (version: string) => `Teebot.Flow_${version}_x64.dmg`,
   },
 };
 
