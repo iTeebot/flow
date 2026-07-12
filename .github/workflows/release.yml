@@ -147,7 +147,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Teebot Flow v__VERSION__'
           releaseBody: 'Release v__VERSION__ of Teebot Flow.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
 
@@ -197,12 +197,11 @@ jobs:
       - name: Install system dependencies (Linux)
         uses: ./.github/actions/install-dependencies
 
-      - name: Install snapcraft and LXD
-        run: |
-          sudo snap install snapcraft --classic
-          sudo snap install lxd
-          sudo lxd init --auto
-          sudo usermod -aG lxd "$USER"
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+
+      - name: Setup LXD
+        uses: canonical/setup-lxd@v1
 
       - name: Build Debian Package via Tauri
         run: pnpm tauri build --bundles deb
