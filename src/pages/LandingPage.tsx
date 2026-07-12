@@ -174,12 +174,12 @@ export function LandingPage() {
                           href={dl.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-block mt-2 hover:opacity-90 transition-opacity"
+                          className="block w-full mt-2 hover:opacity-90 transition-opacity"
                         >
                           <img
                             alt="Get it from the Snap Store"
                             src="https://snapcraft.io/en/dark/install.svg"
-                            className="h-10 w-auto"
+                            className="w-full h-auto"
                           />
                         </a>
                       );

@@ -45,6 +45,7 @@ const ASSET_NAMES = {
   linux: {
     appImage: (version: string) => `Teebot Flow_${version}_amd64.AppImage`,
     deb: (version: string) => `Teebot Flow_${version}_amd64.deb`,
+    rpm: (version: string) => `Teebot.Flow-${version}-1.x86_64.rpm`,
   },
   macOS: {
     aarch64: (version: string) => `Teebot.Flow_${version}_aarch64.dmg`,
@@ -110,6 +111,10 @@ export const getReleaseDownloads = (version: string) => ({
     {
       name: "Debian Package (.deb)",
       url: getDownloadLink(version, ASSET_NAMES.linux.deb(version)),
+    },
+    {
+      name: "Red Hat Package (.rpm)",
+      url: getDownloadLink(version, ASSET_NAMES.linux.rpm(version)),
     },
     {
       name: "Snap Store",
