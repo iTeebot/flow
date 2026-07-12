@@ -55,15 +55,8 @@ const ASSET_NAMES = {
 
 const getMacArch = (): "aarch64" | "x64" | null => {
   if (typeof window === "undefined") return null;
-  const userAgent = window.navigator.userAgent.toLowerCase();
   
-  if (userAgent.includes("arm64") || userAgent.includes("aarch64")) {
-    return "aarch64";
-  }
-  if (userAgent.includes("intel") || userAgent.includes("x64") || userAgent.includes("x86_64")) {
-    return "x64";
-  }
-  
+  // 1. Try WebGL detection first (highly accurate for Apple Silicon GPUs, bypassing masked user-agent strings)
   try {
     const canvas = document.createElement("canvas");
     const gl = (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
@@ -83,7 +76,16 @@ const getMacArch = (): "aarch64" | "x64" | null => {
       }
     }
   } catch (e) {
-    // Ignore fallback
+    // Proceed to fallback
+  }
+
+  // 2. Fallback to User Agent checks
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  if (userAgent.includes("arm64") || userAgent.includes("aarch64")) {
+    return "aarch64";
+  }
+  if (userAgent.includes("intel") || userAgent.includes("x64") || userAgent.includes("x86_64")) {
+    return "x64";
   }
   
   return null;
