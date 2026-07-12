@@ -1,5 +1,9 @@
 # 🌊 Teebot Flow
 
+[![teebot-flow](https://snapcraft.io/teebot-flow/badge.svg)](https://snapcraft.io/teebot-flow)
+
+🌐 **Web Version**: [flow.iteebot.com](https://flow.iteebot.com)
+
 **Teebot Flow** is a high-performance, professional Desktop ERP solution designed for modern business operations. Built with a focus on speed, reliability, and ease of use, it leverages the power of **Tauri** and **Rust** to provide a secure, offline-first desktop experience.
 
 Teebot Flow is now open for public collaboration. The project is released under **AGPL-3.0**, and contributions, issue reports, and pull requests are welcome.

@@ -45,6 +45,7 @@ const ASSET_NAMES = {
   linux: {
     appImage: (version: string) => `Teebot Flow_${version}_amd64.AppImage`,
     deb: (version: string) => `Teebot Flow_${version}_amd64.deb`,
+    rpm: (version: string) => `teebot-flow-${version}-1.x86_64.rpm`,
   },
   macOS: {
     aarch64: (version: string) => `Teebot.Flow_${version}_aarch64.dmg`,
@@ -52,39 +53,34 @@ const ASSET_NAMES = {
   },
 };
 
+// Cache the computed Mac architecture for the duration of the browser session
+let cachedMacArch: "aarch64" | "x64" | null | undefined = undefined;
+
 const getMacArch = (): "aarch64" | "x64" | null => {
-  if (typeof window === "undefined") return null;
+  if (cachedMacArch !== undefined) {
+    return cachedMacArch;
+  }
+
+  if (typeof window === "undefined") {
+    cachedMacArch = null;
+    return null;
+  }
+
   const userAgent = window.navigator.userAgent.toLowerCase();
-  
+
+  // Check for explicit, trustworthy architecture signals in the User Agent.
+  // We do NOT check for generic/spoofed/reduced "intel" or "mac os x" UA strings.
   if (userAgent.includes("arm64") || userAgent.includes("aarch64")) {
+    cachedMacArch = "aarch64";
     return "aarch64";
   }
-  if (userAgent.includes("intel") || userAgent.includes("x64") || userAgent.includes("x86_64")) {
+  if (userAgent.includes("x86_64") || userAgent.includes("amd64") || userAgent.includes("x64")) {
+    cachedMacArch = "x64";
     return "x64";
   }
-  
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
-    if (gl) {
-      const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
-      if (debugInfo) {
-        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).toLowerCase();
-        if (
-          renderer.includes("apple") ||
-          renderer.includes("m1") ||
-          renderer.includes("m2") ||
-          renderer.includes("m3") ||
-          renderer.includes("m4")
-        ) {
-          return "aarch64";
-        }
-      }
-    }
-  } catch (e) {
-    // Ignore fallback
-  }
-  
+
+  // If no explicit, trustworthy architecture signal is found, fail closed and return null
+  cachedMacArch = null;
   return null;
 };
 
@@ -112,6 +108,10 @@ export const getReleaseDownloads = (version: string) => ({
       url: getDownloadLink(version, ASSET_NAMES.linux.deb(version)),
     },
     {
+      name: "Red Hat Package (.rpm)",
+      url: getDownloadLink(version, ASSET_NAMES.linux.rpm(version)),
+    },
+    {
       name: "Snap Store",
       url: SNAP_STORE_URL,
     },
@@ -127,6 +127,35 @@ export const getReleaseDownloads = (version: string) => ({
     },
   ],
 });
+
+const detectLinuxDistro = (): "debian" | "redhat" | "generic" => {
+  if (typeof window === "undefined") return "generic";
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  
+  if (
+    userAgent.includes("ubuntu") ||
+    userAgent.includes("debian") ||
+    userAgent.includes("mint") ||
+    userAgent.includes("pop!_os") ||
+    userAgent.includes("elementary")
+  ) {
+    return "debian";
+  }
+  
+  if (
+    userAgent.includes("fedora") ||
+    userAgent.includes("red hat") ||
+    userAgent.includes("redhat") ||
+    userAgent.includes("centos") ||
+    userAgent.includes("suse") ||
+    userAgent.includes("rocky") ||
+    userAgent.includes("alma")
+  ) {
+    return "redhat";
+  }
+  
+  return "generic";
+};
 
 export const getBestDownloadForOS = (os: string, version: string) => {
   const tagUrl = `${GITHUB_RELEASES_URL}/tag/v${version}`;
@@ -154,11 +183,26 @@ export const getBestDownloadForOS = (os: string, version: string) => {
         url: tagUrl,
       };
     }
-    case "Linux":
+    case "Linux": {
+      const distro = detectLinuxDistro();
+      if (distro === "redhat") {
+        return {
+          label: "Download for Linux (.rpm)",
+          url: getDownloadLink(version, ASSET_NAMES.linux.rpm(version)),
+        };
+      }
+      if (distro === "debian") {
+        return {
+          label: "Download for Linux (.deb)",
+          url: getDownloadLink(version, ASSET_NAMES.linux.deb(version)),
+        };
+      }
+      // Safe generic Linux fallback (AppImage) that does not assume a package format
       return {
-        label: "Download for Linux (.deb)",
-        url: getDownloadLink(version, ASSET_NAMES.linux.deb(version)),
+        label: "Download for Linux (AppImage)",
+        url: getDownloadLink(version, ASSET_NAMES.linux.appImage(version)),
       };
+    }
     default:
       return {
         label: "View All Downloads",
