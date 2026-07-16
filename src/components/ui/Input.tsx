@@ -21,6 +21,7 @@ export const Input: React.FC<InputProps> = ({
   value,
   onChange,
   onBlur,
+  onFocus,
   ...props
 }) => {
   const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
@@ -39,7 +40,12 @@ export const Input: React.FC<InputProps> = ({
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
   if (isNumber) setBuffer(null);             // done typing → show clean number
   onBlur?.(e);
-};
+  };
+  
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (isNumber) e.target.select();   // highlight the whole number
+    onFocus?.(e);                      // still call any parent onFocus
+  };
   return (
     <div className="w-full space-y-1.5">
       {label && (
@@ -63,6 +69,7 @@ export const Input: React.FC<InputProps> = ({
             value={displayValue}
             onChange={handleChange}
             onBlur={handleBlur}
+            onFocus={handleFocus}
           className={`
             w-full h-[46px] bg-background border rounded-xl py-3 ${isUrdu ? "text-xs" : "text-sm"} transition-all outline-none
             focus:ring-4

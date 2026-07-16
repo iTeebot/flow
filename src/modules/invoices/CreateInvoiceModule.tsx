@@ -507,18 +507,19 @@ export function CreateInvoiceModule() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <input 
+                        <input
                           type="number"
-                          value={item.quantity}
+                          value={item.quantity === 0 ? '' : item.quantity}
                           onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))}
+                          onBlur={() => { if (item.quantity < 1) updateItem(idx, 'quantity', 1); }}
                           className="w-full h-8 bg-surface border border-border rounded px-2 text-sm font-bold"
                         />
                         <div className="text-[9px] text-text-muted mt-1 truncate">{item.uom}</div>
                       </td>
                       <td className="px-4 py-4">
-                        <input 
+                        <input
                           type="number"
-                          value={item.unit_price}
+                          value={item.unit_price === 0 ? '' : item.unit_price}
                           onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))}
                           className="w-full h-8 bg-surface border border-border rounded px-2 text-sm font-bold"
                         />

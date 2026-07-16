@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { CreateProductModal } from "../../components/modals/CreateProductModal";
 import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
 import { useUiStore } from "../../store/uiStore";
+import { Input } from "../../components/ui/Input";
 
 type ChallanItem = {
   product_id: number;
@@ -41,7 +42,7 @@ export function CreateDeliveryChallanModule() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [challanItems, setChallanItems] = useState<ChallanItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(0);
   const [previewExpanded, setPreviewExpanded] = useState(false);
   
   const CUSTOM_FIELDS_KEY = 'teebot_challan_custom_fields';
@@ -167,7 +168,7 @@ export function CreateDeliveryChallanModule() {
       }]);
     }
     setSelectedProduct(null);
-    setQuantity(1);
+    setQuantity(0);
   };
 
   const handleUpdateItemQty = (productId: number, delta: number) => {
@@ -185,7 +186,7 @@ export function CreateDeliveryChallanModule() {
   };
 
   const handleSetItemQty = (productId: number, newQty: number) => {
-    if (isNaN(newQty) || newQty < 1) return;
+    if (isNaN(newQty) || newQty < 0) return;
     setChallanItems(items =>
       items.map(item => {
         if (item.product_id !== productId) return item;
@@ -419,7 +420,7 @@ export function CreateDeliveryChallanModule() {
               />
               {selectedProduct && (
                 <div className="mt-3 flex gap-2">
-                  <input
+                  <Input
                     type="number"
                     value={quantity}
                     onChange={(e) => setQuantity(Number(e.target.value))}
@@ -441,9 +442,10 @@ export function CreateDeliveryChallanModule() {
                     </div>
                     <div className="flex items-center gap-0 border border-border rounded-lg overflow-hidden bg-background">
                       <button onClick={() => handleUpdateItemQty(item.product_id, -1)} className="h-6 w-6 flex items-center justify-center border-r border-border hover:bg-surface"><Minus className="h-2.5 w-2.5" /></button>
-                      <input 
-                        value={item.quantity} 
+                      <input
+                        value={item.quantity === 0 ? '' : item.quantity}
                         onChange={e => handleSetItemQty(item.product_id, Number(e.target.value))}
+                        onBlur={() => { if (item.quantity < 1) handleSetItemQty(item.product_id, 1); }}
                         className="w-10 h-6 text-center text-[10px] font-black border-0 bg-transparent focus:ring-0"
                       />
                       <button onClick={() => handleUpdateItemQty(item.product_id, 1)} className="h-6 w-6 flex items-center justify-center border-l border-border hover:bg-surface"><Plus className="h-2.5 w-2.5" /></button>
