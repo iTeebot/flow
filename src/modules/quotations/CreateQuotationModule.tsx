@@ -307,10 +307,16 @@ export function CreateQuotationModule() {
                     <div className="flex items-center gap-4">
                       <div className="flex items-center border border-border rounded-lg overflow-hidden bg-surface/30">
                         <button onClick={() => handleUpdateItemQty(item.product_id!, -1)} className="h-7 w-7 flex items-center justify-center text-text-muted hover:bg-surface"><Minus className="h-2.5 w-2.5" /></button>
-                        <input type="number" value={item.quantity} onChange={(e) => {
+                        <input type="number" value={item.quantity === 0 ? '' : item.quantity} onChange={(e) => {
                           const newItems = [...quotationItems];
-                          newItems[idx].quantity = parseInt(e.target.value) || 1;
+                          newItems[idx].quantity = parseInt(e.target.value) || 0;
                           setQuotationItems(newItems);
+                        }} onBlur={() => {
+                          if (item.quantity < 1) {
+                            const newItems = [...quotationItems];
+                            newItems[idx].quantity = 1;
+                            setQuotationItems(newItems);
+                          }
                         }} className="w-12 text-center text-[11px] font-black tabular-nums bg-transparent outline-none" />
                         <button onClick={() => handleUpdateItemQty(item.product_id!, 1)} className="h-7 w-7 flex items-center justify-center text-text-muted hover:bg-surface"><Plus className="h-2.5 w-2.5" /></button>
                       </div>

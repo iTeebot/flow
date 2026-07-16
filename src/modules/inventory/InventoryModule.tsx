@@ -235,7 +235,7 @@ export function InventoryModule() {
                 <input
                   type="number"
                   required
-                  value={stockAdjustment.quantity_change}
+                  value={stockAdjustment.quantity_change === 0 ? "" : stockAdjustment.quantity_change}
                   onChange={(e) => setStockAdjustment({ ...stockAdjustment, quantity_change: parseInt(e.target.value) || 0 })}
                   placeholder={t("adjust_placeholder")}
                   className="w-full"

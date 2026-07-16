@@ -17,12 +17,35 @@ export const Input: React.FC<InputProps> = ({
   rightIcon,
   className = '',
   id,
+  type,
+  value,
+  onChange,
+  onBlur,
+  onFocus,
   ...props
 }) => {
   const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
   const { language } = useUiStore();
   const isUrdu = language === 'ur';
 
+  const isNumber = type === 'number';
+  const [buffer, setBuffer] = React.useState<string | null>(null);
+  const displayValue = isNumber ? (buffer ?? (value === 0 || value == null ? '' : String(value))) : value;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (isNumber) setBuffer(e.target.value);   // remember the literal text
+  onChange?.(e);                             // still call the parent's onChange
+  };  
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  if (isNumber) setBuffer(null);             // done typing → show clean number
+  onBlur?.(e);
+  };
+  
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (isNumber) e.target.select();   // highlight the whole number
+    onFocus?.(e);                      // still call any parent onFocus
+  };
   return (
     <div className="w-full space-y-1.5">
       {label && (
@@ -42,6 +65,11 @@ export const Input: React.FC<InputProps> = ({
         <div className="relative flex-1">
           <input
             id={inputId}
+            type= {type}
+            value={displayValue}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            onFocus={handleFocus}
           className={`
             w-full h-[46px] bg-background border rounded-xl py-3 ${isUrdu ? "text-xs" : "text-sm"} transition-all outline-none
             focus:ring-4
