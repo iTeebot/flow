@@ -17,6 +17,7 @@ import { CreateProductModal } from "../../components/modals/CreateProductModal";
 import { CreateCustomerModal } from "../../components/modals/CreateCustomerModal";
 import { useUiStore } from "../../store/uiStore";
 import { Input } from "../../components/ui/Input";
+import { NumberField } from "../../components/ui/NumberField";
 
 type ChallanItem = {
   product_id: number;
@@ -442,10 +443,10 @@ export function CreateDeliveryChallanModule() {
                     </div>
                     <div className="flex items-center gap-0 border border-border rounded-lg overflow-hidden bg-background">
                       <button onClick={() => handleUpdateItemQty(item.product_id, -1)} className="h-6 w-6 flex items-center justify-center border-r border-border hover:bg-surface"><Minus className="h-2.5 w-2.5" /></button>
-                      <input
-                        value={item.quantity === 0 ? '' : item.quantity}
-                        onChange={e => handleSetItemQty(item.product_id, Number(e.target.value))}
-                        onBlur={() => { if (item.quantity < 1) handleSetItemQty(item.product_id, 1); }}
+                      <NumberField
+                        value={item.quantity}
+                        onCommit={(n) => handleSetItemQty(item.product_id, n)}
+                        fallback={1}
                         className="w-10 h-6 text-center text-[10px] font-black border-0 bg-transparent focus:ring-0"
                       />
                       <button onClick={() => handleUpdateItemQty(item.product_id, 1)} className="h-6 w-6 flex items-center justify-center border-l border-border hover:bg-surface"><Plus className="h-2.5 w-2.5" /></button>

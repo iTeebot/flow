@@ -12,6 +12,7 @@ import { Input } from "../../components/ui/Input";
 import { ModulePage } from "../../components/ModulePage";
 import { DataTable } from "../../components/DataTable";
 import { useUiStore } from "../../store/uiStore";
+import { NumberField } from "../../components/ui/NumberField";
 
 export function InventoryModule() {
   const { t } = useTranslation("inventory");
@@ -232,11 +233,12 @@ export function InventoryModule() {
             <form onSubmit={handleStockAdjustment} className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-[10px] font-black uppercase text-text-muted mb-1 ml-1">{t("adjust_qty_change")}</label>
-                <input
+                <NumberField
                   type="number"
                   required
-                  value={stockAdjustment.quantity_change === 0 ? "" : stockAdjustment.quantity_change}
-                  onChange={(e) => setStockAdjustment({ ...stockAdjustment, quantity_change: parseInt(e.target.value) || 0 })}
+                  value={stockAdjustment.quantity_change}
+                  onCommit={(n) => setStockAdjustment({ ...stockAdjustment, quantity_change: Math.trunc(n)})}
+                  allowNegative
                   placeholder={t("adjust_placeholder")}
                   className="w-full"
                 />
