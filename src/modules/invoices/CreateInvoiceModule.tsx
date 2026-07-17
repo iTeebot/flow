@@ -19,6 +19,7 @@ import { Input } from "../../components/ui/Input";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { Select } from "../../components/ui/Select";
 import { formatCurrency } from "../../lib/utils";
+import { NumberField } from "../../components/ui/NumberField";
 
 const PROVINCES = ["Sindh", "Punjab", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad Capital Territory", "Gilgit-Baltistan", "Azad Kashmir"];
 const REGISTRATION_TYPES = ["Registered", "Unregistered"];
@@ -517,10 +518,10 @@ export function CreateInvoiceModule() {
                         <div className="text-[9px] text-text-muted mt-1 truncate">{item.uom}</div>
                       </td>
                       <td className="px-4 py-4">
-                        <input
+                        <NumberField
                           type="number"
-                          value={item.unit_price === 0 ? '' : item.unit_price}
-                          onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))}
+                          value={item.unit_price}
+                          onCommit={(n) => updateItem(idx, 'unit_price',n)}
                           className="w-full h-8 bg-surface border border-border rounded px-2 text-sm font-bold"
                         />
                       </td>
